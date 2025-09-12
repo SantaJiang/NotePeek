@@ -1,0 +1,14 @@
+[Desktop Entry]
+Type=Application
+Name=NotePeek
+Comment=A convenient and fast notebook for quick note-taking
+Comment[zh_CN]=方便快速记录的笔记本
+Icon=notepeek
+Exec=/opt/notepeek/bin/notepeek  %u
+StartupNotify=false
+MimeType=text/plain;application/x-python;
+Categories=Utility;Development;Editor;
+Terminal=false
+X-UKUI-AutoRestart=true
+X-UKUI-Autostart-Phase=Application
+
