@@ -1,0 +1,8 @@
+<RCC>
+    <qresource prefix="/">
+        <file>rescoure/SourceCodePro-Regular.ttf</file>
+        <file>rescoure/FiraCode-Regular.ttf</file>
+        <file>rescoure/notepeek.svg</file>
+        <file>rescoure/fontawesome-webfont.ttf</file>
+    </qresource>
+</RCC>

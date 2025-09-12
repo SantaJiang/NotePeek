@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Installer>
+    <Name>NotePeek</Name>
+    <Version>0.1.0</Version>
+    <Title>NotePeek</Title>
+    <Publisher>Santa</Publisher>
+    <!-- Directory name is used in component.xml -->
+    <StartMenuDir>NotePeek</StartMenuDir>
+	<WizardStyle>Modern</WizardStyle>
+    <TargetDir>@ApplicationsDirX64@/NotePeek</TargetDir>
+</Installer>
