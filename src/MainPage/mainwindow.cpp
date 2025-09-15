@@ -133,7 +133,7 @@ void MainWindow::createDirView()
     m_pTreeView->hideColumn(2);
     m_pTreeView->hideColumn(3);
 
-    connect(m_pTreeView, &QTreeView::clicked, this, &MainWindow::onFileClicked);
+    connect(m_pTreeView, &QTreeView::doubleClicked, this, &MainWindow::onFileClicked);
     QScroller::grabGesture(m_pTreeView, QScroller::TouchGesture);
 }
 

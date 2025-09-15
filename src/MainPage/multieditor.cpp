@@ -612,10 +612,34 @@ bool MultiEditor::eventFilter(QObject *obj, QEvent *event)
     if (event->type() == QEvent::KeyPress)
     {
         QKeyEvent *keyEvent = static_cast<QKeyEvent*>(event);
-        if (keyEvent->modifiers() == Qt::ControlModifier && keyEvent->key() == Qt::Key_Tab)
+
+        // 检测是否按下了Tab键..
+        if (keyEvent->key() == Qt::Key_Tab)
         {
-            showEditorSwitchPopup();
-            return true;
+            // 获取当前平台..
+            QString platform = QGuiApplication::platformName().toLower();
+
+            // 检查修饰键..
+            Qt::KeyboardModifiers modifiers = keyEvent->modifiers();
+
+            // macOS: 响应Option+Tab或Command+Tab..
+            if (platform.contains("cocoa") || platform.contains("macos"))
+            {
+                if ((modifiers & Qt::AltModifier) || (modifiers & Qt::MetaModifier))
+                {
+                    showEditorSwitchPopup();
+                    return true;
+                }
+            }
+            // Windows/Linux: 响应Ctrl+Tab..
+            else
+            {
+                if (modifiers & Qt::ControlModifier)
+                {
+                    showEditorSwitchPopup();
+                    return true;
+                }
+            }
         }
     }
 
