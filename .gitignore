@@ -9,6 +9,10 @@
 *.so.*
 *.dll
 *.dylib
+*.DS_Store
+*.plist
+*.idx
+*.stash
 
 # Qt-es
 object_script.*.Release

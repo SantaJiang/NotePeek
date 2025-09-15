@@ -14,17 +14,17 @@ EditorSwitchPopup::EditorSwitchPopup(QWidget *parent)
     m_listWidget->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     layout->addWidget(m_listWidget);
 
-    // 安装事件过滤器来捕获列表项的点击事件
+    // 安装事件过滤器来捕获列表项的点击事件..
     m_listWidget->installEventFilter(this);
 
-    // 连接项选择信号
+    // 连接项选择信号..
     connect(m_listWidget, &QListWidget::itemClicked, [this](QListWidgetItem *item)
     {
         emit itemSelected(m_listWidget->row(item));
         close();
     });
 
-    // 设置样式，使其看起来像组合框的下拉列表
+    // 设置样式，使其看起来像组合框的下拉列表..
     setStyleSheet("QListWidget { border: 1px solid #C0C0C0; background-color: white; }"
                   "QListWidget::item { padding: 2px; }"
                   "QListWidget::item:selected { background-color: #316AC5; color: white; }");
@@ -66,15 +66,9 @@ QString EditorSwitchPopup::currentText() const
 
 void EditorSwitchPopup::showPopup()
 {
-    // 计算显示位置（在父窗口中心）
-    QPoint pos = parentWidget()->mapToGlobal(parentWidget()->rect().center());
-    pos.rx() -= width() / 2;
-    pos.ry() -= height() / 2;
-    move(pos);
-
     setFocus();
     m_listWidget->setFocus();
-    m_ctrlPressed = true; // 初始状态为Ctrl按下
+    m_ctrlPressed = true; // 初始状态为Ctrl按下..
 
     if (m_listWidget->currentRow() < m_listWidget->count() - 1)
     {
@@ -102,7 +96,7 @@ void EditorSwitchPopup::keyPressEvent(QKeyEvent *event)
         switch (event->key())
         {
         case Qt::Key_Tab:
-            // 向下选择
+            // 向下选择..
             if (m_listWidget->currentRow() < m_listWidget->count() - 1)
             {
                 m_listWidget->setCurrentRow(m_listWidget->currentRow() + 1);
@@ -115,7 +109,7 @@ void EditorSwitchPopup::keyPressEvent(QKeyEvent *event)
             return;
 
         case Qt::Key_Backtab:
-            // 向上选择（Shift+Tab）
+            // 向上选择（Shift+Tab）..
             if (m_listWidget->currentRow() > 0)
             {
                 m_listWidget->setCurrentRow(m_listWidget->currentRow() - 1);
@@ -129,14 +123,14 @@ void EditorSwitchPopup::keyPressEvent(QKeyEvent *event)
 
         case Qt::Key_Enter:
         case Qt::Key_Return:
-            // 确认选择
+            // 确认选择..
             emit itemSelected(m_listWidget->currentRow());
             close();
             event->accept();
             return;
 
         case Qt::Key_Escape:
-            // 取消选择
+            // 取消选择..
             close();
             event->accept();
             return;
@@ -148,10 +142,10 @@ void EditorSwitchPopup::keyPressEvent(QKeyEvent *event)
 
 void EditorSwitchPopup::keyReleaseEvent(QKeyEvent *event)
 {
-    if (event->key() == Qt::Key_Control)
+    if (event->key() == Qt::Key_Control || event->key() == Qt::Key_Alt)
     {
         m_ctrlPressed = false;
-        // Ctrl键释放时，如果当前有选中项，则触发选择
+        // Ctrl键释放时，如果当前有选中项，则触发选择..
         if (m_listWidget->currentRow() >= 0)
         {
             emit itemSelected(m_listWidget->currentRow());
@@ -167,7 +161,7 @@ void EditorSwitchPopup::keyReleaseEvent(QKeyEvent *event)
 void EditorSwitchPopup::focusOutEvent(QFocusEvent *event)
 {
     Q_UNUSED(event)
-    // 失去焦点时关闭弹窗
+    // 失去焦点时关闭弹窗..
     emit popupClosed();
     close();
 }
