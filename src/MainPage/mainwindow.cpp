@@ -10,7 +10,7 @@
 #include <QMessageBox>
 #include <QCloseEvent>
 #include <QCoreApplication>
-#include "filesavedialog.h"
+#include "./editor/filesavedialog.h"
 #include "../QScintilla/Qsci/qsciscintilla.h"
 
 MainWindow::MainWindow(QWidget *parent)

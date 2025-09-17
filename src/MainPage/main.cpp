@@ -1,6 +1,7 @@
 #include "mainwindow.h"
 #include <QApplication>
 #include <QTranslator>
+#include <QDebug>
 
 int main(int argc, char *argv[])
 {
@@ -27,6 +28,12 @@ int main(int argc, char *argv[])
             a.installTranslator(&translator);
             break;
         }
+    }
+
+    int id = QFontDatabase::addApplicationFont("://rescoure/SourceCodePro-Regular.ttf");
+    if (id == -1)
+    {
+        qWarning() << "Failed to load font from resource";
     }
 
     MainWindow w;

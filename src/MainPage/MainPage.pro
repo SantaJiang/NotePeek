@@ -1,4 +1,4 @@
-QT += core gui printsupport
+QT += core gui printsupport svg
 greaterThan(QT_MAJOR_VERSION, 4): QT += widgets
 CONFIG += c++17
 
@@ -53,30 +53,30 @@ INCLUDEPATH += $$PWD/../QScintilla \
                $$PWD/../QScintilla/scintilla/include
 
 SOURCES += \
-    editormanager.cpp \
-    editorswitchpopup.cpp \
-    filesavedialog.cpp \
-    findreplacewidget.cpp \
-    lexerfactory.cpp \
+    ./editor/editormanager.cpp \
+    ./editor/lexerfactory.cpp \
+    ./editor/editorswitchpopup.cpp \
+    ./editor/multieditor.cpp \
+    ./editor/filesavedialog.cpp \
+    ./widgets/findreplacewidget.cpp \
+    ./widgets/qscieditorinfostatusbar.cpp \
     main.cpp \
-    mainwindow.cpp \
-    multieditor.cpp \
-    qscieditorinfostatusbar.cpp
+    mainwindow.cpp
 
 HEADERS += \
-    editormanager.h \
-    editorswitchpopup.h \
-    filesavedialog.h \
-    findreplacewidget.h \
-    lexerfactory.h \
-    mainwindow.h \
-    multieditor.h \
-    qscieditorinfostatusbar.h
+    ./editor/editormanager.h \
+    ./editor/lexerfactory.h \
+    ./editor/editorswitchpopup.h \
+    ./editor/multieditor.h \
+    ./editor/filesavedialog.h \
+    ./widgets/findreplacewidget.h \
+    ./widgets/qscieditorinfostatusbar.h \
+    mainwindow.h
 
 FORMS += \
-    findreplacewidget.ui \
+    ./widgets/findreplacewidget.ui \
     mainwindow.ui \
-    multieditor.ui
+    ./editor/multieditor.ui
 
 TRANSLATIONS = \
     $$PWD/../../i18n/notepeek_zh_CN.ts

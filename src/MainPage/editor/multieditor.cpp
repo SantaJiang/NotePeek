@@ -14,6 +14,7 @@ MultiEditor::MultiEditor(QWidget *parent, bool createDefault) : QWidget(parent),
     m_switchPopup(nullptr)  // 初始化弹出窗口指针
 {
     ui->setupUi(this);
+
     int fontId = QFontDatabase::addApplicationFont("://rescoure/fontawesome-webfont.ttf");
     QString fontName = QFontDatabase::applicationFontFamilies(fontId).at(0);
     QFont iconFont = QFont(fontName);

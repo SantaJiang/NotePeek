@@ -5,7 +5,7 @@
 #include <QFileSystemModel>
 #include <QTreeView>
 #include <QDockWidget>
-#include "multieditor.h"
+#include "./editor/multieditor.h"
 
 namespace Ui
 {
