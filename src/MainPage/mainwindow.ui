@@ -48,13 +48,13 @@
       <property name="minimumSize">
        <size>
         <width>0</width>
-        <height>100</height>
+        <height>94</height>
        </size>
       </property>
       <property name="maximumSize">
        <size>
         <width>16777215</width>
-        <height>100</height>
+        <height>94</height>
        </size>
       </property>
      </widget>
@@ -67,7 +67,7 @@
      <x>0</x>
      <y>0</y>
      <width>968</width>
-     <height>27</height>
+     <height>24</height>
     </rect>
    </property>
    <widget class="QMenu" name="menuFile">
@@ -244,18 +244,18 @@
   <customwidget>
    <class>QsciEditorInfoStatusBar</class>
    <extends>QStatusBar</extends>
-   <header>qscieditorinfostatusbar.h</header>
+   <header>./widgets/qscieditorinfostatusbar.h</header>
   </customwidget>
   <customwidget>
    <class>FindReplaceWidget</class>
    <extends>QWidget</extends>
-   <header>findreplacewidget.h</header>
+   <header>./widgets/findreplacewidget.h</header>
    <container>1</container>
   </customwidget>
   <customwidget>
    <class>MultiEditor</class>
    <extends>QWidget</extends>
-   <header>multieditor.h</header>
+   <header>./editor/multieditor.h</header>
    <container>1</container>
   </customwidget>
  </customwidgets>

@@ -217,17 +217,8 @@ void EditorManager::setEditorFont(QsciScintilla *editor)
 {
     if (!editor) return;
 
-    int id = QFontDatabase::addApplicationFont("://rescoure/SourceCodePro-Regular.ttf");
-    if (id == -1)
-    {
-        qWarning() << "Failed to load font from resource";
-    }
-    else
-    {
-        QString family = QFontDatabase::applicationFontFamilies(id).at(0);
-        QFont font(family, 11);
-        editor->setFont(font);
-    }
+    QFont font("Source Code Pro", 11);
+    editor->setFont(font);
 }
 
 void EditorManager::setMarginsFont(QsciScintilla *editor)

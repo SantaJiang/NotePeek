@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>920</width>
-    <height>97</height>
+    <height>94</height>
    </rect>
   </property>
   <property name="sizePolicy">
@@ -39,7 +39,7 @@
     <number>2</number>
    </property>
    <property name="sizeConstraint">
-    <enum>QLayout::SizeConstraint::SetNoConstraint</enum>
+    <enum>QLayout::SetDefaultConstraint</enum>
    </property>
    <property name="leftMargin">
     <number>0</number>
@@ -67,82 +67,43 @@
      <property name="verticalSpacing">
       <number>3</number>
      </property>
-     <item row="1" column="1">
-      <widget class="QComboBox" name="comboReplace">
+     <item row="1" column="2">
+      <widget class="QPushButton" name="buttonReplace">
        <property name="sizePolicy">
-        <sizepolicy hsizetype="MinimumExpanding" vsizetype="Fixed">
+        <sizepolicy hsizetype="Minimum" vsizetype="Minimum">
          <horstretch>0</horstretch>
          <verstretch>0</verstretch>
         </sizepolicy>
        </property>
-       <property name="editable">
-        <bool>true</bool>
-       </property>
-       <property name="maxCount">
-        <number>10</number>
-       </property>
-       <property name="insertPolicy">
-        <enum>QComboBox::InsertPolicy::NoInsert</enum>
-       </property>
-      </widget>
-     </item>
-     <item row="1" column="0">
-      <widget class="QLabel" name="labelReplaceWith">
-       <property name="enabled">
-        <bool>true</bool>
-       </property>
-       <property name="sizePolicy">
-        <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
-         <horstretch>0</horstretch>
-         <verstretch>0</verstretch>
-        </sizepolicy>
-       </property>
-       <property name="minimumSize">
-        <size>
-         <width>0</width>
-         <height>0</height>
-        </size>
-       </property>
-       <property name="maximumSize">
-        <size>
-         <width>16777215</width>
-         <height>16777215</height>
-        </size>
+       <property name="font">
+        <font>
+         <pointsize>9</pointsize>
+        </font>
        </property>
        <property name="text">
-        <string>Replace:</string>
+        <string>&amp;Replace</string>
        </property>
       </widget>
      </item>
-     <item row="0" column="0" alignment="Qt::AlignmentFlag::AlignVCenter">
-      <widget class="QLabel" name="label">
+     <item row="1" column="3">
+      <widget class="QPushButton" name="buttonReplaceAll">
        <property name="sizePolicy">
-        <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
+        <sizepolicy hsizetype="Minimum" vsizetype="Minimum">
          <horstretch>0</horstretch>
          <verstretch>0</verstretch>
         </sizepolicy>
        </property>
-       <property name="minimumSize">
-        <size>
-         <width>0</width>
-         <height>0</height>
-        </size>
-       </property>
-       <property name="maximumSize">
-        <size>
-         <width>16777215</width>
-         <height>16777215</height>
-        </size>
+       <property name="font">
+        <font>
+         <pointsize>9</pointsize>
+        </font>
        </property>
        <property name="text">
-        <string>&amp;Find:</string>
-       </property>
-       <property name="buddy">
-        <cstring>comboFind</cstring>
+        <string>Replace &amp;All</string>
        </property>
       </widget>
      </item>
-     <item row="0" column="1" alignment="Qt::AlignmentFlag::AlignVCenter">
+     <item row="0" column="1">
       <widget class="QComboBox" name="comboFind">
        <property name="sizePolicy">
         <sizepolicy hsizetype="MinimumExpanding" vsizetype="Fixed">
@@ -150,6 +111,11 @@
          <verstretch>0</verstretch>
         </sizepolicy>
        </property>
+       <property name="font">
+        <font>
+         <pointsize>9</pointsize>
+        </font>
+       </property>
        <property name="editable">
         <bool>true</bool>
        </property>
@@ -157,12 +123,23 @@
         <number>10</number>
        </property>
        <property name="insertPolicy">
-        <enum>QComboBox::InsertPolicy::NoInsert</enum>
+        <enum>QComboBox::NoInsert</enum>
        </property>
       </widget>
      </item>
-     <item row="0" column="2" alignment="Qt::AlignmentFlag::AlignVCenter">
+     <item row="0" column="2">
       <widget class="QPushButton" name="buttonFind">
+       <property name="sizePolicy">
+        <sizepolicy hsizetype="Minimum" vsizetype="Minimum">
+         <horstretch>0</horstretch>
+         <verstretch>0</verstretch>
+        </sizepolicy>
+       </property>
+       <property name="font">
+        <font>
+         <pointsize>9</pointsize>
+        </font>
+       </property>
        <property name="text">
         <string>Find</string>
        </property>
@@ -174,21 +151,101 @@
        </property>
       </widget>
      </item>
-     <item row="1" column="2">
-      <widget class="QPushButton" name="buttonReplace">
+     <item row="1" column="0">
+      <widget class="QLabel" name="labelReplaceWith">
+       <property name="enabled">
+        <bool>true</bool>
+       </property>
+       <property name="sizePolicy">
+        <sizepolicy hsizetype="Preferred" vsizetype="Minimum">
+         <horstretch>0</horstretch>
+         <verstretch>0</verstretch>
+        </sizepolicy>
+       </property>
+       <property name="minimumSize">
+        <size>
+         <width>0</width>
+         <height>0</height>
+        </size>
+       </property>
+       <property name="maximumSize">
+        <size>
+         <width>16777215</width>
+         <height>16777215</height>
+        </size>
+       </property>
+       <property name="font">
+        <font>
+         <pointsize>9</pointsize>
+         <weight>50</weight>
+         <bold>false</bold>
+        </font>
+       </property>
        <property name="text">
-        <string>&amp;Replace</string>
+        <string>Replace:</string>
        </property>
       </widget>
      </item>
-     <item row="1" column="3">
-      <widget class="QPushButton" name="buttonReplaceAll">
+     <item row="0" column="0">
+      <widget class="QLabel" name="label">
+       <property name="sizePolicy">
+        <sizepolicy hsizetype="Preferred" vsizetype="Minimum">
+         <horstretch>0</horstretch>
+         <verstretch>0</verstretch>
+        </sizepolicy>
+       </property>
+       <property name="minimumSize">
+        <size>
+         <width>0</width>
+         <height>0</height>
+        </size>
+       </property>
+       <property name="maximumSize">
+        <size>
+         <width>16777215</width>
+         <height>16777215</height>
+        </size>
+       </property>
+       <property name="font">
+        <font>
+         <pointsize>9</pointsize>
+         <weight>50</weight>
+         <bold>false</bold>
+        </font>
+       </property>
        <property name="text">
-        <string>Replace &amp;All</string>
+        <string>&amp;Find:</string>
+       </property>
+       <property name="buddy">
+        <cstring>comboFind</cstring>
        </property>
       </widget>
      </item>
-     <item row="0" column="3" alignment="Qt::AlignmentFlag::AlignRight">
+     <item row="1" column="1">
+      <widget class="QComboBox" name="comboReplace">
+       <property name="sizePolicy">
+        <sizepolicy hsizetype="MinimumExpanding" vsizetype="Fixed">
+         <horstretch>0</horstretch>
+         <verstretch>0</verstretch>
+        </sizepolicy>
+       </property>
+       <property name="font">
+        <font>
+         <pointsize>9</pointsize>
+        </font>
+       </property>
+       <property name="editable">
+        <bool>true</bool>
+       </property>
+       <property name="maxCount">
+        <number>10</number>
+       </property>
+       <property name="insertPolicy">
+        <enum>QComboBox::NoInsert</enum>
+       </property>
+      </widget>
+     </item>
+     <item row="0" column="3" alignment="Qt::AlignRight">
       <widget class="QToolButton" name="buttonClose">
        <property name="sizePolicy">
         <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
@@ -198,14 +255,14 @@
        </property>
        <property name="minimumSize">
         <size>
-         <width>30</width>
-         <height>30</height>
+         <width>27</width>
+         <height>27</height>
         </size>
        </property>
        <property name="maximumSize">
         <size>
-         <width>30</width>
-         <height>30</height>
+         <width>27</width>
+         <height>27</height>
         </size>
        </property>
        <property name="text">
@@ -228,6 +285,11 @@
      </property>
      <item>
       <widget class="QCheckBox" name="checkBoxWrapAround">
+       <property name="font">
+        <font>
+         <pointsize>9</pointsize>
+        </font>
+       </property>
        <property name="text">
         <string>Wra&amp;p Around</string>
        </property>
@@ -235,6 +297,11 @@
      </item>
      <item>
       <widget class="QCheckBox" name="checkBoxMatchCase">
+       <property name="font">
+        <font>
+         <pointsize>9</pointsize>
+        </font>
+       </property>
        <property name="text">
         <string>Match &amp;case</string>
        </property>
@@ -242,6 +309,11 @@
      </item>
      <item>
       <widget class="QCheckBox" name="checkBoxMatchWholeWord">
+       <property name="font">
+        <font>
+         <pointsize>9</pointsize>
+        </font>
+       </property>
        <property name="text">
         <string>Match &amp;whole word only</string>
        </property>
@@ -249,6 +321,11 @@
      </item>
      <item>
       <widget class="QCheckBox" name="checkBoxBackwardsDirection">
+       <property name="font">
+        <font>
+         <pointsize>9</pointsize>
+        </font>
+       </property>
        <property name="text">
         <string>Backward direction</string>
        </property>
@@ -257,7 +334,7 @@
      <item>
       <spacer name="horizontalSpacer">
        <property name="orientation">
-        <enum>Qt::Orientation::Horizontal</enum>
+        <enum>Qt::Horizontal</enum>
        </property>
        <property name="sizeHint" stdset="0">
         <size>
@@ -272,5 +349,22 @@
   </layout>
  </widget>
  <resources/>
- <connections/>
+ <connections>
+  <connection>
+   <sender>buttonClose</sender>
+   <signal>clicked()</signal>
+   <receiver>FindReplaceWidget</receiver>
+   <slot>close()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>848</x>
+     <y>15</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>459</x>
+     <y>48</y>
+    </hint>
+   </hints>
+  </connection>
+ </connections>
 </ui>

@@ -1,6 +1,6 @@
 ﻿#include "findreplacewidget.h"
 #include "ui_findreplacewidget.h"
-#include "multieditor.h"
+#include "../editor/multieditor.h"
 #include <QMessageBox>
 #include <QKeyEvent>
 #include <QLineEdit>
