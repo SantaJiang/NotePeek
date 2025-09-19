@@ -6,11 +6,15 @@ TEMPLATE = app
 TARGET = notepeek
 
 win32 {
-    CONFIG(release, debug|release): {
-        LIBS += -L$$PWD/../Bin/Release -lqscintilla2
-    } else: CONFIG(debug, debug|release): {
+    DEFINES += QSCINTILLA_DLL
+    DEFINES -= QSCINTILLA_MAKE_DLL
+
+    CONFIG(debug, debug|release) {
         LIBS += -L$$PWD/../Bin/Debug -lqscintilla2
+    } else {
+        LIBS += -L$$PWD/../Bin/Release -lqscintilla2
     }
+
     RC_FILE += app.rc
 }
 
