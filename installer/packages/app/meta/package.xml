@@ -3,7 +3,7 @@
     <DisplayName>NotePeek</DisplayName>
     <Description>NotePeek</Description>
     <Version>0.1.0</Version>
-    <ReleaseDate>2025-08-25</ReleaseDate>
+    <ReleaseDate>2025-09-25</ReleaseDate>
     <Default>true</Default>
     <Script>installscript.qs</Script>
 </Package>
