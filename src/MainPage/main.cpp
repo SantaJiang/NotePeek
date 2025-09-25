@@ -2,6 +2,7 @@
 #include <QApplication>
 #include <QTranslator>
 #include <QDebug>
+#include <QStyleFactory>
 
 int main(int argc, char *argv[])
 {
@@ -18,6 +19,17 @@ int main(int argc, char *argv[])
     QCoreApplication::setApplicationName("NotePeek");
     QCoreApplication::setApplicationVersion("0.1.0");
 
+    QStringList styles = QStyleFactory::keys();
+    qDebug() << "Available styles:" << styles;
+#ifdef Q_OS_WIN
+    a.setStyle(QStyleFactory::create("windowsvista"));
+#elif defined(Q_OS_MAC)
+    a.setStyle(QStyleFactory::create("Fusion"));
+#elif defined(Q_OS_LINUX)
+    a.setStyle(QStyleFactory::create("Fusion"));
+#else
+    qDebug() << "Running on unknown platform";
+#endif
     QTranslator translator;
     const QStringList uiLanguages = QLocale::system().uiLanguages();
     for(const QString &locale : uiLanguages)

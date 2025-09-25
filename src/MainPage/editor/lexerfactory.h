@@ -23,6 +23,7 @@ public:
         MARKDOWN,
         TEX,
         SHELL,
+        YAML,
         Unknown
     };
 

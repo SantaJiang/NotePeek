@@ -13,6 +13,7 @@
 #include "../QScintilla/Qsci/qscilexermarkdown.h"
 #include "../QScintilla/Qsci/qscilexertex.h"
 #include "../QScintilla/Qsci/qscilexerbash.h"
+#include "../QScintilla/Qsci/qscilexeryaml.h"
 
 QsciLexer* LexerFactory::createLexer(Language lang)
 {
@@ -46,6 +47,8 @@ QsciLexer* LexerFactory::createLexer(Language lang)
         return new QsciLexerTeX();
     case SHELL:
         return new QsciLexerBash();
+    case YAML:
+        return new QsciLexerYAML();
     default:
         return nullptr;
     }
@@ -72,7 +75,8 @@ LexerFactory::Language LexerFactory::languageFromExtension(const QString& ext)
         {"makefile", MAKEFILE},
         {"md", MARKDOWN},
         {"tex", TEX},
-        {"sh", SHELL}
+        {"sh", SHELL},
+        {"yaml", YAML}
     };
 
     QString lowerExt = ext.toLower();
