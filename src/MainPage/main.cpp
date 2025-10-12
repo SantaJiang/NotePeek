@@ -3,6 +3,32 @@
 #include <QTranslator>
 #include <QDebug>
 #include <QStyleFactory>
+#include <QStandardPaths>
+#include "savelog.h"
+
+QString getLogDirectory()
+{
+    QString logDir;
+
+#if defined(Q_OS_WIN)
+    // Windows: AppData/Roaming/AppName/log
+    logDir = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation) + "/log";
+
+#elif defined(Q_OS_MAC)
+    // macOS: ~/Library/Logs/AppName
+    logDir = QStandardPaths::writableLocation(QStandardPaths::HomeLocation) + "/Library/Log";
+
+#elif defined(Q_OS_LINUX)
+    // Linux: ~/.local/share/AppName/log
+    logDir = QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation) + "/log";
+
+#else
+    // 其他平台使用AppDataLocation
+    logDir = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation) + "/log";
+#endif
+
+    return logDir;
+}
 
 int main(int argc, char *argv[])
 {
@@ -18,6 +44,12 @@ int main(int argc, char *argv[])
     QApplication a(argc, argv);
     QCoreApplication::setApplicationName("NotePeek");
     QCoreApplication::setApplicationVersion("0.1.0");
+
+#ifdef QT_NO_DEBUG
+    SaveLog::Instance()->setUseContext(false);
+    SaveLog::Instance()->setPath(getLogDirectory());
+    //SaveLog::Instance()->start();
+#endif
 
     QStringList styles = QStyleFactory::keys();
     qDebug() << "Available styles:" << styles;

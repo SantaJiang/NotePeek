@@ -45,7 +45,6 @@ public:
     bool maybeSave(QsciScintilla *editor);
     bool saveFile(QsciScintilla *editor, const QString &filePath);
     void openFile(const QString &filePath);
-    void openFileByArg(const QString &filePath);
     void setCurrentFile(QsciScintilla *editor, const QString &filePath);
     void createDefaultDoc();
 

@@ -159,6 +159,7 @@ bool MultiEditor::saveFile(QsciScintilla *editor, const QString &filePath)
 
 void MultiEditor::openFile(const QString &filePath)
 {
+    qDebug()<<Q_FUNC_INFO<<filePath;
     // 检查是否有默认空白编辑器且未修改..
     if (m_defaultEditor && !m_defaultEditor->isModified() && m_defaultEditor->text().isEmpty())
     {
@@ -234,11 +235,6 @@ void MultiEditor::openFile(const QString &filePath)
 
     // 连接编辑器信号..
     connectEditorSignals(editor);
-}
-
-void MultiEditor::openFileByArg(const QString &filePath)
-{
-    openFile(filePath);
 }
 
 void MultiEditor::setCurrentFile(QsciScintilla *editor, const QString &filePath)

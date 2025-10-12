@@ -4,6 +4,7 @@
 #include <QFontDatabase>
 #include <QApplication>
 #include <QScreen>
+#include <QDir>
 #include "../QScintilla/Qsci/qscilexer.h"
 #include "../QScintilla/Qsci/qsciscintilla.h"
 #include "lexerfactory.h"
@@ -86,13 +87,23 @@ QsciScintilla *EditorManager::getEditorByFilePath(const QString &filePath)
     QFileInfo targetInfo(filePath);
     targetInfo.makeAbsolute();
 
+    // 规范化路径，统一分隔符和格式..
+    QString canonicalTargetPath = QDir::cleanPath(targetInfo.absoluteFilePath());
+
     purgeOldEditorPointers();
 
     for (QsciScintilla *editor : m_editors)
     {
-        if (editor && editor->property("filePath").toString() == targetInfo.filePath())
+        if (editor)
         {
-            return editor;
+            QString editorPath = editor->property("filePath").toString();
+            // 同样规范化编辑器中的路径..
+            QString canonicalEditorPath = QDir::cleanPath(QFileInfo(editorPath).absoluteFilePath());
+
+            if (canonicalEditorPath == canonicalTargetPath)
+            {
+                return editor;
+            }
         }
     }
     return nullptr;
