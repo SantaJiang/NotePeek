@@ -1,4 +1,4 @@
-QT += core gui printsupport svg
+QT += core gui printsupport svg network
 greaterThan(QT_MAJOR_VERSION, 4): QT += widgets
 CONFIG += c++17
 
@@ -65,7 +65,8 @@ SOURCES += \
     ./widgets/findreplacewidget.cpp \
     ./widgets/qscieditorinfostatusbar.cpp \
     main.cpp \
-    mainwindow.cpp
+    mainwindow.cpp \
+    savelog.cpp
 
 HEADERS += \
     ./editor/editormanager.h \
@@ -75,7 +76,8 @@ HEADERS += \
     ./editor/filesavedialog.h \
     ./widgets/findreplacewidget.h \
     ./widgets/qscieditorinfostatusbar.h \
-    mainwindow.h
+    mainwindow.h \
+    savelog.h
 
 FORMS += \
     ./widgets/findreplacewidget.ui \

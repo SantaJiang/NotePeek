@@ -82,7 +82,7 @@ MainWindow::~MainWindow()
 
 void MainWindow::openFileByArg(const QString &fileName)
 {
-    ui->multieditor->openFileByArg(fileName);
+    ui->multieditor->openFile(fileName);
 
     QFileInfo fileInfo(fileName);
     QString dirPath = fileInfo.absolutePath();
