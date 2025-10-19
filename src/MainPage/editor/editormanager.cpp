@@ -228,7 +228,7 @@ void EditorManager::setEditorFont(QsciScintilla *editor)
 {
     if (!editor) return;
 
-    QFont font("Source Code Pro", 11);
+    QFont font("Source Code Pro", 10);
     editor->setFont(font);
 }
 

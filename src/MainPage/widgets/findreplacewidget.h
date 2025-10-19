@@ -29,7 +29,6 @@ protected:
     void keyPressEvent(QKeyEvent *event) override;
     void hideEvent(QHideEvent *event) override;
 
-
 public slots:
     void find();
 
@@ -45,6 +44,7 @@ private:
 
     int m_highlightIndicator; // 用于高亮匹配项的指示器..
     QString m_initialFindText; // 记录初始查找文本..
+    int m_savedFirstVisibleLine;//保存打开查找窗口时的滚动位置..
 
     void clearHighlights();
     void selectFirstMatch();
