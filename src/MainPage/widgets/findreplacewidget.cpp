@@ -11,6 +11,7 @@ FindReplaceWidget::FindReplaceWidget(QWidget *parent)
     , ui(new Ui::FindReplaceWidget)
     , m_pEditor(nullptr)
     , m_highlightIndicator(8) // 使用一个不常用的指示器编号..
+    , m_savedFirstVisibleLine(0)
 {
     ui->setupUi(this);
     int fontId = QFontDatabase::addApplicationFont("://rescoure/fontawesome-webfont.ttf");
@@ -49,6 +50,9 @@ void FindReplaceWidget::showEvent(QShowEvent *event)
         QsciScintilla *editor = m_pEditor->currentEditor();
         if (editor)
         {
+            // 保存当前的滚动位置..
+            m_savedFirstVisibleLine = editor->firstVisibleLine();
+
             // 初始化高亮指示器 - 使用自定义样式..
             editor->indicatorDefine(QsciScintilla::FullBoxIndicator, m_highlightIndicator);
 
@@ -74,10 +78,17 @@ void FindReplaceWidget::showEvent(QShowEvent *event)
 
                 // 立即高亮所有匹配项..
                 highlightAllMatches();
+
+                // 恢复滚动位置 - 用户选中文本时不要改变滚动位置
+                editor->setFirstVisibleLine(m_savedFirstVisibleLine);
             }
             else
             {
+                // 添加到查找历史..
+                addToHistory(ui->comboFind, ui->comboFind->currentText());
+
                 m_initialFindText.clear();
+                ui->comboFind->lineEdit()->clear();
             }
         }
     }
@@ -214,7 +225,7 @@ void FindReplaceWidget::selectFirstMatch()
     bool wrap = ui->checkBoxWrapAround->isChecked();
     bool forward = !ui->checkBoxBackwardsDirection->isChecked();
 
-    // 查找第一个匹配项并选中它..
+    // 查找第一个匹配项并选中它 - 使用 QScintilla 默认行为
     editor->findFirst(searchText, re, cs, wo, wrap, forward);
 }
 
@@ -254,7 +265,7 @@ void FindReplaceWidget::find()
     bool wrap = ui->checkBoxWrapAround->isChecked();
     bool forward = !ui->checkBoxBackwardsDirection->isChecked();
 
-    // 执行查找..
+    // 执行查找 - 使用 QScintilla 默认行为
     editor->findFirst(ui->comboFind->currentText(), re, cs, wo, wrap, forward);
 }
 
@@ -277,12 +288,12 @@ void FindReplaceWidget::findNext()
         return;
     }
 
-    // 使用相同的选项继续查找下一个..
+    // 使用相同的选项继续查找下一个 - 使用 QScintilla 默认行为
     bool found = editor->findNext();
 
     if (!found && ui->checkBoxWrapAround->isChecked())
     {
-        // 如果启用了循环搜索，尝试从文档开头/结尾重新查找..
+        // 如果启用了循环搜索，尝试从文档开头/结尾重新查找 - 使用 QScintilla 默认行为
         bool forward = !ui->checkBoxBackwardsDirection->isChecked();
         int line = forward ? 0 : editor->lines() - 1;
         int index = forward ? 0 : editor->lineLength(line);
@@ -293,7 +304,7 @@ void FindReplaceWidget::findNext()
         bool wo = ui->checkBoxMatchWholeWord->isChecked();
         bool wrap = false; // 禁用循环以避免无限递归..
 
-        found = editor->findFirst(searchText, re, cs, wo, wrap, forward, line, index);
+        editor->findFirst(searchText, re, cs, wo, wrap, forward, line, index);
     }
 }
 
