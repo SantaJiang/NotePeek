@@ -36,14 +36,16 @@ int main(int argc, char *argv[])
     qputenv("QT_QPA_PLATFORM", "xcb");
 #endif
 
+    //high dpi
 #if QT_VERSION < QT_VERSION_CHECK(6,0,0)
     QApplication::setAttribute(Qt::AA_UseHighDpiPixmaps);
     QApplication::setAttribute(Qt::AA_EnableHighDpiScaling);
 #endif
 
     QApplication a(argc, argv);
+    QCoreApplication::setOrganizationName("NotePeek");
     QCoreApplication::setApplicationName("NotePeek");
-    QCoreApplication::setApplicationVersion("0.1.0");
+    QCoreApplication::setApplicationVersion(APP_VERSION);
 
 #ifdef QT_NO_DEBUG
     SaveLog::Instance()->setUseContext(false);
@@ -51,6 +53,7 @@ int main(int argc, char *argv[])
     //SaveLog::Instance()->start();
 #endif
 
+    //style
     QStringList styles = QStyleFactory::keys();
     qDebug() << "Available styles:" << styles;
 #ifdef Q_OS_WIN
@@ -62,6 +65,8 @@ int main(int argc, char *argv[])
 #else
     qDebug() << "Running on unknown platform";
 #endif
+
+    //translate
     QTranslator translator;
     const QStringList uiLanguages = QLocale::system().uiLanguages();
     for(const QString &locale : uiLanguages)
@@ -74,6 +79,7 @@ int main(int argc, char *argv[])
         }
     }
 
+    //font
     int id = QFontDatabase::addApplicationFont("://rescoure/SourceCodePro-Regular.ttf");
     if (id == -1)
     {
