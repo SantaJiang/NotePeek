@@ -62,6 +62,7 @@ SOURCES += \
     ./editor/filesavedialog.cpp \
     ./widgets/findreplacewidget.cpp \
     ./widgets/qscieditorinfostatusbar.cpp \
+    editor/customeditor.cpp \
     main.cpp \
     mainwindow.cpp \
     savelog.cpp
@@ -74,6 +75,7 @@ HEADERS += \
     ./editor/filesavedialog.h \
     ./widgets/findreplacewidget.h \
     ./widgets/qscieditorinfostatusbar.h \
+    editor/customeditor.h \
     mainwindow.h \
     savelog.h
 

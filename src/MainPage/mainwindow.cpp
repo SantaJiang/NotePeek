@@ -11,7 +11,7 @@
 #include <QCloseEvent>
 #include <QCoreApplication>
 #include "./editor/filesavedialog.h"
-#include "../QScintilla/Qsci/qsciscintilla.h"
+#include "./editor/customeditor.h"
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
@@ -19,6 +19,7 @@ MainWindow::MainWindow(QWidget *parent)
     , m_pFileModel(nullptr)
 {
     ui->setupUi(this);
+    setAcceptDrops(false);  // 主窗口不处理拖拽
 
     // 检查命令行参数..
     QStringList args = QCoreApplication::arguments();
@@ -50,7 +51,7 @@ MainWindow::MainWindow(QWidget *parent)
     ui->widget_findreplace->setVisible(false);
 
     // 连接MultiEditor的信号到MainWindow的槽..
-    connect(ui->multieditor, &MultiEditor::currentEditorChanged, this, [this](QsciScintilla *editor)
+    connect(ui->multieditor, &MultiEditor::currentEditorChanged, this, [this](CustomEditor *editor)
     {
         ui->statusbar->connectToEditor(editor);
         refreshHighlights();
@@ -58,6 +59,7 @@ MainWindow::MainWindow(QWidget *parent)
 
     connect(ui->multieditor, &MultiEditor::modificationChanged, this, &MainWindow::updateWindowTitle);
     connect(ui->multieditor, &MultiEditor::copyAvailable, this, &MainWindow::updateEditActions);
+    connect(ui->multieditor, &MultiEditor::filesDropped, this, &MainWindow::onFileDraged);
 
     // 连接编辑动作..
     connect(ui->action_cut, &QAction::triggered, this, &MainWindow::on_action_cut_triggered);
@@ -247,7 +249,7 @@ void MainWindow::on_action_showSlideBar_triggered(bool checked)
 
 void MainWindow::on_action_undo_triggered()
 {
-    QsciScintilla *editor = ui->multieditor->currentEditor();
+    CustomEditor *editor = ui->multieditor->currentEditor();
     if (editor)
     {
         editor->undo();
@@ -256,7 +258,7 @@ void MainWindow::on_action_undo_triggered()
 
 void MainWindow::on_action_redo_triggered()
 {
-    QsciScintilla *editor = ui->multieditor->currentEditor();
+    CustomEditor *editor = ui->multieditor->currentEditor();
     if (editor)
     {
         editor->redo();
@@ -265,7 +267,7 @@ void MainWindow::on_action_redo_triggered()
 
 void MainWindow::on_action_cut_triggered()
 {
-    QsciScintilla *editor = ui->multieditor->currentEditor();
+    CustomEditor *editor = ui->multieditor->currentEditor();
     if (editor)
     {
         editor->cut();
@@ -274,7 +276,7 @@ void MainWindow::on_action_cut_triggered()
 
 void MainWindow::on_action_copy_triggered()
 {
-    QsciScintilla *editor = ui->multieditor->currentEditor();
+    CustomEditor *editor = ui->multieditor->currentEditor();
     if (editor)
     {
         editor->copy();
@@ -283,7 +285,7 @@ void MainWindow::on_action_copy_triggered()
 
 void MainWindow::on_action_paste_triggered()
 {
-    QsciScintilla *editor = ui->multieditor->currentEditor();
+    CustomEditor *editor = ui->multieditor->currentEditor();
     if (editor)
     {
         editor->paste();
@@ -292,7 +294,7 @@ void MainWindow::on_action_paste_triggered()
 
 void MainWindow::on_action_find_triggered()
 {
-    QsciScintilla *editor = ui->multieditor->currentEditor();
+    CustomEditor *editor = ui->multieditor->currentEditor();
     if (!editor) return;
 
     if(ui->widget_findreplace->isVisible())
@@ -300,6 +302,19 @@ void MainWindow::on_action_find_triggered()
     else
         ui->widget_findreplace->show();
 }
+
+void MainWindow::onFileDraged(const QList<QUrl> &urls)
+{
+    for (const QUrl &url : urls)
+    {
+        if (url.isLocalFile())
+        {
+            QString filePath = url.toLocalFile();
+            openFileByArg(filePath);
+        }
+    }
+}
+
 
 void MainWindow::onFileClicked(const QModelIndex &index)
 {
@@ -318,7 +333,7 @@ void MainWindow::updateEditActions(bool available)
 
 void MainWindow::updateWindowTitle(bool modified)
 {
-    QsciScintilla *editor = ui->multieditor->currentEditor();
+    CustomEditor *editor = ui->multieditor->currentEditor();
     if (!editor) return;
 
     QString title;

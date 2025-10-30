@@ -6,7 +6,7 @@
 #include <QDebug>
 #include <QMessageBox>
 #include <QCoreApplication>
-#include "../QScintilla/Qsci/qsciscintilla.h"
+#include "customeditor.h"
 
 MultiEditor::MultiEditor(QWidget *parent, bool createDefault) : QWidget(parent),
     ui(new Ui::MultiEditor),
@@ -14,6 +14,7 @@ MultiEditor::MultiEditor(QWidget *parent, bool createDefault) : QWidget(parent),
     m_switchPopup(nullptr)  // 初始化弹出窗口指针
 {
     ui->setupUi(this);
+    setAcceptDrops(false);
 
     int fontId = QFontDatabase::addApplicationFont("://rescoure/fontawesome-webfont.ttf");
     QString fontName = QFontDatabase::applicationFontFamilies(fontId).at(0);
@@ -23,6 +24,7 @@ MultiEditor::MultiEditor(QWidget *parent, bool createDefault) : QWidget(parent),
 
     // 初始化编辑器管理器..
     m_editorManager = new EditorManager(this);
+    connect(m_editorManager, &EditorManager::filesDropped, this, &MultiEditor::filesDropped);
 
     // 设置标签页..
     ui->tabWidget->setTabsClosable(true);
@@ -56,17 +58,17 @@ MultiEditor::~MultiEditor()
     delete ui;
 }
 
-QsciScintilla *MultiEditor::currentEditor() const
+CustomEditor *MultiEditor::currentEditor() const
 {
     if(ui->tabWidget == nullptr)
     {
         return nullptr;
     }
 
-    return qobject_cast<QsciScintilla *>(ui->tabWidget->currentWidget());
+    return qobject_cast<CustomEditor *>(ui->tabWidget->currentWidget());
 }
 
-int MultiEditor::findEditorIndex(QsciScintilla *editor) const
+int MultiEditor::findEditorIndex(CustomEditor *editor) const
 {
     for (int i = 0; i < ui->tabWidget->count(); ++i)
     {
@@ -78,7 +80,7 @@ int MultiEditor::findEditorIndex(QsciScintilla *editor) const
     return -1;
 }
 
-void MultiEditor::switchToEditor(QsciScintilla *editor)
+void MultiEditor::switchToEditor(CustomEditor *editor)
 {
     if (!editor) return;
 
@@ -93,14 +95,14 @@ void MultiEditor::switchToEditor(QsciScintilla *editor)
     }
 }
 
-bool MultiEditor::maybeSave(QsciScintilla *editor)
+bool MultiEditor::maybeSave(CustomEditor *editor)
 {
     if (!editor || !editor->isModified()) return true;
 
     switchToEditor(editor);
 
     // 使用新的多文件对话框，但只显示当前文件..
-    QMap<QsciScintilla*, QString> files;
+    QMap<CustomEditor*, QString> files;
     QString filePath = editor->property("filePath").toString();
     QString displayName = filePath.isEmpty() ? tr("untitled.txt") : QFileInfo(filePath).fileName();
     files.insert(editor, displayName);
@@ -128,7 +130,7 @@ bool MultiEditor::maybeSave(QsciScintilla *editor)
     return false; // 取消..
 }
 
-bool MultiEditor::saveFile(QsciScintilla *editor, const QString &filePath)
+bool MultiEditor::saveFile(CustomEditor *editor, const QString &filePath)
 {
     if (!editor) return false;
 
@@ -176,7 +178,7 @@ void MultiEditor::openFile(const QString &filePath)
     }
 
     // Check if file is already open
-    QsciScintilla *existingEditor = m_editorManager->getEditorByFilePath(filePath);
+    CustomEditor *existingEditor = m_editorManager->getEditorByFilePath(filePath);
     if (existingEditor)
     {
         int index = findEditorIndex(existingEditor);
@@ -189,7 +191,7 @@ void MultiEditor::openFile(const QString &filePath)
     }
 
     // Create new editor
-    QsciScintilla *editor = m_editorManager->createEditorFromFile(filePath, false);
+    CustomEditor *editor = m_editorManager->createEditorFromFile(filePath, false);
     if (!editor)
     {
         return;
@@ -237,7 +239,7 @@ void MultiEditor::openFile(const QString &filePath)
     connectEditorSignals(editor);
 }
 
-void MultiEditor::setCurrentFile(QsciScintilla *editor, const QString &filePath)
+void MultiEditor::setCurrentFile(CustomEditor *editor, const QString &filePath)
 {
     if (!editor)
         return;
@@ -267,7 +269,7 @@ void MultiEditor::setCurrentFile(QsciScintilla *editor, const QString &filePath)
 
 void MultiEditor::createDefaultDoc()
 {
-    QsciScintilla *editor = m_editorManager->createEditor(tr("Untitled"));
+    CustomEditor *editor = m_editorManager->createEditor(tr("Untitled"));
     int tabIndex = ui->tabWidget->addTab(editor, tr("Untitled"));
     ui->tabWidget->setCurrentIndex(tabIndex);
 
@@ -309,7 +311,7 @@ void MultiEditor::onOpenFile(const QString &fileName)
 
 bool MultiEditor::onSave()
 {
-    QsciScintilla *editor = currentEditor();
+    CustomEditor *editor = currentEditor();
     if (!editor) return false;
 
     QString filePath = editor->property("filePath").toString();
@@ -325,7 +327,7 @@ bool MultiEditor::onSave()
 
 bool MultiEditor::onSaveAs()
 {
-    QsciScintilla *editor = currentEditor();
+    CustomEditor *editor = currentEditor();
     if (!editor) return false;
 
     QString fileName = QFileDialog::getSaveFileName(this);
@@ -389,7 +391,7 @@ void MultiEditor::clear()
 
 void MultiEditor::tabCloseRequested(int index)
 {
-    QsciScintilla *editor = qobject_cast<QsciScintilla *>(ui->tabWidget->widget(index));
+    CustomEditor *editor = qobject_cast<CustomEditor *>(ui->tabWidget->widget(index));
     if (!editor) return;
 
     // 如果关闭的是默认编辑器，清除指针..
@@ -421,7 +423,7 @@ void MultiEditor::currentTabChanged(int index)
 {
     if (index == -1) return;
 
-    QsciScintilla *editor = qobject_cast<QsciScintilla *>(ui->tabWidget->widget(index));
+    CustomEditor *editor = qobject_cast<CustomEditor *>(ui->tabWidget->widget(index));
     if (!editor) return;
 
     // 发出当前编辑器改变信号..
@@ -448,7 +450,7 @@ void MultiEditor::currentTabChanged(int index)
 
 void MultiEditor::documentWasModified()
 {
-    QsciScintilla *editor = qobject_cast<QsciScintilla *>(sender());
+    CustomEditor *editor = qobject_cast<CustomEditor *>(sender());
     if (!editor) return;
 
     // 如果默认编辑器被修改，取消其默认状态
@@ -500,7 +502,7 @@ void MultiEditor::on_comboBox_files_currentIndexChanged(int index)
     }
 }
 
-void MultiEditor::connectEditorSignals(QsciScintilla *editor)
+void MultiEditor::connectEditorSignals(CustomEditor *editor)
 {
     if (!editor) return;
 
@@ -511,9 +513,9 @@ void MultiEditor::connectEditorSignals(QsciScintilla *editor)
 bool MultiEditor::closeAllEditors()
 {
     // 收集所有未保存的文件..
-    QMap<QsciScintilla*, QString> modifiedFiles;
-    QList<QsciScintilla *> listEditors = m_editorManager->getEditors();
-    for(QsciScintilla *editor : listEditors)
+    QMap<CustomEditor*, QString> modifiedFiles;
+    QList<CustomEditor *> listEditors = m_editorManager->getEditors();
+    for(CustomEditor *editor : listEditors)
     {
         if (editor && editor->isModified())
         {
@@ -535,10 +537,10 @@ bool MultiEditor::closeAllEditors()
     if (result == QDialog::Accepted)
     {
         // 保存选中的文件..
-        QList<QsciScintilla*> editorsToSave = dialog.selectedEditors();
+        QList<CustomEditor*> editorsToSave = dialog.selectedEditors();
         bool allSaved = true;
 
-        for(QsciScintilla *editor : editorsToSave)
+        for(CustomEditor *editor : editorsToSave)
         {
             QString filePath = editor->property("filePath").toString();
             if (filePath.isEmpty())
@@ -670,7 +672,7 @@ void MultiEditor::switchToEditorByIndex(int index)
     {
         ui->tabWidget->setCurrentIndex(index);
         // 确保编辑器获得焦点
-        QsciScintilla *editor = qobject_cast<QsciScintilla *>(ui->tabWidget->widget(index));
+        CustomEditor *editor = qobject_cast<CustomEditor *>(ui->tabWidget->widget(index));
         if (editor)
         {
             editor->setFocus();

@@ -5,8 +5,9 @@
 #include <QObject>
 #include <QPointer>
 #include <QList>
+#include <QUrl>
 
-class QsciScintilla;
+class CustomEditor;
 class EditorManager : public QObject
 {
     Q_OBJECT
@@ -14,28 +15,30 @@ public:
     explicit EditorManager(QObject *parent = nullptr);
     ~EditorManager();
 
-    QsciScintilla *createEditor(const QString &name = QString());
-    QsciScintilla *createEditorFromFile(const QString &filePath, bool tryToCreate = false);
-    QsciScintilla *getEditorByFilePath(const QString &filePath);
-    QList<QsciScintilla *> getEditors() const;
+    CustomEditor *createEditor(const QString &name = QString());
+    CustomEditor *createEditorFromFile(const QString &filePath, bool tryToCreate = false);
+    CustomEditor *getEditorByFilePath(const QString &filePath);
+    QList<CustomEditor *> getEditors() const;
 
-    void setupEditor(QsciScintilla *editor);
-    void updateLineNumberMarginWidth(QsciScintilla *editor);
+    void setupEditor(CustomEditor *editor);
+    void updateLineNumberMarginWidth(CustomEditor *editor);
 
 signals:
-    void editorCreated(QsciScintilla *editor);
-    void editorClosed(QsciScintilla *editor);
+    void fileDraged(QString filePath);
+    void editorCreated(CustomEditor *editor);
+    void editorClosed(CustomEditor *editor);
+    void filesDropped(const QList<QUrl> &urls);
 
 private slots:
     void handleTextChanged();
 
 private:
-    void setupEditorSyntax(QsciScintilla *editor, const QString &filePath);
-    void setEditorFont(QsciScintilla *editor);
-    void setMarginsFont(QsciScintilla *editor);
+    void setupEditorSyntax(CustomEditor *editor, const QString &filePath);
+    void setEditorFont(CustomEditor *editor);
+    void setMarginsFont(CustomEditor *editor);
     void purgeOldEditorPointers();
 
-    QList<QPointer<QsciScintilla>> m_editors;
+    QList<QPointer<CustomEditor>> m_editors;
 };
 
 #endif // EDITORMANAGER_H

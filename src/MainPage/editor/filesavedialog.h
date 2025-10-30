@@ -10,18 +10,18 @@
 #include <QScrollArea>
 #include <QCheckBox>
 
-class QsciScintilla;
+class CustomEditor;
 class FileSaveDialog : public QDialog
 {
     Q_OBJECT
 
 public:
-    explicit FileSaveDialog(const QMap<QsciScintilla*, QString> &files, QWidget *parent = nullptr);
-    QList<QsciScintilla*> selectedEditors() const;
+    explicit FileSaveDialog(const QMap<CustomEditor*, QString> &files, QWidget *parent = nullptr);
+    QList<CustomEditor*> selectedEditors() const;
 
 private:
     QList<QCheckBox*> m_checkboxes;
-    QMap<QCheckBox*, QsciScintilla*> m_editorMap;
+    QMap<QCheckBox*, CustomEditor*> m_editorMap;
 };
 
 #endif // FILESAVEDIALOG_H
