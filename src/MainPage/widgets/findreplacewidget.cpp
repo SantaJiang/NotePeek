@@ -4,7 +4,7 @@
 #include <QMessageBox>
 #include <QKeyEvent>
 #include <QLineEdit>
-#include "../QScintilla/Qsci/qsciscintilla.h"
+#include "../editor/customeditor.h"
 
 FindReplaceWidget::FindReplaceWidget(QWidget *parent)
     : QWidget(parent)
@@ -47,14 +47,14 @@ void FindReplaceWidget::showEvent(QShowEvent *event)
 
     if(m_pEditor != nullptr)
     {
-        QsciScintilla *editor = m_pEditor->currentEditor();
+        CustomEditor *editor = m_pEditor->currentEditor();
         if (editor)
         {
             // 保存当前的滚动位置..
             m_savedFirstVisibleLine = editor->firstVisibleLine();
 
             // 初始化高亮指示器 - 使用自定义样式..
-            editor->indicatorDefine(QsciScintilla::FullBoxIndicator, m_highlightIndicator);
+            editor->indicatorDefine(CustomEditor::FullBoxIndicator, m_highlightIndicator);
 
             // 设置高亮颜色..
             QColor highlightColor("#F59E0B");
@@ -110,7 +110,7 @@ void FindReplaceWidget::highlightAllMatches()
     if(m_pEditor == nullptr)
         return;
 
-    QsciScintilla *editor = m_pEditor->currentEditor();
+    CustomEditor *editor = m_pEditor->currentEditor();
     if (!editor)
         return;
 
@@ -124,7 +124,7 @@ void FindReplaceWidget::highlightAllMatches()
     }
 
     // 确保当前编辑器有正确的高亮指示器设置..
-    editor->indicatorDefine(QsciScintilla::FullBoxIndicator, m_highlightIndicator);
+    editor->indicatorDefine(CustomEditor::FullBoxIndicator, m_highlightIndicator);
     QColor highlightColor("#F59E0B");
     long color = (highlightColor.blue() << 16) | (highlightColor.green() << 8) | highlightColor.red();
     editor->SendScintilla(QsciScintillaBase::SCI_INDICSETFORE, m_highlightIndicator, color);
@@ -197,7 +197,7 @@ void FindReplaceWidget::clearHighlights()
     if(m_pEditor == nullptr)
         return;
 
-    QsciScintilla *editor = m_pEditor->currentEditor();
+    CustomEditor *editor = m_pEditor->currentEditor();
     if (!editor)
         return;
 
@@ -210,7 +210,7 @@ void FindReplaceWidget::selectFirstMatch()
     if(m_pEditor == nullptr)
         return;
 
-    QsciScintilla *editor = m_pEditor->currentEditor();
+    CustomEditor *editor = m_pEditor->currentEditor();
     if (!editor)
         return;
 
@@ -235,7 +235,7 @@ void FindReplaceWidget::find()
         return;
 
     // 通过主窗口获取当前编辑器..
-    QsciScintilla *editor = m_pEditor->currentEditor();
+    CustomEditor *editor = m_pEditor->currentEditor();
     if (!editor)
     {
         QMessageBox::information(this, tr("Find"), tr("No active editor."));
@@ -275,7 +275,7 @@ void FindReplaceWidget::findNext()
         return;
 
     // 通过主窗口获取当前编辑器..
-    QsciScintilla *editor = m_pEditor->currentEditor();
+    CustomEditor *editor = m_pEditor->currentEditor();
     if (!editor)
     {
         QMessageBox::information(this, tr("Find"), tr("No active editor."));
@@ -323,7 +323,7 @@ void FindReplaceWidget::replace()
         return;
 
     // 通过主窗口获取当前编辑器..
-    QsciScintilla *editor = m_pEditor->currentEditor();
+    CustomEditor *editor = m_pEditor->currentEditor();
     if (!editor)
     {
         QMessageBox::information(this, tr("Replace"), tr("No active editor."));
@@ -351,7 +351,7 @@ void FindReplaceWidget::replaceAll()
         return;
 
     // 通过主窗口获取当前编辑器..
-    QsciScintilla *editor = m_pEditor->currentEditor();
+    CustomEditor *editor = m_pEditor->currentEditor();
     if (!editor)
     {
         QMessageBox::information(this, tr("Replace All"), tr("No active editor."));

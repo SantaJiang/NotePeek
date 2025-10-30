@@ -19,7 +19,7 @@ namespace Ui
 class MultiEditor;
 }
 
-class QsciScintilla;
+class CustomEditor;
 class MultiEditor : public QWidget
 {
     Q_OBJECT
@@ -28,9 +28,9 @@ public:
     ~MultiEditor();
 
     // 编辑器管理..
-    QsciScintilla *currentEditor() const;
-    int findEditorIndex(QsciScintilla *editor) const;
-    void switchToEditor(QsciScintilla *editor);
+    CustomEditor *currentEditor() const;
+    int findEditorIndex(CustomEditor *editor) const;
+    void switchToEditor(CustomEditor *editor);
     void setCreateDefault(bool createDefault);
 
     // tab管理..
@@ -42,10 +42,10 @@ public:
     void clear();
 
     // 文件操作..
-    bool maybeSave(QsciScintilla *editor);
-    bool saveFile(QsciScintilla *editor, const QString &filePath);
+    bool maybeSave(CustomEditor *editor);
+    bool saveFile(CustomEditor *editor, const QString &filePath);
     void openFile(const QString &filePath);
-    void setCurrentFile(QsciScintilla *editor, const QString &filePath);
+    void setCurrentFile(CustomEditor *editor, const QString &filePath);
     void createDefaultDoc();
 
     // 关闭所有标签页（用于应用程序退出）..
@@ -55,13 +55,14 @@ protected:
     bool eventFilter(QObject *obj, QEvent *event) override;
 
 signals:
-    void currentEditorChanged(QsciScintilla *editor);
-    void editorModificationChanged(QsciScintilla *editor, bool modified);
-    void editorCreated(QsciScintilla *editor);
-    void editorClosed(QsciScintilla *editor);
-    void fileOpened(QsciScintilla *editor, const QString &filePath);
+    void currentEditorChanged(CustomEditor *editor);
+    void editorModificationChanged(CustomEditor *editor, bool modified);
+    void editorCreated(CustomEditor *editor);
+    void editorClosed(CustomEditor *editor);
+    void fileOpened(CustomEditor *editor, const QString &filePath);
     void modificationChanged(bool modified);
     void copyAvailable(bool available);
+    void filesDropped(const QList<QUrl> &urls);
 
 public slots:
     void onNewFile();
@@ -81,12 +82,12 @@ private slots:
     void on_comboBox_files_currentIndexChanged(int index);
 
 private:
-    void setEditorFont(QsciScintilla *editor);
-    void connectEditorSignals(QsciScintilla *editor);
+    void setEditorFont(CustomEditor *editor);
+    void connectEditorSignals(CustomEditor *editor);
 
     Ui::MultiEditor *ui;
     EditorManager *m_editorManager;
-    QsciScintilla *m_defaultEditor; // 指向默认空白编辑器的指针..
+    CustomEditor *m_defaultEditor; // 指向默认空白编辑器的指针..
     EditorSwitchPopup *m_switchPopup;
 };
 

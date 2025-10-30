@@ -6,7 +6,7 @@
 #include <QScreen>
 #include <QDir>
 #include "../QScintilla/Qsci/qscilexer.h"
-#include "../QScintilla/Qsci/qsciscintilla.h"
+#include "customeditor.h"
 #include "lexerfactory.h"
 
 EditorManager::EditorManager(QObject *parent) : QObject(parent)
@@ -26,17 +26,20 @@ EditorManager::~EditorManager()
     m_editors.clear();
 }
 
-QsciScintilla *EditorManager::createEditor(const QString &name)
+CustomEditor *EditorManager::createEditor(const QString &name)
 {
-    QsciScintilla *editor = new QsciScintilla();
+    CustomEditor *editor = new CustomEditor();
     editor->setWindowTitle(name.isEmpty() ? tr("Untitled") : name);
     setupEditor(editor);
+    // 连接 URI 拖放信号
+    connect(editor, &CustomEditor::filesDropped,  this, &EditorManager::filesDropped);
+
     m_editors.append(editor);
     emit editorCreated(editor);
     return editor;
 }
 
-QsciScintilla *EditorManager::createEditorFromFile(const QString &filePath, bool tryToCreate)
+CustomEditor *EditorManager::createEditorFromFile(const QString &filePath, bool tryToCreate)
 {
     QFileInfo fileInfo(filePath);
     if (!fileInfo.exists() && !tryToCreate)
@@ -45,13 +48,13 @@ QsciScintilla *EditorManager::createEditorFromFile(const QString &filePath, bool
     }
 
     // Check if file is already open
-    QsciScintilla *existingEditor = getEditorByFilePath(filePath);
+    CustomEditor *existingEditor = getEditorByFilePath(filePath);
     if (existingEditor)
     {
         return existingEditor;
     }
 
-    QsciScintilla *editor = createEditor(fileInfo.fileName());
+    CustomEditor *editor = createEditor(fileInfo.fileName());
 
     // Load file content
     QFileInfo fileInfo2(filePath);
@@ -60,8 +63,8 @@ QsciScintilla *EditorManager::createEditorFromFile(const QString &filePath, bool
     if (isLargeFile)
     {
         editor->setLexer(nullptr);
-        editor->setEolMode(QsciScintilla::EolWindows);
-        editor->setWrapMode(QsciScintilla::WrapNone);
+        editor->setEolMode(CustomEditor::EolWindows);
+        editor->setWrapMode(CustomEditor::WrapNone);
         editor->setMarginWidth(1, 0);
         editor->setUpdatesEnabled(false);
 
@@ -82,7 +85,7 @@ QsciScintilla *EditorManager::createEditorFromFile(const QString &filePath, bool
     return editor;
 }
 
-QsciScintilla *EditorManager::getEditorByFilePath(const QString &filePath)
+CustomEditor *EditorManager::getEditorByFilePath(const QString &filePath)
 {
     QFileInfo targetInfo(filePath);
     targetInfo.makeAbsolute();
@@ -92,7 +95,7 @@ QsciScintilla *EditorManager::getEditorByFilePath(const QString &filePath)
 
     purgeOldEditorPointers();
 
-    for (QsciScintilla *editor : m_editors)
+    for (CustomEditor *editor : m_editors)
     {
         if (editor)
         {
@@ -109,10 +112,10 @@ QsciScintilla *EditorManager::getEditorByFilePath(const QString &filePath)
     return nullptr;
 }
 
-QList<QsciScintilla *> EditorManager::getEditors() const
+QList<CustomEditor *> EditorManager::getEditors() const
 {
-    QList<QsciScintilla *> list;
-    for (const QPointer<QsciScintilla> &editor : m_editors)
+    QList<CustomEditor *> list;
+    for (const QPointer<CustomEditor> &editor : m_editors)
     {
         if (editor)
         {
@@ -122,15 +125,15 @@ QList<QsciScintilla *> EditorManager::getEditors() const
     return list;
 }
 
-void EditorManager::setupEditor(QsciScintilla *editor)
+void EditorManager::setupEditor(CustomEditor *editor)
 {
     // Basic editor setup
-    editor->setMarginType(0, QsciScintilla::NumberMargin);
+    editor->setMarginType(0, CustomEditor::NumberMargin);
     editor->setMarginWidth(0, 30);
     editor->setTabWidth(4);
     editor->setCaretLineVisible(true);
     editor->setCaretLineBackgroundColor(QColor("#E8E8FF"));
-    editor->setBraceMatching(QsciScintilla::SloppyBraceMatch);
+    editor->setBraceMatching(CustomEditor::SloppyBraceMatch);
     editor->setMatchedBraceForegroundColor(Qt::blue);
     editor->setMatchedBraceBackgroundColor(Qt::yellow);
 
@@ -146,10 +149,10 @@ void EditorManager::setupEditor(QsciScintilla *editor)
 
 void EditorManager::purgeOldEditorPointers()
 {
-    QMutableListIterator<QPointer<QsciScintilla>> it(m_editors);
+    QMutableListIterator<QPointer<CustomEditor>> it(m_editors);
     while (it.hasNext())
     {
-        QPointer<QsciScintilla> pointer = it.next();
+        QPointer<CustomEditor> pointer = it.next();
         if (pointer.isNull())
         {
             it.remove();
@@ -160,14 +163,14 @@ void EditorManager::purgeOldEditorPointers()
 void EditorManager::handleTextChanged()
 {
     // 获取发送信号的 editor 对象..
-    QsciScintilla *editor = qobject_cast<QsciScintilla*>(sender());
+    CustomEditor *editor = qobject_cast<CustomEditor*>(sender());
     if (editor)
     {
         emit editor->modificationChanged(editor->isModified());
     }
 }
 
-void EditorManager::updateLineNumberMarginWidth(QsciScintilla *editor)
+void EditorManager::updateLineNumberMarginWidth(CustomEditor *editor)
 {
     if (!editor) return;
 
@@ -195,7 +198,7 @@ void EditorManager::updateLineNumberMarginWidth(QsciScintilla *editor)
     editor->setMarginWidth(0, width);
 }
 
-void EditorManager::setupEditorSyntax(QsciScintilla *editor, const QString &filePath)
+void EditorManager::setupEditorSyntax(CustomEditor *editor, const QString &filePath)
 {
     if (!editor) return;
 
@@ -224,7 +227,7 @@ void EditorManager::setupEditorSyntax(QsciScintilla *editor, const QString &file
     setMarginsFont(editor);
 }
 
-void EditorManager::setEditorFont(QsciScintilla *editor)
+void EditorManager::setEditorFont(CustomEditor *editor)
 {
     if (!editor) return;
 
@@ -232,7 +235,7 @@ void EditorManager::setEditorFont(QsciScintilla *editor)
     editor->setFont(font);
 }
 
-void EditorManager::setMarginsFont(QsciScintilla *editor)
+void EditorManager::setMarginsFont(CustomEditor *editor)
 {
     if (!editor) return;
     QFont marginFont = editor->font();

@@ -1,7 +1,7 @@
 #include "filesavedialog.h"
-#include "../QScintilla/Qsci/qsciscintilla.h"
+#include "customeditor.h"
 
-FileSaveDialog::FileSaveDialog(const QMap<QsciScintilla*, QString> &files, QWidget *parent)
+FileSaveDialog::FileSaveDialog(const QMap<CustomEditor*, QString> &files, QWidget *parent)
     : QDialog(parent)
 {
     setWindowTitle(tr("Save Changes"));
@@ -17,8 +17,8 @@ FileSaveDialog::FileSaveDialog(const QMap<QsciScintilla*, QString> &files, QWidg
     QWidget *scrollWidget = new QWidget;
     QVBoxLayout *scrollLayout = new QVBoxLayout(scrollWidget);
 
-    QList<QsciScintilla*> editors = files.keys();
-    for (QsciScintilla *editor : editors)
+    QList<CustomEditor*> editors = files.keys();
+    for (CustomEditor *editor : editors)
     {
         QCheckBox *checkBox = new QCheckBox(files.value(editor));
         checkBox->setChecked(true);
@@ -52,9 +52,9 @@ FileSaveDialog::FileSaveDialog(const QMap<QsciScintilla*, QString> &files, QWidg
     }); // 使用2表示不保存..
 }
 
-QList<QsciScintilla*> FileSaveDialog::selectedEditors() const
+QList<CustomEditor*> FileSaveDialog::selectedEditors() const
 {
-    QList<QsciScintilla*> editors;
+    QList<CustomEditor*> editors;
     for (QCheckBox *checkBox : m_checkboxes)
     {
         if (checkBox->isChecked())

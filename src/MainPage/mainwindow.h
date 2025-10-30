@@ -42,6 +42,7 @@ private slots:
     void on_action_paste_triggered();
     void on_action_find_triggered();
 
+    void onFileDraged(const QList<QUrl> &urls);
     void onFileClicked(const QModelIndex &index);
     void updateEditActions(bool available);
     void updateWindowTitle(bool modified);
