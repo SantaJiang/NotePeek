@@ -7,16 +7,19 @@
 #include <QHeaderView>
 #include <QFileInfo>
 #include <QDir>
+#include <QScrollBar>
 #include <QMessageBox>
 #include <QCloseEvent>
 #include <QCoreApplication>
 #include "./editor/filesavedialog.h"
 #include "./editor/customeditor.h"
+#include "./decorators/highlightedscrollbardecorator.h"
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
     , ui(new Ui::MainWindow)
     , m_pFileModel(nullptr)
+    , m_findReplaceManager(new FindReplaceManager(this))
 {
     ui->setupUi(this);
     setAcceptDrops(false);  // 主窗口不处理拖拽
@@ -41,7 +44,13 @@ MainWindow::MainWindow(QWidget *parent)
     ui->multieditor->setCreateDefault(!hasFileArg);
 
     // 初始化查找替换部件..
-    ui->widget_findreplace->setMutiEditor(ui->multieditor);
+    ui->widget_findreplace->setMultiEditor(ui->multieditor);
+
+    // 初始化查找替换管理器
+    m_findReplaceManager->setMultiEditor(ui->multieditor);
+
+    // 设置查找替换部件和管理器的关联
+    ui->widget_findreplace->setFindReplaceManager(m_findReplaceManager);
 
     // 初始化其他组件..
     createDirView();
@@ -54,7 +63,22 @@ MainWindow::MainWindow(QWidget *parent)
     connect(ui->multieditor, &MultiEditor::currentEditorChanged, this, [this](CustomEditor *editor)
     {
         ui->statusbar->connectToEditor(editor);
+
+        // 设置当前编辑器到查找管理器
+        m_findReplaceManager->setCurrentEditor(editor);
+
+        // 设置查找管理器到当前编辑器的装饰器
+        ui->multieditor->setFindReplaceManagerForCurrentEditor(m_findReplaceManager);
+
         refreshHighlights();
+    });
+
+    // 连接查找替换部件的可见性变化
+    connect(ui->widget_findreplace, &FindReplaceWidget::visibilityChanged, this, [this](bool visible) {
+        if (!visible)
+        {
+            m_findReplaceManager->clearHighlights();
+        }
     });
 
     connect(ui->multieditor, &MultiEditor::modificationChanged, this, &MainWindow::updateWindowTitle);
@@ -74,6 +98,8 @@ MainWindow::MainWindow(QWidget *parent)
     {
         openFileByArg(filePath);
     }
+
+    connect(m_findReplaceManager, &FindReplaceManager::searchResultsChanged, this, &MainWindow::onSearchResultsChanged);
 }
 
 MainWindow::~MainWindow()
@@ -297,10 +323,15 @@ void MainWindow::on_action_find_triggered()
     CustomEditor *editor = ui->multieditor->currentEditor();
     if (!editor) return;
 
-    if(ui->widget_findreplace->isVisible())
+    QString selectedText = editor->selectedText();
+    if (ui->widget_findreplace->isVisible())
+    {
         ui->widget_findreplace->find();
+    }
     else
-        ui->widget_findreplace->show();
+    {
+        ui->widget_findreplace->showWithInitialText(selectedText);
+    }
 }
 
 void MainWindow::onFileDraged(const QList<QUrl> &urls)
@@ -357,5 +388,14 @@ void MainWindow::updateWindowTitle(bool modified)
     {
         setWindowTitle(tr("%1 - %2").arg(tr("NotePeek")).arg(title));
         setWindowModified(false);
+    }
+}
+
+void MainWindow::onSearchResultsChanged()
+{
+    CustomEditor *editor = ui->multieditor->currentEditor();
+    if (editor)
+    {
+        editor->verticalScrollBar()->update();
     }
 }

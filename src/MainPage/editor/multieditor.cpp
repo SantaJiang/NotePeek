@@ -7,6 +7,7 @@
 #include <QMessageBox>
 #include <QCoreApplication>
 #include "customeditor.h"
+#include "../decorators/highlightedscrollbardecorator.h"
 
 MultiEditor::MultiEditor(QWidget *parent, bool createDefault) : QWidget(parent),
     ui(new Ui::MultiEditor),
@@ -598,6 +599,26 @@ void MultiEditor::setCreateDefault(bool createDefault)
     {
         // 如果需要创建默认编辑器且当前没有编辑器，则创建..
         createDefaultDoc();
+    }
+}
+
+void MultiEditor::setFindReplaceManagerForCurrentEditor(FindReplaceManager *manager)
+{
+    CustomEditor *editor = currentEditor();
+    if (!editor || !manager) return;
+
+    manager->setCurrentEditor(editor);
+
+    QVariant decoratorVar = editor->property("scrollDecorator");
+    if (decoratorVar.isValid())
+    {
+        HighlightedScrollBarDecorator *decorator = decoratorVar.value<HighlightedScrollBarDecorator*>();
+        if (decorator)
+        {
+            // 连接管理器的搜索结果变化信号到装饰器的更新槽
+            connect(manager, &FindReplaceManager::searchResultsChanged,
+                    decorator, &HighlightedScrollBarDecorator::updateScrollBar);
+        }
     }
 }
 

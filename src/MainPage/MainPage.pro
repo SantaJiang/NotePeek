@@ -60,9 +60,13 @@ SOURCES += \
     ./editor/editorswitchpopup.cpp \
     ./editor/multieditor.cpp \
     ./editor/filesavedialog.cpp \
-    ./widgets/findreplacewidget.cpp \
     ./widgets/qscieditorinfostatusbar.cpp \
+    decorators/editordecorator.cpp \
+    decorators/highlightedscrollbar.cpp \
+    decorators/highlightedscrollbardecorator.cpp \
     editor/customeditor.cpp \
+    ./find/findreplacemanager.cpp \
+    ./find/findreplacewidget.cpp \
     main.cpp \
     mainwindow.cpp \
     savelog.cpp
@@ -73,14 +77,18 @@ HEADERS += \
     ./editor/editorswitchpopup.h \
     ./editor/multieditor.h \
     ./editor/filesavedialog.h \
-    ./widgets/findreplacewidget.h \
     ./widgets/qscieditorinfostatusbar.h \
+    decorators/editordecorator.h \
+    decorators/highlightedscrollbar.h \
+    decorators/highlightedscrollbardecorator.h \
     editor/customeditor.h \
+    ./find/findreplacemanager.h \
+    ./find/findreplacewidget.h \
     mainwindow.h \
     savelog.h
 
 FORMS += \
-    ./widgets/findreplacewidget.ui \
+    ./find/findreplacewidget.ui \
     mainwindow.ui \
     ./editor/multieditor.ui
 
