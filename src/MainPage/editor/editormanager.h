@@ -33,6 +33,7 @@ private slots:
     void handleTextChanged();
 
 private:
+    void setupScrollBarDecorator(CustomEditor *editor);
     void setupEditorSyntax(CustomEditor *editor, const QString &filePath);
     void setEditorFont(CustomEditor *editor);
     void setMarginsFont(CustomEditor *editor);

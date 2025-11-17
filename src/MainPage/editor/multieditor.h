@@ -13,6 +13,7 @@
 #include <QVBoxLayout>
 #include "editormanager.h"
 #include "editorswitchpopup.h"
+#include "../find/findreplacemanager.h"
 
 namespace Ui
 {
@@ -32,6 +33,7 @@ public:
     int findEditorIndex(CustomEditor *editor) const;
     void switchToEditor(CustomEditor *editor);
     void setCreateDefault(bool createDefault);
+    void setFindReplaceManagerForCurrentEditor(FindReplaceManager *manager);
 
     // tab管理..
     void addTab(const QString &text, const QString &filePath = "");

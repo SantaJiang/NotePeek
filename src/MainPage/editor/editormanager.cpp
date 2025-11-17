@@ -6,6 +6,7 @@
 #include <QScreen>
 #include <QDir>
 #include "../QScintilla/Qsci/qscilexer.h"
+#include "../decorators/highlightedscrollbardecorator.h"
 #include "customeditor.h"
 #include "lexerfactory.h"
 
@@ -145,6 +146,9 @@ void EditorManager::setupEditor(CustomEditor *editor)
 
     // Connect signals
     connect(editor, SIGNAL(textChanged()), this, SLOT(handleTextChanged()));
+
+    // 设置高亮滚动条装饰器
+    setupScrollBarDecorator(editor);
 }
 
 void EditorManager::purgeOldEditorPointers()
@@ -168,6 +172,15 @@ void EditorManager::handleTextChanged()
     {
         emit editor->modificationChanged(editor->isModified());
     }
+}
+
+void EditorManager::setupScrollBarDecorator(CustomEditor *editor)
+{
+    HighlightedScrollBarDecorator *scrollDecorator = new HighlightedScrollBarDecorator(editor);
+    scrollDecorator->setEnabled(true);
+
+    // 存储装饰器指针以便管理
+    editor->setProperty("scrollDecorator", QVariant::fromValue(scrollDecorator));
 }
 
 void EditorManager::updateLineNumberMarginWidth(CustomEditor *editor)

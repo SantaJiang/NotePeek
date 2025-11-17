@@ -6,6 +6,7 @@
 #include <QTreeView>
 #include <QDockWidget>
 #include "./editor/multieditor.h"
+#include "./find/findreplacemanager.h"
 
 namespace Ui
 {
@@ -46,6 +47,7 @@ private slots:
     void onFileClicked(const QModelIndex &index);
     void updateEditActions(bool available);
     void updateWindowTitle(bool modified);
+    void onSearchResultsChanged();
 
 private:
     void createDirView();
@@ -57,6 +59,7 @@ private:
     QFileSystemModel *m_pFileModel;
     QTreeView *m_pTreeView;
     QDockWidget *m_pDock;
+    FindReplaceManager *m_findReplaceManager;
 };
 
 #endif // MAINWINDOW_H
