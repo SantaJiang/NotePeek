@@ -33,3 +33,15 @@ make release
 # 打包
 make appimage   # 创建AppImage
 ```
+
+### Linux 直接安装:
+工程根目录下:
+```bash
+#安装
+chmod +x install_notepeek.sh
+sudo ./install_notepeek.sh
+
+#卸载
+chmod +x uninstall_notepeek.sh
+sudo ./uninstall_notepeek.sh
+```
