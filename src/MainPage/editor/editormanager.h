@@ -2,10 +2,10 @@
 #define EDITORMANAGER_H
 
 #include <QObject>
-#include <QObject>
 #include <QPointer>
 #include <QList>
 #include <QUrl>
+#include <QtGlobal>
 
 class CustomEditor;
 class EditorManager : public QObject
@@ -38,6 +38,8 @@ private:
     void setEditorFont(CustomEditor *editor);
     void setMarginsFont(CustomEditor *editor);
     void purgeOldEditorPointers();
+
+    static constexpr qint64 LARGE_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
 
     QList<QPointer<CustomEditor>> m_editors;
 };

@@ -7,6 +7,7 @@
 #include <QDockWidget>
 #include "./editor/multieditor.h"
 #include "./find/findreplacemanager.h"
+#include "./tool/cpp/headersourcemanager.h"
 
 namespace Ui
 {
@@ -42,6 +43,7 @@ private slots:
     void on_action_copy_triggered();
     void on_action_paste_triggered();
     void on_action_find_triggered();
+    void on_action_switchHeaderSource_triggered();
 
     void onFileDraged(const QList<QUrl> &urls);
     void onFileClicked(const QModelIndex &index);
@@ -54,12 +56,14 @@ private:
     void createDockWindows();
     void setRootDirectory(const QString &dirPath);
     void refreshHighlights();
+    void openFileAndSetRootDirectory(const QString &fileName);
 
     Ui::MainWindow *ui;
     QFileSystemModel *m_pFileModel;
     QTreeView *m_pTreeView;
     QDockWidget *m_pDock;
     FindReplaceManager *m_findReplaceManager;
+    HeaderSourceManager *m_headerSourceManager;
 };
 
 #endif // MAINWINDOW_H

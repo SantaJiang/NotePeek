@@ -15,7 +15,7 @@
   </property>
   <property name="windowIcon">
    <iconset resource="rec.qrc">
-    <normaloff>:/rescoure/notepeek.svg</normaloff>:/rescoure/notepeek.svg</iconset>
+    <normaloff>:/resource/notepeek.svg</normaloff>:/resource/notepeek.svg</iconset>
   </property>
   <widget class="QWidget" name="centralwidget">
    <layout class="QVBoxLayout" name="verticalLayout">
@@ -108,9 +108,22 @@
     <addaction name="separator"/>
     <addaction name="action_find"/>
    </widget>
+   <widget class="QMenu" name="menuTool">
+    <property name="title">
+     <string>Tool</string>
+    </property>
+    <widget class="QMenu" name="menuToolCpp">
+     <property name="title">
+      <string>C++</string>
+     </property>
+     <addaction name="action_switchHeaderSource"/>
+    </widget>
+    <addaction name="menuToolCpp"/>
+   </widget>
    <addaction name="menuFile"/>
    <addaction name="menuEdit"/>
    <addaction name="menuView"/>
+   <addaction name="menuTool"/>
    <addaction name="menuHelp"/>
   </widget>
   <widget class="QsciEditorInfoStatusBar" name="statusbar">
@@ -237,6 +250,14 @@
    </property>
    <property name="shortcut">
     <string>Ctrl+F</string>
+   </property>
+  </action>
+  <action name="action_switchHeaderSource">
+   <property name="text">
+    <string>Switch Header/Source File</string>
+   </property>
+   <property name="shortcut">
+    <string>F4</string>
    </property>
   </action>
  </widget>

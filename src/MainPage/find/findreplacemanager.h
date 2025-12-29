@@ -65,6 +65,9 @@ private:
     void updateScrollBarMarkers();
     void initializeEditor();
     bool isLargeFile() const;
+    void prepareFindOptions(bool &re, bool &cs, bool &wo, bool &wrap, bool &forward, bool wrapAround = false) const;
+
+    static constexpr qint64 LARGE_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
 
     CustomEditor *m_editor;
     MultiEditor *m_multiEditor;

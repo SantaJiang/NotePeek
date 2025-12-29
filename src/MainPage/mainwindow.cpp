@@ -20,6 +20,7 @@ MainWindow::MainWindow(QWidget *parent)
     , ui(new Ui::MainWindow)
     , m_pFileModel(nullptr)
     , m_findReplaceManager(new FindReplaceManager(this))
+    , m_headerSourceManager(new HeaderSourceManager(this))
 {
     ui->setupUi(this);
     setAcceptDrops(false);  // 主窗口不处理拖拽
@@ -104,24 +105,13 @@ MainWindow::MainWindow(QWidget *parent)
 
 MainWindow::~MainWindow()
 {
-    delete m_pFileModel;
+    // m_pFileModel is owned by parent, no need to delete
     delete ui;
 }
 
 void MainWindow::openFileByArg(const QString &fileName)
 {
-    ui->multieditor->openFile(fileName);
-
-    QFileInfo fileInfo(fileName);
-    QString dirPath = fileInfo.absolutePath();
-    setRootDirectory(dirPath);
-
-    QModelIndex index = m_pFileModel->index(fileName);
-    if (index.isValid())
-    {
-        m_pTreeView->scrollTo(index);
-        m_pTreeView->setCurrentIndex(index);
-    }
+    openFileAndSetRootDirectory(fileName);
 }
 
 MultiEditor *MainWindow::multiEditor()
@@ -178,7 +168,7 @@ void MainWindow::refreshHighlights()
 {
     if (ui->widget_findreplace->isVisible())
     {
-        QTimer::singleShot(0, this, [ = ]
+        QTimer::singleShot(0, this, [=]
         {
             ui->widget_findreplace->refreshHighlights();
         });
@@ -199,10 +189,26 @@ void MainWindow::setRootDirectory(const QString &dirPath)
     }
 }
 
+void MainWindow::openFileAndSetRootDirectory(const QString &fileName)
+{
+    ui->multieditor->openFile(fileName);
+
+    QFileInfo fileInfo(fileName);
+    QString dirPath = fileInfo.absolutePath();
+    setRootDirectory(dirPath);
+
+    QModelIndex index = m_pFileModel->index(fileName);
+    if (index.isValid())
+    {
+        m_pTreeView->scrollTo(index);
+        m_pTreeView->setCurrentIndex(index);
+    }
+}
+
 void MainWindow::on_action_new_triggered()
 {
     ui->multieditor->onNewFile();
-    setRootDirectory("");
+    setRootDirectory(QString());
 }
 
 void MainWindow::on_action_openFile_triggered()
@@ -210,18 +216,7 @@ void MainWindow::on_action_openFile_triggered()
     QString fileName = QFileDialog::getOpenFileName(this, tr("Open File"));
     if (!fileName.isEmpty())
     {
-        ui->multieditor->openFile(fileName);
-
-        QFileInfo fileInfo(fileName);
-        QString dirPath = fileInfo.absolutePath();
-        setRootDirectory(dirPath);
-
-        QModelIndex index = m_pFileModel->index(fileName);
-        if (index.isValid())
-        {
-            m_pTreeView->scrollTo(index);
-            m_pTreeView->setCurrentIndex(index);
-        }
+        openFileAndSetRootDirectory(fileName);
     }
 }
 
@@ -265,7 +260,7 @@ void MainWindow::on_action_about_triggered()
                        QStringLiteral("<h3>%1 v%2</h3>"
                                       "<p>%3</p>"
                                       R"(<p>%4</p>)")
-                       .arg(QApplication::applicationDisplayName(), QApplication::applicationVersion(), "Copyright © 2025 Santa.", tr("Made for my baby, Yueyue")));
+                       .arg(QApplication::applicationDisplayName(), QApplication::applicationVersion(), "Copyright © 2026 Santa.", tr("Made for my baby, Yueyue")));
 }
 
 void MainWindow::on_action_showSlideBar_triggered(bool checked)
@@ -326,11 +321,34 @@ void MainWindow::on_action_find_triggered()
     QString selectedText = editor->selectedText();
     if (ui->widget_findreplace->isVisible())
     {
-        ui->widget_findreplace->find();
+        ui->widget_findreplace->setFocus();
     }
     else
     {
         ui->widget_findreplace->showWithInitialText(selectedText);
+    }
+}
+
+void MainWindow::on_action_switchHeaderSource_triggered()
+{
+    CustomEditor *editor = ui->multieditor->currentEditor();
+    if (!editor) return;
+
+    QString currentFilePath = editor->property("filePath").toString();
+    if (currentFilePath.isEmpty()) return;
+
+    // 获取对应的头文件/源文件路径
+    QString correspondingFile = m_headerSourceManager->getCorrespondingFile(currentFilePath);
+
+    if (!correspondingFile.isEmpty())
+    {
+        ui->multieditor->openFile(correspondingFile);
+
+        QModelIndex index = m_pFileModel->index(correspondingFile);
+        if (index.isValid()) {
+            m_pTreeView->scrollTo(index);
+            m_pTreeView->setCurrentIndex(index);
+        }
     }
 }
 
@@ -379,14 +397,15 @@ void MainWindow::updateWindowTitle(bool modified)
         title = QFileInfo(filePath).fileName();
     }
 
+    const QString appName = tr("NotePeek");
     if (modified)
     {
-        setWindowTitle(tr("%1 - %2[*]").arg(tr("NotePeek")).arg(title));
+        setWindowTitle(tr("%1 - %2[*]").arg(appName, title));
         setWindowModified(true);
     }
     else
     {
-        setWindowTitle(tr("%1 - %2").arg(tr("NotePeek")).arg(title));
+        setWindowTitle(tr("%1 - %2").arg(appName, title));
         setWindowModified(false);
     }
 }

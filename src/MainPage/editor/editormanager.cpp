@@ -58,8 +58,7 @@ CustomEditor *EditorManager::createEditorFromFile(const QString &filePath, bool 
     CustomEditor *editor = createEditor(fileInfo.fileName());
 
     // Load file content
-    QFileInfo fileInfo2(filePath);
-    bool isLargeFile = (fileInfo2.size() > 10 * 1024 * 1024);
+    bool isLargeFile = (fileInfo.size() > LARGE_FILE_SIZE);
 
     if (isLargeFile)
     {
@@ -69,7 +68,7 @@ CustomEditor *EditorManager::createEditorFromFile(const QString &filePath, bool 
         editor->setMarginWidth(1, 0);
         editor->setUpdatesEnabled(false);
 
-        qint64 fileSize = fileInfo2.size();
+        qint64 fileSize = fileInfo.size();
         if (fileSize > 0 && fileSize < std::numeric_limits<unsigned long>::max() - 1000)
         {
             editor->SendScintilla(QsciScintillaBase::SCI_ALLOCATE,
