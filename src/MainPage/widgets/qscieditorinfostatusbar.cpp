@@ -37,7 +37,7 @@ QsciEditorInfoStatusBar::QsciEditorInfoStatusBar(QMainWindow *window)
     eolFormat = new StatusLabel(150);
     addPermanentWidget(eolFormat, 0);
     eolFormat->setContextMenuPolicy(Qt::CustomContextMenu);
-    connect(eolFormat, &StatusLabel::customContextMenuRequested, this, [ = ](const QPoint &pos)
+    connect(eolFormat, &StatusLabel::customContextMenuRequested, this, [=](const QPoint &pos)
     {
         emit customContextMenuRequestedForEOLLabel(eolFormat->mapToGlobal(pos));
     });

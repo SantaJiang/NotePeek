@@ -27,6 +27,7 @@ public:
 
     void refreshHighlights();
     void findNext();
+    void setFocus();
 
 public slots:
     void find();

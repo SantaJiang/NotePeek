@@ -69,10 +69,10 @@ int main(int argc, char *argv[])
     //translate
     QTranslator translator;
     const QStringList uiLanguages = QLocale::system().uiLanguages();
-    for(const QString &locale : uiLanguages)
+    for (const QString &locale : uiLanguages)
     {
-        const QString baseName = "notepeek_" + QLocale(locale).name();
-        if(translator.load(":/i18n/" + baseName))
+        const QString baseName = QStringLiteral("notepeek_") + QLocale(locale).name();
+        if (translator.load(QStringLiteral(":/i18n/") + baseName))
         {
             a.installTranslator(&translator);
             break;
@@ -80,7 +80,7 @@ int main(int argc, char *argv[])
     }
 
     //font
-    int id = QFontDatabase::addApplicationFont("://rescoure/SourceCodePro-Regular.ttf");
+    int id = QFontDatabase::addApplicationFont(QStringLiteral("://resource/SourceCodePro-Regular.ttf"));
     if (id == -1)
     {
         qWarning() << "Failed to load font from resource";

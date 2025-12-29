@@ -14,7 +14,7 @@ FindReplaceWidget::FindReplaceWidget(QWidget *parent)
 {
     ui->setupUi(this);
 
-    int fontId = QFontDatabase::addApplicationFont("://rescoure/fontawesome-webfont.ttf");
+    int fontId = QFontDatabase::addApplicationFont("://resource/fontawesome-webfont.ttf");
     QString fontName = QFontDatabase::applicationFontFamilies(fontId).at(0);
     QFont iconFont = QFont(fontName);
     ui->buttonClose->setFont(iconFont);
@@ -62,8 +62,7 @@ void FindReplaceWidget::showWithInitialText(const QString &initialText)
         ui->comboFind->setCurrentText(initialText);
     }
     show();
-    ui->comboFind->setFocus();
-    ui->comboFind->lineEdit()->selectAll();
+    setFocus();
 }
 
 void FindReplaceWidget::refreshHighlights()
@@ -78,6 +77,12 @@ void FindReplaceWidget::findNext()
     if (m_manager) {
         m_manager->findNext();
     }
+}
+
+void FindReplaceWidget::setFocus()
+{
+    ui->comboFind->setFocus();
+    ui->comboFind->lineEdit()->selectAll();
 }
 
 void FindReplaceWidget::find()

@@ -47,7 +47,7 @@ macx {
 
     QMAKE_RPATHDIR += $$DESTDIR
     QMAKE_LFLAGS += -Wl,-rpath,\'\$$ORIGIN\'
-    ICON = $$PWD/rescoure/notepeek.icns
+    ICON = $$PWD/resource/notepeek.icns
 }
 
 INCLUDEPATH += $$PWD/../QScintilla \
@@ -69,7 +69,8 @@ SOURCES += \
     ./find/findreplacewidget.cpp \
     main.cpp \
     mainwindow.cpp \
-    savelog.cpp
+    savelog.cpp \
+    tool/cpp/headersourcemanager.cpp
 
 HEADERS += \
     ./editor/editormanager.h \
@@ -85,7 +86,8 @@ HEADERS += \
     ./find/findreplacemanager.h \
     ./find/findreplacewidget.h \
     mainwindow.h \
-    savelog.h
+    savelog.h \
+    tool/cpp/headersourcemanager.h
 
 FORMS += \
     ./find/findreplacewidget.ui \
@@ -145,7 +147,7 @@ linux {
         mkdir -p $$shell_path($${OUT_PWD}/AppDir/usr/share/icons/hicolor/scalable/apps) && \
         cp $$shell_path($${DESTDIR}/notepeek) $$shell_path($${OUT_PWD}/AppDir/usr/bin/) && \
         cp $$shell_path($${PWD}/../../deploy/linux/notepeek.desktop) $$shell_path($${OUT_PWD}/AppDir/usr/share/applications/) && \
-        cp $$shell_path($${PWD}/rescoure/notepeek.svg) $$shell_path($${OUT_PWD}/AppDir/usr/share/icons/hicolor/scalable/apps/) && \
+        cp $$shell_path($${PWD}/resource/notepeek.svg) $$shell_path($${OUT_PWD}/AppDir/usr/share/icons/hicolor/scalable/apps/) && \
         cd $$shell_path($${OUT_PWD}/AppDir) && \
         wget --no-verbose "https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage" && \
         wget --no-verbose "https://github.com/linuxdeploy/linuxdeploy-plugin-qt/releases/download/continuous/linuxdeploy-plugin-qt-x86_64.AppImage" && \

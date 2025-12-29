@@ -55,11 +55,8 @@ void FindReplaceManager::find(const QString &text)
 
     addToFindHistory(m_findText);
 
-    bool re = false;
-    bool cs = m_caseSensitive;
-    bool wo = m_wholeWord;
-    bool wrap = m_wrapAround;
-    bool forward = !m_backwards;
+    bool re, cs, wo, wrap, forward;
+    prepareFindOptions(re, cs, wo, wrap, forward, m_wrapAround);
 
     m_editor->findFirst(m_findText, re, cs, wo, wrap, forward);
     emit findRequested();
@@ -84,10 +81,8 @@ void FindReplaceManager::findNext()
         int line = forward ? 0 : m_editor->lines() - 1;
         int index = forward ? 0 : m_editor->lineLength(line);
 
-        bool re = false;
-        bool cs = m_caseSensitive;
-        bool wo = m_wholeWord;
-        bool wrap = false;
+        bool re, cs, wo, wrap;
+        prepareFindOptions(re, cs, wo, wrap, forward, false);
 
         m_editor->findFirst(m_findText, re, cs, wo, wrap, forward, line, index);
     }
@@ -133,14 +128,14 @@ void FindReplaceManager::replaceAll()
     int currentLine, currentIndex;
     m_editor->getCursorPosition(&currentLine, &currentIndex);
 
-    bool re = false;
-    bool cs = m_caseSensitive;
-    bool wo = m_wholeWord;
+    bool re, cs, wo, wrap, forward;
+    prepareFindOptions(re, cs, wo, wrap, forward, false);
+    forward = true; // Always forward for replaceAll
 
     m_editor->setCursorPosition(0, 0);
 
     int replaceCount = 0;
-    bool found = m_editor->findFirst(m_findText, re, cs, wo, false, true);
+    bool found = m_editor->findFirst(m_findText, re, cs, wo, wrap, forward);
 
     while (found) {
         m_editor->replaceSelectedText(m_replaceText);
@@ -179,11 +174,9 @@ void FindReplaceManager::highlightAllMatches()
         m_editor->getSelection(&selLineFrom, &selIndexFrom, &selLineTo, &selIndexTo);
     }
 
-    bool re = false;
-    bool cs = m_caseSensitive;
-    bool wo = m_wholeWord;
-    bool wrap = false;
-    bool forward = true;
+    bool re, cs, wo, wrap, forward;
+    prepareFindOptions(re, cs, wo, wrap, forward, false);
+    forward = true; // Always forward for highlightAllMatches
 
     m_editor->setCursorPosition(0, 0);
     bool found = m_editor->findFirst(m_findText, re, cs, wo, wrap, forward);
@@ -288,13 +281,13 @@ void FindReplaceManager::setBackwards(bool backwards)
 void FindReplaceManager::addToFindHistory(const QString &text)
 {
     // 历史记录管理实现
-    Q_UNUSED(text)
+    Q_UNUSED(text);
 }
 
 void FindReplaceManager::addToReplaceHistory(const QString &text)
 {
     // 历史记录管理实现
-    Q_UNUSED(text)
+    Q_UNUSED(text);
 }
 
 void FindReplaceManager::selectFirstMatch()
@@ -302,11 +295,8 @@ void FindReplaceManager::selectFirstMatch()
     if (!m_editor || m_findText.isEmpty())
         return;
 
-    bool re = false;
-    bool cs = m_caseSensitive;
-    bool wo = m_wholeWord;
-    bool wrap = m_wrapAround;
-    bool forward = !m_backwards;
+    bool re, cs, wo, wrap, forward;
+    prepareFindOptions(re, cs, wo, wrap, forward, m_wrapAround);
 
     m_editor->findFirst(m_findText, re, cs, wo, wrap, forward);
 }
@@ -347,5 +337,14 @@ bool FindReplaceManager::isLargeFile() const
 
     QString filePath = m_editor->property("filePath").toString();
     QFileInfo fileInfo(filePath);
-    return (fileInfo.size() > 10 * 1024 * 1024);
+    return (fileInfo.size() > LARGE_FILE_SIZE);
+}
+
+void FindReplaceManager::prepareFindOptions(bool &re, bool &cs, bool &wo, bool &wrap, bool &forward, bool wrapAround) const
+{
+    re = false; // regex not supported yet
+    cs = m_caseSensitive;
+    wo = m_wholeWord;
+    wrap = wrapAround ? m_wrapAround : false;
+    forward = !m_backwards;
 }

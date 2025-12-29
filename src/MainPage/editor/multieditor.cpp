@@ -17,7 +17,7 @@ MultiEditor::MultiEditor(QWidget *parent, bool createDefault) : QWidget(parent),
     ui->setupUi(this);
     setAcceptDrops(false);
 
-    int fontId = QFontDatabase::addApplicationFont("://rescoure/fontawesome-webfont.ttf");
+    int fontId = QFontDatabase::addApplicationFont("://resource/fontawesome-webfont.ttf");
     QString fontName = QFontDatabase::applicationFontFamilies(fontId).at(0);
     QFont iconFont = QFont(fontName);
     ui->pushButton_closeDoc->setFont(iconFont);
