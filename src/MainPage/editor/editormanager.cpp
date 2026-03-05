@@ -130,6 +130,8 @@ void EditorManager::setupEditor(CustomEditor *editor)
     // Basic editor setup
     editor->setMarginType(0, CustomEditor::NumberMargin);
     editor->setMarginWidth(0, 30);
+    // 确保横向滚动条能够根据内容宽度自动调整
+    editor->setScrollWidthTracking(true);
     editor->setTabWidth(4);
     editor->setCaretLineVisible(true);
     editor->setCaretLineBackgroundColor(QColor("#E8E8FF"));
