@@ -130,7 +130,9 @@ void EditorManager::setupEditor(CustomEditor *editor)
     // Basic editor setup
     editor->setMarginType(0, CustomEditor::NumberMargin);
     editor->setMarginWidth(0, 30);
-    // 确保横向滚动条能够根据内容宽度自动调整
+    // 设置初始滚动宽度为最小值，避免空文档时显示横向滚动条
+    // 启用滚动宽度跟踪后，当文档内容变宽时会自动更新
+    editor->setScrollWidth(1);
     editor->setScrollWidthTracking(true);
     editor->setTabWidth(4);
     editor->setCaretLineVisible(true);
