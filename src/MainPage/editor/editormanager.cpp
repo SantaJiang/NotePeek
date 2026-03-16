@@ -245,10 +245,19 @@ void EditorManager::setupEditorSyntax(CustomEditor *editor, const QString &fileP
 
 void EditorManager::setEditorFont(CustomEditor *editor)
 {
-    if (!editor) return;
+    if (!editor)
+        return;
 
+#if defined(Q_OS_WIN)
     QFont font("Source Code Pro", 10);
     editor->setFont(font);
+#elif defined(Q_OS_MAC)
+    QFont font("Menlo", 12);
+    editor->setFont(font);
+#elif defined(Q_OS_LINUX)
+    QFont font("Source Code Pro", 10);
+    editor->setFont(font);
+#endif
 }
 
 void EditorManager::setMarginsFont(CustomEditor *editor)
