@@ -255,7 +255,12 @@ void EditorManager::setEditorFont(CustomEditor *editor)
     QFont font("Menlo", 12);
     editor->setFont(font);
 #elif defined(Q_OS_LINUX)
-    QFont font("Source Code Pro", 10);
+    QFont font;
+    QFontDatabase fontDB;
+    if (fontDB.hasFamily("Noto Sans Mono"))
+        font = QFont("Noto Sans Mono", 10);
+    else
+        font = QFont("Source Code Pro", 10);
     editor->setFont(font);
 #endif
 }
