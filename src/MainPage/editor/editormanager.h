@@ -22,6 +22,7 @@ public:
 
     void setupEditor(CustomEditor *editor);
     void updateLineNumberMarginWidth(CustomEditor *editor);
+    void updateEditorSyntax(CustomEditor *editor, const QString &filePath);
 
 signals:
     void fileDraged(QString filePath);

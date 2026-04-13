@@ -268,6 +268,36 @@ void EditorManager::setEditorFont(CustomEditor *editor)
 void EditorManager::setMarginsFont(CustomEditor *editor)
 {
     if (!editor) return;
+
     QFont marginFont = editor->font();
     editor->setMarginsFont(marginFont);
+}
+
+void EditorManager::updateEditorSyntax(CustomEditor *editor, const QString &filePath)
+{
+    if (!editor) return;
+
+    QFileInfo fileInfo(filePath);
+    QString extension = fileInfo.suffix();
+
+    LexerFactory::Language lang = LexerFactory::languageFromExtension(extension);
+    QsciLexer* lexer = LexerFactory::createLexer(lang);
+
+    if(lexer)
+    {
+        QFont editorFont = editor->font();
+        for (int i = 0; i <= QsciScintillaBase::STYLE_MAX; ++i)
+        {
+            lexer->setFont(editorFont, i);
+        }
+        editor->setLexer(lexer);
+        editor->setAutoIndent(true);
+    }
+    else
+    {
+        editor->setLexer(nullptr);
+        editor->setAutoIndent(false);
+        setEditorFont(editor);
+    }
+    setMarginsFont(editor);
 }

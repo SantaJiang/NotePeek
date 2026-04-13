@@ -1,11 +1,13 @@
 ﻿#include "multieditor.h"
 #include "ui_multieditor.h"
 #include "filesavedialog.h"
+#include "lexerfactory.h"
 #include <QTabBar>
 #include <QFileDialog>
 #include <QDebug>
 #include <QMessageBox>
 #include <QCoreApplication>
+#include <QRegularExpression>
 #include "customeditor.h"
 #include "../decorators/highlightedscrollbardecorator.h"
 
@@ -157,6 +159,7 @@ bool MultiEditor::saveFile(CustomEditor *editor, const QString &filePath)
     QApplication::restoreOverrideCursor();
 
     setCurrentFile(editor, filePath);
+    m_editorManager->updateEditorSyntax(editor, filePath);
     return true;
 }
 
@@ -331,9 +334,35 @@ bool MultiEditor::onSaveAs()
     CustomEditor *editor = currentEditor();
     if (!editor) return false;
 
-    QString fileName = QFileDialog::getSaveFileName(this);
+    QString filter = tr("Text Files (*.txt)") + ";;";
+    QStringList extensions = LexerFactory::supportedExtensions();
+    QStringList filters;
+    filters.append(tr("Text Files (*.txt)"));
+    for (const QString &ext : extensions)
+    {
+        filters.append(QString("%1 (*.%2)").arg(LexerFactory::languageName(LexerFactory::languageFromExtension(ext))).arg(ext));
+    }
+    filters.append(tr("All Files (*)"));
+    QString selectedFilter;
+
+    QString fileName = QFileDialog::getSaveFileName(this, tr("Save As"), "untitled.txt", filters.join(";;"), &selectedFilter);
     if (fileName.isEmpty())
         return false;
+
+    QFileInfo fileInfo(fileName);
+    if (fileInfo.suffix().isEmpty() && !selectedFilter.isEmpty() && selectedFilter != tr("All Files (*)"))
+    {
+        QRegularExpression re("\\(\\*\\.([^)]+)\\)");
+        QRegularExpressionMatch match = re.match(selectedFilter);
+        if (match.hasMatch())
+        {
+            QString ext = match.captured(1);
+            if (!ext.isEmpty())
+            {
+                fileName += "." + ext;
+            }
+        }
+    }
 
     return saveFile(editor, fileName);
 }
@@ -547,12 +576,39 @@ bool MultiEditor::closeAllEditors()
             if (filePath.isEmpty())
             {
                 // 未命名文件，需要另存为..
-                QString fileName = QFileDialog::getSaveFileName(this, tr("Save As"));
+                QString filter = tr("Text Files (*.txt)") + ";;";
+                QStringList extensions = LexerFactory::supportedExtensions();
+                QStringList filters;
+                filters.append(tr("Text Files (*.txt)"));
+                for (const QString &ext : extensions)
+                {
+                    filters.append(QString("%1 (*.%2)").arg(LexerFactory::languageName(LexerFactory::languageFromExtension(ext))).arg(ext));
+                }
+                filters.append(tr("All Files (*)"));
+                QString selectedFilter;
+
+                QString fileName = QFileDialog::getSaveFileName(this, tr("Save As"), "untitled.txt", filters.join(";;"), &selectedFilter);
                 if (fileName.isEmpty())
                 {
                     allSaved = false;
                     break;
                 }
+
+                QFileInfo fileInfo(fileName);
+                if (fileInfo.suffix().isEmpty() && !selectedFilter.isEmpty() && selectedFilter != tr("All Files (*)"))
+                {
+                    QRegularExpression re("\\(\\*\\.([^)]+)\\)");
+                    QRegularExpressionMatch match = re.match(selectedFilter);
+                    if (match.hasMatch())
+                    {
+                        QString ext = match.captured(1);
+                        if (!ext.isEmpty())
+                        {
+                            fileName += "." + ext;
+                        }
+                    }
+                }
+
                 if (!saveFile(editor, fileName))
                 {
                     allSaved = false;
