@@ -2,6 +2,9 @@ QT += core gui printsupport svg network
 greaterThan(QT_MAJOR_VERSION, 4): QT += widgets
 CONFIG += c++17
 
+# ARM 芯片编译兼容
+macx: QMAKE_CXXFLAGS += -Wno-error=implicit-function-declaration
+
 TEMPLATE = app
 TARGET = notepeek
 
