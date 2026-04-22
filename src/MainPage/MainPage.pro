@@ -51,6 +51,7 @@ macx {
     QMAKE_RPATHDIR += $$DESTDIR
     QMAKE_LFLAGS += -Wl,-rpath,\'\$$ORIGIN\'
     ICON = $$PWD/resource/notepeek.icns
+    QMAKE_INFO_PLIST = $$PWD/Info.plist
 }
 
 INCLUDEPATH += $$PWD/../QScintilla \
