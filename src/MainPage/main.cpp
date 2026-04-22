@@ -4,7 +4,40 @@
 #include <QDebug>
 #include <QStyleFactory>
 #include <QStandardPaths>
+#include <QEvent>
+#include <QFileOpenEvent>
 #include "savelog.h"
+
+class MacFileOpenEventFilter : public QObject
+{
+public:
+    explicit MacFileOpenEventFilter(MainWindow *window, QObject *parent = nullptr)
+        : QObject(parent)
+        , m_window(window)
+    {
+    }
+
+protected:
+    bool eventFilter(QObject *watched, QEvent *event) override
+    {
+        Q_UNUSED(watched);
+        if (event->type() == QEvent::FileOpen && m_window != nullptr)
+        {
+            auto *fileOpenEvent = static_cast<QFileOpenEvent *>(event);
+            const QString filePath = fileOpenEvent->file();
+            if (!filePath.isEmpty())
+            {
+                m_window->openFileByArg(filePath);
+            }
+            return true;
+        }
+
+        return QObject::eventFilter(watched, event);
+    }
+
+private:
+    MainWindow *m_window = nullptr;
+};
 
 QString getLogDirectory()
 {
@@ -87,6 +120,8 @@ int main(int argc, char *argv[])
     }
 
     MainWindow w;
+    MacFileOpenEventFilter fileOpenEventFilter(&w, &a);
+    a.installEventFilter(&fileOpenEventFilter);
     w.show();
 
     return a.exec();
