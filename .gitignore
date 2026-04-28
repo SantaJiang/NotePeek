@@ -49,6 +49,22 @@ target_wrapper.*
 # QtCreator CMake
 CMakeLists.txt.user*
 
+# CMake
+/build/
+cmake-build-*/
+
+# IDE
+.vscode/
+.idea/
+*.xcworkspace
+*.xcuserdata
+
+# Packaging output
+*.dmg
+*.deb
+*.rpm
+*.AppImage
+
 # QtCreator 4.8< compilation database
 compile_commands.json
 
