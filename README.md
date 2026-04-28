@@ -1,47 +1,37 @@
 # NotePeek
 
-## 各平台打包说明
+A modern cross-platform code/text editor powered by Qt (5.15+ or 6.2+) and QScintilla.
 
-### Windows 打包:
+## Build
+
+Requirements: Qt 5.15+ / Qt 6.2+, CMake 3.16+, C++17 compiler.
+
 ```bash
-# 构建项目
-qmake MainPage.pro
-make release
-
-# 打包
-make package    # 创建包含所有依赖的文件夹
-make zip        # 创建ZIP分发包
-make installer  # 创建安装程序
+cmake -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=/path/to/Qt
+cmake --build build --config Release --parallel
 ```
 
-### macOS 打包:
-```bash
-# 构建项目
-qmake MainPage.pro
-make release
+## Package
 
-# 打包
-make dmg        # 创建DMG磁盘映像
+```bash
+cd build
+
+# macOS: DMG
+cpack -G DragNDrop
+
+# Windows: NSIS installer
+cpack -G NSIS
+
+# Linux: DEB + RPM
+cpack -G "DEB;RPM"
 ```
 
-### Linux 打包:
+## Linux Direct Install
+
 ```bash
-# 构建项目
-qmake MainPage.pro
-make release
+chmod +x deploy/linux/install.sh
+sudo ./deploy/linux/install.sh
 
-# 打包
-make appimage   # 创建AppImage
-```
-
-### Linux 直接安装:
-工程根目录下:
-```bash
-#安装
-chmod +x install_notepeek.sh
-sudo ./install_notepeek.sh
-
-#卸载
-chmod +x uninstall_notepeek.sh
-sudo ./uninstall_notepeek.sh
+chmod +x deploy/linux/uninstall.sh
+sudo ./deploy/linux/uninstall.sh
 ```
