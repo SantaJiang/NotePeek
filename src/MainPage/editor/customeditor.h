@@ -12,13 +12,18 @@ class CustomEditor : public QsciScintilla
 public:
     explicit CustomEditor(QWidget *parent = nullptr);
 
+    void setFilePath(const QString &path);
+    QString filePath() const;
+
 signals:
-    void filesDropped(const QList<QUrl> &urls);  // 自定义多文件信号
+    void filesDropped(const QList<QUrl> &urls);
 
 protected:
     void dragEnterEvent(QDragEnterEvent  *e) override;
     void dropEvent(QDropEvent *e) override;
 
+private:
+    QString m_filePath;
 };
 
 #endif // CUSTOMEDITOR_H

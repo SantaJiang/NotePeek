@@ -8,7 +8,6 @@ set(MAINPAGE_SOURCES
     editor/filesavedialog.cpp
     editor/lexerfactory.cpp
     editor/multieditor.cpp
-    decorators/editordecorator.cpp
     decorators/highlightedscrollbar.cpp
     decorators/highlightedscrollbardecorator.cpp
     find/findreplacemanager.cpp
@@ -26,7 +25,6 @@ set(MAINPAGE_HEADERS
     editor/filesavedialog.h
     editor/lexerfactory.h
     editor/multieditor.h
-    decorators/editordecorator.h
     decorators/highlightedscrollbar.h
     decorators/highlightedscrollbardecorator.h
     find/findreplacemanager.h

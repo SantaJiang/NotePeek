@@ -5,6 +5,7 @@
 #include "editorswitchpopup.h"
 #include "../find/findreplacemanager.h"
 #include <QTabBar>
+#include <QShortcut>
 #include <QFileDialog>
 #include <QFontDatabase>
 #include <QApplication>
@@ -59,8 +60,17 @@ MultiEditor::MultiEditor(QWidget *parent, bool createDefault) : QWidget(parent),
     connect(m_switchPopup, &EditorSwitchPopup::itemSelected, this, &MultiEditor::switchToEditorByIndex);
     connect(m_switchPopup, &EditorSwitchPopup::popupClosed, this, &MultiEditor::onSwitchPopupClosed);
 
-    // 安装事件过滤器以捕获Ctrl+Tab快捷键
-    qApp->installEventFilter(this);
+    // Ctrl+Tab 切换编辑器（仅在本控件及子控件获得焦点时生效）
+    auto *tabShortcut = new QShortcut(QKeySequence(Qt::CTRL | Qt::Key_Tab), this);
+    tabShortcut->setContext(Qt::WidgetWithChildrenShortcut);
+    connect(tabShortcut, &QShortcut::activated, this, &MultiEditor::showEditorSwitchPopup);
+
+#ifdef Q_OS_MAC
+    // macOS 上 Cmd+Tab 被系统占用，改用 Option+Tab
+    auto *tabShortcutMac = new QShortcut(QKeySequence(Qt::ALT | Qt::Key_Tab), this);
+    tabShortcutMac->setContext(Qt::WidgetWithChildrenShortcut);
+    connect(tabShortcutMac, &QShortcut::activated, this, &MultiEditor::showEditorSwitchPopup);
+#endif
 }
 
 MultiEditor::~MultiEditor()
@@ -113,7 +123,7 @@ bool MultiEditor::maybeSave(CustomEditor *editor)
 
     // 使用新的多文件对话框，但只显示当前文件..
     QMap<CustomEditor*, QString> files;
-    QString filePath = editor->property("filePath").toString();
+    QString filePath = editor->filePath();
     QString displayName = filePath.isEmpty() ? tr("untitled.txt") : QFileInfo(filePath).fileName();
     files.insert(editor, displayName);
 
@@ -122,7 +132,7 @@ bool MultiEditor::maybeSave(CustomEditor *editor)
 
     if (result == QDialog::Accepted)
     {
-        QString filePath = editor->property("filePath").toString();
+        QString filePath = editor->filePath();
         if (filePath.isEmpty())
         {
             return onSaveAs();
@@ -255,7 +265,7 @@ void MultiEditor::setCurrentFile(CustomEditor *editor, const QString &filePath)
     if (!editor)
         return;
 
-    editor->setProperty("filePath", filePath);
+    editor->setFilePath(filePath);
     editor->setModified(false);
 
     QString shownName;
@@ -325,7 +335,7 @@ bool MultiEditor::onSave()
     CustomEditor *editor = currentEditor();
     if (!editor) return false;
 
-    QString filePath = editor->property("filePath").toString();
+    QString filePath = editor->filePath();
     if (filePath.isEmpty())
     {
         return onSaveAs();
@@ -341,37 +351,41 @@ bool MultiEditor::onSaveAs()
     CustomEditor *editor = currentEditor();
     if (!editor) return false;
 
-    QString filter = tr("Text Files (*.txt)") + ";;";
-    QStringList extensions = LexerFactory::supportedExtensions();
-    QStringList filters;
-    filters.append(tr("Text Files (*.txt)"));
-    for (const QString &ext : extensions)
-    {
-        filters.append(QString("%1 (*.%2)").arg(LexerFactory::languageName(LexerFactory::languageFromExtension(ext))).arg(ext));
-    }
-    filters.append(tr("All Files (*)"));
-    QString selectedFilter;
-
-    QString fileName = QFileDialog::getSaveFileName(this, tr("Save As"), "untitled.txt", filters.join(";;"), &selectedFilter);
+    QString fileName = promptSaveFileName(this);
     if (fileName.isEmpty())
         return false;
 
-    QFileInfo fileInfo(fileName);
-    if (fileInfo.suffix().isEmpty() && !selectedFilter.isEmpty() && selectedFilter != tr("All Files (*)"))
+    return saveFile(editor, fileName);
+}
+
+QString MultiEditor::promptSaveFileName(QWidget *parent)
+{
+    QStringList filters;
+    filters.append(tr("Text Files (*.txt)"));
+    for (const QString &ext : LexerFactory::supportedExtensions())
+        filters.append(QStringLiteral("%1 (*.%2)").arg(LexerFactory::languageName(LexerFactory::languageFromExtension(ext)), ext));
+    filters.append(tr("All Files (*)"));
+    QString selectedFilter;
+
+    QString fileName = QFileDialog::getSaveFileName(parent, tr("Save As"), QStringLiteral("untitled.txt"),
+                                                    filters.join(QStringLiteral(";;")), &selectedFilter);
+    if (fileName.isEmpty())
+        return {};
+
+    if (QFileInfo(fileName).suffix().isEmpty()
+        && !selectedFilter.isEmpty()
+        && selectedFilter != tr("All Files (*)"))
     {
-        QRegularExpression re("\\(\\*\\.([^)]+)\\)");
+        QRegularExpression re(QStringLiteral("\\(\\*\\.([^)]+)\\)"));
         QRegularExpressionMatch match = re.match(selectedFilter);
         if (match.hasMatch())
         {
-            QString ext = match.captured(1);
+            const QString ext = match.captured(1);
             if (!ext.isEmpty())
-            {
-                fileName += "." + ext;
-            }
+                fileName += u'.' + ext;
         }
     }
-
-    return saveFile(editor, fileName);
+    return fileName;
 }
 
 void MultiEditor::addTab(const QString &text, const QString &filePath)
@@ -556,7 +570,7 @@ bool MultiEditor::closeAllEditors()
     {
         if (editor && editor->isModified())
         {
-            QString filePath = editor->property("filePath").toString();
+            QString filePath = editor->filePath();
             QString displayName = filePath.isEmpty() ? tr("untitled.txt") : QFileInfo(filePath).fileName();
             modifiedFiles.insert(editor, displayName);
         }
@@ -579,56 +593,21 @@ bool MultiEditor::closeAllEditors()
 
         for(CustomEditor *editor : editorsToSave)
         {
-            QString filePath = editor->property("filePath").toString();
+            QString filePath = editor->filePath();
             if (filePath.isEmpty())
             {
-                // 未命名文件，需要另存为..
-                QString filter = tr("Text Files (*.txt)") + ";;";
-                QStringList extensions = LexerFactory::supportedExtensions();
-                QStringList filters;
-                filters.append(tr("Text Files (*.txt)"));
-                for (const QString &ext : extensions)
-                {
-                    filters.append(QString("%1 (*.%2)").arg(LexerFactory::languageName(LexerFactory::languageFromExtension(ext))).arg(ext));
-                }
-                filters.append(tr("All Files (*)"));
-                QString selectedFilter;
-
-                QString fileName = QFileDialog::getSaveFileName(this, tr("Save As"), "untitled.txt", filters.join(";;"), &selectedFilter);
-                if (fileName.isEmpty())
-                {
-                    allSaved = false;
-                    break;
-                }
-
-                QFileInfo fileInfo(fileName);
-                if (fileInfo.suffix().isEmpty() && !selectedFilter.isEmpty() && selectedFilter != tr("All Files (*)"))
-                {
-                    QRegularExpression re("\\(\\*\\.([^)]+)\\)");
-                    QRegularExpressionMatch match = re.match(selectedFilter);
-                    if (match.hasMatch())
-                    {
-                        QString ext = match.captured(1);
-                        if (!ext.isEmpty())
-                        {
-                            fileName += "." + ext;
-                        }
-                    }
-                }
-
-                if (!saveFile(editor, fileName))
+                filePath = promptSaveFileName(this->parentWidget());
+                if (filePath.isEmpty())
                 {
                     allSaved = false;
                     break;
                 }
             }
-            else
+
+            if (!saveFile(editor, filePath))
             {
-                if (!saveFile(editor, filePath))
-                {
-                    allSaved = false;
-                    break;
-                }
+                allSaved = false;
+                break;
             }
         }
 
@@ -671,70 +650,22 @@ void MultiEditor::setFindReplaceManagerForCurrentEditor(FindReplaceManager *mana
 
     manager->setCurrentEditor(editor);
 
-    QVariant decoratorVar = editor->property("scrollDecorator");
-    if (decoratorVar.isValid())
+    HighlightedScrollBarDecorator *decorator = editor->findChild<HighlightedScrollBarDecorator*>();
+    if (decorator)
     {
-        HighlightedScrollBarDecorator *decorator = decoratorVar.value<HighlightedScrollBarDecorator*>();
-        if (decorator)
-        {
-            // 连接管理器的搜索结果变化信号到装饰器的更新槽
-            connect(manager, &FindReplaceManager::searchResultsChanged,
-                    decorator, &HighlightedScrollBarDecorator::updateScrollBar,
-                    Qt::UniqueConnection);
-        }
+        connect(manager, &FindReplaceManager::searchResultsChanged,
+                decorator, &HighlightedScrollBarDecorator::updateScrollBar,
+                Qt::UniqueConnection);
     }
-}
-
-bool MultiEditor::eventFilter(QObject *obj, QEvent *event)
-{
-    if(m_switchPopup && m_switchPopup->isVisible())
-    {
-        return false;
-    }
-
-    if (event->type() == QEvent::KeyPress)
-    {
-        QKeyEvent *keyEvent = static_cast<QKeyEvent*>(event);
-
-        // 检测是否按下了Tab键..
-        if (keyEvent->key() == Qt::Key_Tab)
-        {
-            // 获取当前平台..
-            QString platform = QGuiApplication::platformName().toLower();
-
-            // 检查修饰键..
-            Qt::KeyboardModifiers modifiers = keyEvent->modifiers();
-
-            // macOS: 响应Option+Tab或Command+Tab..
-            if (platform.contains("cocoa") || platform.contains("macos"))
-            {
-                if ((modifiers & Qt::AltModifier) || (modifiers & Qt::MetaModifier))
-                {
-                    showEditorSwitchPopup();
-                    return true;
-                }
-            }
-            // Windows/Linux: 响应Ctrl+Tab..
-            else
-            {
-                if (modifiers & Qt::ControlModifier)
-                {
-                    showEditorSwitchPopup();
-                    return true;
-                }
-            }
-        }
-    }
-
-    return QObject::eventFilter(obj, event);
 }
 
 void MultiEditor::showEditorSwitchPopup()
 {
-    if (ui->tabWidget->count() <= 1)
-    {
+    if (m_switchPopup && m_switchPopup->isVisible())
         return;
-    }
+
+    if (ui->tabWidget->count() <= 1)
+        return;
 
     QStringList items;
     QStringList toolTips;

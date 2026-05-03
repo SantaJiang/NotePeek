@@ -99,7 +99,7 @@ CustomEditor *EditorManager::getEditorByFilePath(const QString &filePath)
     {
         if (editor)
         {
-            QString editorPath = editor->property("filePath").toString();
+            QString editorPath = editor->filePath();
             // 同样规范化编辑器中的路径..
             QString canonicalEditorPath = QDir::cleanPath(QFileInfo(editorPath).absoluteFilePath());
 
@@ -171,11 +171,8 @@ void EditorManager::purgeOldEditorPointers()
 
 void EditorManager::setupScrollBarDecorator(CustomEditor *editor)
 {
-    HighlightedScrollBarDecorator *scrollDecorator = new HighlightedScrollBarDecorator(editor);
-    scrollDecorator->setEnabled(true);
-
-    // 存储装饰器指针以便管理
-    editor->setProperty("scrollDecorator", QVariant::fromValue(scrollDecorator));
+    // Parented to editor, retrieved later via editor->findChild<HighlightedScrollBarDecorator*>()
+    new HighlightedScrollBarDecorator(editor);
 }
 
 void EditorManager::updateLineNumberMarginWidth(CustomEditor *editor)

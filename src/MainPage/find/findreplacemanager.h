@@ -7,7 +7,6 @@
 #include <QColor>
 
 class CustomEditor;
-class MultiEditor;
 class HighlightedScrollBarDecorator;
 
 class FindReplaceManager : public QObject
@@ -25,7 +24,6 @@ public:
     ~FindReplaceManager();
 
     void setCurrentEditor(CustomEditor *editor);
-    void setMultiEditor(MultiEditor *multiEditor);
 
     QString findText() const { return m_findText; }
     QString replaceText() const { return m_replaceText; }
@@ -70,7 +68,6 @@ private:
     static constexpr qint64 LARGE_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
 
     CustomEditor *m_editor;
-    MultiEditor *m_multiEditor;
     QString m_findText;
     QString m_replaceText;
     bool m_caseSensitive;

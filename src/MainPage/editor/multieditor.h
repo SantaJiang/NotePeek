@@ -46,9 +46,6 @@ public:
     // 关闭所有标签页（用于应用程序退出）..
     bool closeAllEditors();
 
-protected:
-    bool eventFilter(QObject *obj, QEvent *event) override;
-
 signals:
     void currentEditorChanged(CustomEditor *editor);
     void editorModificationChanged(CustomEditor *editor, bool modified);
@@ -79,6 +76,7 @@ private slots:
 private:
     void setEditorFont(CustomEditor *editor);
     void connectEditorSignals(CustomEditor *editor);
+    QString promptSaveFileName(QWidget *parent = nullptr);
 
     Ui::MultiEditor *ui;
     EditorManager *m_editorManager;

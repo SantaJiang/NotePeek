@@ -1,23 +1,22 @@
 #ifndef HIGHLIGHTEDSCROLLBARDECORATOR_H
 #define HIGHLIGHTEDSCROLLBARDECORATOR_H
 
-#include "editordecorator.h"
-#include <QPointer>
+#include <QObject>
 
+class QsciScintilla;
 class HighlightedScrollBar;
-class FindReplaceWidget;
 
-class HighlightedScrollBarDecorator : public EditorDecorator
+class HighlightedScrollBarDecorator : public QObject
 {
     Q_OBJECT
 
 public:
     explicit HighlightedScrollBarDecorator(QsciScintilla *editor);
 
-    void notify(const void *notificationData = nullptr) override;
+    void notify(const void *notificationData = nullptr);
 
-    HighlightedScrollBar *getScrollBar() const { return scrollBar; }
-    int getSearchIndicator() const { return searchIndicator; }
+    HighlightedScrollBar *getScrollBar() const { return m_scrollBar; }
+    int getSearchIndicator() const { return m_searchIndicator; }
 
 public slots:
     void updateScrollBar();
@@ -29,9 +28,10 @@ private slots:
     void handleScroll(int value);
 
 private:
-    HighlightedScrollBar *scrollBar;
-    int searchIndicator;
-    int bookmarkMarker;
+    QsciScintilla *m_editor;
+    HighlightedScrollBar *m_scrollBar;
+    int m_searchIndicator;
+    int m_bookmarkMarker;
 };
 
 #endif // HIGHLIGHTEDSCROLLBARDECORATOR_H

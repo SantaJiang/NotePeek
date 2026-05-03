@@ -1,8 +1,6 @@
 #include "findreplacemanager.h"
-#include "../editor/multieditor.h"
 #include "../editor/customeditor.h"
 #include "../decorators/highlightedscrollbardecorator.h"
-#include "../decorators/highlightedscrollbar.h"
 #include <QMessageBox>
 #include <QFileInfo>
 #include <QTimer>
@@ -11,7 +9,6 @@
 FindReplaceManager::FindReplaceManager(QObject *parent)
     : QObject(parent)
     , m_editor(nullptr)
-    , m_multiEditor(nullptr)
     , m_caseSensitive(false)
     , m_wholeWord(false)
     , m_wrapAround(true)
@@ -29,11 +26,6 @@ void FindReplaceManager::setCurrentEditor(CustomEditor *editor)
 {
     m_editor = editor;
     initializeEditor();
-}
-
-void FindReplaceManager::setMultiEditor(MultiEditor *multiEditor)
-{
-    m_multiEditor = multiEditor;
 }
 
 void FindReplaceManager::find(const QString &text)
@@ -307,15 +299,11 @@ void FindReplaceManager::updateScrollBarMarkers()
     if (!m_editor)
         return;
 
-    QVariant decoratorVar = m_editor->property("scrollDecorator");
-    if (decoratorVar.isValid()) {
-        HighlightedScrollBarDecorator *decorator = decoratorVar.value<HighlightedScrollBarDecorator*>();
-        if (decorator) {
-            decorator->notify(nullptr);
-        }
-    } else {
+    HighlightedScrollBarDecorator *decorator = m_editor->findChild<HighlightedScrollBarDecorator*>();
+    if (decorator)
+        decorator->notify(nullptr);
+    else
         m_editor->verticalScrollBar()->update();
-    }
 }
 
 void FindReplaceManager::initializeEditor()
@@ -325,12 +313,9 @@ void FindReplaceManager::initializeEditor()
 
     // Reuse the same indicator number as the scrollbar decorator so that
     // search-result ticks appear in the custom scrollbar.
-    QVariant decoratorVar = m_editor->property("scrollDecorator");
-    if (decoratorVar.isValid()) {
-        HighlightedScrollBarDecorator *decorator = decoratorVar.value<HighlightedScrollBarDecorator*>();
-        if (decorator)
-            m_highlightIndicator = decorator->getSearchIndicator();
-    }
+    HighlightedScrollBarDecorator *decorator = m_editor->findChild<HighlightedScrollBarDecorator*>();
+    if (decorator)
+        m_highlightIndicator = decorator->getSearchIndicator();
     if (m_highlightIndicator < 0)
         m_highlightIndicator = m_editor->indicatorDefine(CustomEditor::FullBoxIndicator);
 
@@ -347,7 +332,7 @@ bool FindReplaceManager::isLargeFile() const
     if (!m_editor)
         return false;
 
-    QString filePath = m_editor->property("filePath").toString();
+    QString filePath = m_editor->filePath();
     QFileInfo fileInfo(filePath);
     return (fileInfo.size() > LARGE_FILE_SIZE);
 }
