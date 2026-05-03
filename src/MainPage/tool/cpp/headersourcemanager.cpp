@@ -29,7 +29,7 @@ bool HeaderSourceManager::isSourceFile(const QString &filePath) const
     QString suffix = fileInfo.suffix().toLower();
     
     static QStringList sourceExtensions = {
-        "cpp", "cc", "cxx", "c++", "c", "m", "mm"
+        "cpp", "cc", "cxx", "c++", "c", "mm"
     };
     
     return sourceExtensions.contains(suffix);
@@ -65,9 +65,9 @@ bool HeaderSourceManager::hasCorrespondingFile(const QString &filePath) const
 
 QStringList HeaderSourceManager::getSupportedCppExtensions()
 {
-    return QStringList() << "h" << "hh" << "hpp" << "hxx" << "h++" 
+    return QStringList() << "h" << "hh" << "hpp" << "hxx" << "h++"
                          << "cpp" << "cc" << "cxx" << "c++" << "c"
-                         << "m" << "mm" << "inl";
+                         << "mm" << "inl";
 }
 
 QString HeaderSourceManager::getBaseName(const QString &filePath) const
@@ -90,7 +90,7 @@ QStringList HeaderSourceManager::getPossibleExtensions(const QString &filePath) 
         // 如果是头文件，找对应的源文件
         return QStringList{
             "cpp", "cc", "cxx", "c++", "c",
-            "m", "mm"  // Objective-C/C++
+            "mm"  // Objective-C++
         };
     } else if (isSourceFile(filePath)) {
         // 如果是源文件，找对应的头文件

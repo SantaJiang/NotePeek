@@ -16,6 +16,8 @@ class FileSaveDialog : public QDialog
     Q_OBJECT
 
 public:
+    enum { DontSave = 2 };
+
     explicit FileSaveDialog(const QMap<CustomEditor*, QString> &files, QWidget *parent = nullptr);
     QList<CustomEditor*> selectedEditors() const;
 

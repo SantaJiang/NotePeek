@@ -121,56 +121,58 @@ QsciLexer* LexerFactory::createLexer(Language lang)
     }
 }
 
+static const QHash<QString, LexerFactory::Language>& extensionMap()
+{
+    static const QHash<QString, LexerFactory::Language> map = {
+        {"py", LexerFactory::Python},
+        {"cpp", LexerFactory::CPP}, {"cc", LexerFactory::CPP}, {"cxx", LexerFactory::CPP},
+        {"h", LexerFactory::CPP}, {"hpp", LexerFactory::CPP}, {"hxx", LexerFactory::CPP},
+        {"java", LexerFactory::Java},
+        {"js", LexerFactory::JavaScript},
+        {"html", LexerFactory::HTML}, {"htm", LexerFactory::HTML},
+        {"xml", LexerFactory::XML}, {"ui", LexerFactory::XML}, {"qrc", LexerFactory::XML},
+        {"svg", LexerFactory::XML}, {"ts", LexerFactory::XML},
+        {"json", LexerFactory::JSON},
+        {"sql", LexerFactory::SQL},
+        {"cmake", LexerFactory::CMAKE},
+        {"css", LexerFactory::CSS},
+        {"makefile", LexerFactory::MAKEFILE}, {"mk", LexerFactory::MAKEFILE},
+        {"md", LexerFactory::MARKDOWN},
+        {"tex", LexerFactory::TEX},
+        {"sh", LexerFactory::SHELL}, {"bash", LexerFactory::SHELL},
+        {"yaml", LexerFactory::YAML}, {"yml", LexerFactory::YAML},
+        {"rb", LexerFactory::RUBY},
+        {"avs", LexerFactory::AVS},
+        {"bat", LexerFactory::BATCH}, {"cmd", LexerFactory::BATCH},
+        {"coffee", LexerFactory::COFFEESCRIPT},
+        {"cs", LexerFactory::CSHARP},
+        {"d", LexerFactory::D},
+        {"diff", LexerFactory::DIFF}, {"patch", LexerFactory::DIFF},
+        {"f", LexerFactory::FORTRAN}, {"for", LexerFactory::FORTRAN},
+        {"f90", LexerFactory::FORTRAN}, {"f95", LexerFactory::FORTRAN}, {"f03", LexerFactory::FORTRAN},
+        {"f77", LexerFactory::FORTRAN77},
+        {"lua", LexerFactory::LUA},
+        {"m", LexerFactory::MATLAB},
+        {"pas", LexerFactory::PASCAL}, {"p", LexerFactory::PASCAL},
+        {"pl", LexerFactory::PERL}, {"pm", LexerFactory::PERL},
+        {"po", LexerFactory::PO}, {"pot", LexerFactory::PO},
+        {"ps", LexerFactory::POSTSCRIPT}, {"eps", LexerFactory::POSTSCRIPT},
+        {"pov", LexerFactory::POV}, {"inc", LexerFactory::POV},
+        {"properties", LexerFactory::PROPERTIES}, {"prop", LexerFactory::PROPERTIES},
+        {"ini", LexerFactory::PROPERTIES}, {"cfg", LexerFactory::PROPERTIES},
+        {"spice", LexerFactory::SPICE}, {"cir", LexerFactory::SPICE},
+        {"tcl", LexerFactory::TCL}, {"tk", LexerFactory::TCL},
+        {"v", LexerFactory::VERILOG},
+        {"vhdl", LexerFactory::VHDL}, {"vhd", LexerFactory::VHDL},
+        {"idl", LexerFactory::IDL},
+        {"octave", LexerFactory::OCTAVE}, {"oct", LexerFactory::OCTAVE},
+    };
+    return map;
+}
+
 LexerFactory::Language LexerFactory::languageFromExtension(const QString& ext)
 {
-    static QHash<QString, Language> extensionMap =
-        {
-            {"py", Python},
-            {"cpp", CPP}, {"cc", CPP}, {"cxx", CPP}, {"h", CPP}, {"hpp", CPP}, {"hxx", CPP},
-            {"java", Java},
-            {"js", JavaScript},
-            {"html", HTML}, {"htm", HTML},
-            {"xml", XML},
-            {"ui", XML},
-            {"qrc", XML},
-            {"svg", XML},
-            {"ts", XML},
-            {"json", JSON},
-            {"sql", SQL},
-            {"cmake", CMAKE},
-            {"css", CSS},
-            {"makefile", MAKEFILE}, {"mk", MAKEFILE},
-            {"md", MARKDOWN},
-            {"tex", TEX},
-            {"sh", SHELL}, {"bash", SHELL},
-            {"yaml", YAML}, {"yml", YAML},
-            {"rb", RUBY},
-            {"avs", AVS},
-            {"bat", BATCH}, {"cmd", BATCH},
-            {"coffee", COFFEESCRIPT},
-            {"cs", CSHARP},
-            {"d", D},
-            {"diff", DIFF}, {"patch", DIFF},
-            {"f", FORTRAN}, {"for", FORTRAN}, {"f90", FORTRAN}, {"f95", FORTRAN}, {"f03", FORTRAN},
-            {"f77", FORTRAN77},
-            {"lua", LUA},
-            {"m", MATLAB},
-            {"pas", PASCAL}, {"p", PASCAL},
-            {"pl", PERL}, {"pm", PERL},
-            {"po", PO}, {"pot", PO},
-            {"ps", POSTSCRIPT}, {"eps", POSTSCRIPT},
-            {"pov", POV}, {"inc", POV},
-            {"properties", PROPERTIES}, {"prop", PROPERTIES}, {"ini", PROPERTIES}, {"cfg", PROPERTIES},
-            {"spice", SPICE}, {"cir", SPICE},
-            {"tcl", TCL}, {"tk", TCL},
-            {"v", VERILOG},
-            {"vhdl", VHDL}, {"vhd", VHDL},
-            {"idl", IDL},
-            {"octave", OCTAVE}, {"oct", OCTAVE}
-        };
-
-    QString lowerExt = ext.toLower();
-    return extensionMap.value(lowerExt, Unknown);
+    return extensionMap().value(ext.toLower(), Unknown);
 }
 
 QString LexerFactory::languageName(Language lang)
@@ -221,45 +223,5 @@ QString LexerFactory::languageName(Language lang)
 
 QStringList LexerFactory::supportedExtensions()
 {
-    static QStringList extensions = {
-        "py",
-        "cpp", "cc", "cxx", "h", "hpp", "hxx",
-        "java",
-        "js",
-        "html", "htm",
-        "xml", "ui", "qrc", "svg", "ts",
-        "json",
-        "sql",
-        "cmake",
-        "css",
-        "makefile", "mk",
-        "md",
-        "tex",
-        "sh", "bash",
-        "yaml", "yml",
-        "rb",
-        "avs",
-        "bat", "cmd",
-        "coffee",
-        "cs",
-        "d",
-        "diff", "patch",
-        "f", "for", "f90", "f95", "f03",
-        "f77",
-        "lua",
-        "m",
-        "pas", "p",
-        "pl", "pm",
-        "po", "pot",
-        "ps", "eps",
-        "pov", "inc",
-        "properties", "prop", "ini", "cfg",
-        "spice", "cir",
-        "tcl", "tk",
-        "v",
-        "vhdl", "vhd",
-        "idl",
-        "octave", "oct"
-    };
-    return extensions;
+    return extensionMap().keys();
 }

@@ -2,18 +2,11 @@
 #define MULTIEDITOR_H
 
 #include <QWidget>
-#include <QTabWidget>
-#include <QMap>
-#include <QFileInfo>
-#include <QTextStream>
-#include <QMessageBox>
-#include <QApplication>
-#include <QFontDatabase>
-#include <QCloseEvent>
-#include <QVBoxLayout>
+#include <QUrl>
 #include "editormanager.h"
-#include "editorswitchpopup.h"
-#include "../find/findreplacemanager.h"
+
+class EditorSwitchPopup;
+class FindReplaceManager;
 
 namespace Ui
 {

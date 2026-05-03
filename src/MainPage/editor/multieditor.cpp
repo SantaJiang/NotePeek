@@ -2,8 +2,15 @@
 #include "ui_multieditor.h"
 #include "filesavedialog.h"
 #include "lexerfactory.h"
+#include "editorswitchpopup.h"
+#include "../find/findreplacemanager.h"
 #include <QTabBar>
 #include <QFileDialog>
+#include <QFontDatabase>
+#include <QApplication>
+#include <QFileInfo>
+#include <QTextStream>
+#include <QMap>
 #include <QDebug>
 #include <QMessageBox>
 #include <QCoreApplication>
@@ -125,12 +132,12 @@ bool MultiEditor::maybeSave(CustomEditor *editor)
             return saveFile(editor, filePath);
         }
     }
-    else if (result == 2)
+    else if (result == FileSaveDialog::DontSave)
     {
-        return true; // 不保存..
+        return true;
     }
 
-    return false; // 取消..
+    return false;
 }
 
 bool MultiEditor::saveFile(CustomEditor *editor, const QString &filePath)
@@ -627,13 +634,12 @@ bool MultiEditor::closeAllEditors()
 
         return allSaved;
     }
-    else if (result == 2)
+    else if (result == FileSaveDialog::DontSave)
     {
-        // 不保存，直接退出..
         return true;
     }
 
-    return false; // 取消..
+    return false;
 }
 
 void MultiEditor::setCreateDefault(bool createDefault)
@@ -673,7 +679,8 @@ void MultiEditor::setFindReplaceManagerForCurrentEditor(FindReplaceManager *mana
         {
             // 连接管理器的搜索结果变化信号到装饰器的更新槽
             connect(manager, &FindReplaceManager::searchResultsChanged,
-                    decorator, &HighlightedScrollBarDecorator::updateScrollBar);
+                    decorator, &HighlightedScrollBarDecorator::updateScrollBar,
+                    Qt::UniqueConnection);
         }
     }
 }

@@ -4,6 +4,7 @@
 #include <QDebug>
 #include <QStyleFactory>
 #include <QStandardPaths>
+#include <QFontDatabase>
 #include <QEvent>
 #include <QFileOpenEvent>
 #include "savelog.h"
@@ -49,7 +50,7 @@ QString getLogDirectory()
 
 #elif defined(Q_OS_MAC)
     // macOS: ~/Library/Logs/AppName
-    logDir = QStandardPaths::writableLocation(QStandardPaths::HomeLocation) + "/Library/Log";
+    logDir = QStandardPaths::writableLocation(QStandardPaths::HomeLocation) + "/Library/Logs";
 
 #elif defined(Q_OS_LINUX)
     // Linux: ~/.local/share/AppName/log
@@ -65,10 +66,6 @@ QString getLogDirectory()
 
 int main(int argc, char *argv[])
 {
-#ifdef Q_OS_LINUX
-    qputenv("QT_QPA_PLATFORM", "xcb");
-#endif
-
     //high dpi
 #if QT_VERSION < QT_VERSION_CHECK(6,0,0)
     QApplication::setAttribute(Qt::AA_UseHighDpiPixmaps);

@@ -79,7 +79,7 @@ CustomEditor *EditorManager::createEditorFromFile(const QString &filePath, bool 
     }
     else
     {
-        setupEditorSyntax(editor, filePath);
+        updateEditorSyntax(editor, filePath);
     }
 
     return editor;
@@ -148,7 +148,9 @@ void EditorManager::setupEditor(CustomEditor *editor)
     setMarginsFont(editor);
 
     // Connect signals
-    connect(editor, SIGNAL(textChanged()), this, SLOT(handleTextChanged()));
+    connect(editor, &CustomEditor::textChanged, this, [editor]() {
+        emit editor->modificationChanged(editor->isModified());
+    });
 
     // 设置高亮滚动条装饰器
     setupScrollBarDecorator(editor);
@@ -164,16 +166,6 @@ void EditorManager::purgeOldEditorPointers()
         {
             it.remove();
         }
-    }
-}
-
-void EditorManager::handleTextChanged()
-{
-    // 获取发送信号的 editor 对象..
-    CustomEditor *editor = qobject_cast<CustomEditor*>(sender());
-    if (editor)
-    {
-        emit editor->modificationChanged(editor->isModified());
     }
 }
 
@@ -212,35 +204,6 @@ void EditorManager::updateLineNumberMarginWidth(CustomEditor *editor)
     width = qMax(width, 30);
 
     editor->setMarginWidth(0, width);
-}
-
-void EditorManager::setupEditorSyntax(CustomEditor *editor, const QString &filePath)
-{
-    if (!editor) return;
-
-    QFileInfo fileInfo(filePath);
-    QString extension = fileInfo.suffix();
-
-    LexerFactory::Language lang = LexerFactory::languageFromExtension(extension);
-    QsciLexer* lexer = LexerFactory::createLexer(lang);
-
-    if(lexer)
-    {
-        QFont editorFont = editor->font();
-        for (int i = 0; i <= QsciScintillaBase::STYLE_MAX; ++i)
-        {
-            lexer->setFont(editorFont, i);
-        }
-        editor->setLexer(lexer);
-        editor->setAutoIndent(true);
-    }
-    else
-    {
-        editor->setLexer(nullptr);
-        editor->setAutoIndent(false);
-        setEditorFont(editor);
-    }
-    setMarginsFont(editor);
 }
 
 void EditorManager::setEditorFont(CustomEditor *editor)
