@@ -47,9 +47,6 @@ MainWindow::MainWindow(QWidget *parent)
     // 初始化查找替换部件..
     ui->widget_findreplace->setMultiEditor(ui->multieditor);
 
-    // 初始化查找替换管理器
-    m_findReplaceManager->setMultiEditor(ui->multieditor);
-
     // 设置查找替换部件和管理器的关联
     ui->widget_findreplace->setFindReplaceManager(m_findReplaceManager);
 
@@ -334,7 +331,7 @@ void MainWindow::on_action_switchHeaderSource_triggered()
     CustomEditor *editor = ui->multieditor->currentEditor();
     if (!editor) return;
 
-    QString currentFilePath = editor->property("filePath").toString();
+    QString currentFilePath = editor->filePath();
     if (currentFilePath.isEmpty()) return;
 
     // 获取对应的头文件/源文件路径
@@ -386,7 +383,7 @@ void MainWindow::updateWindowTitle(bool modified)
     if (!editor) return;
 
     QString title;
-    QString filePath = editor->property("filePath").toString();
+    QString filePath = editor->filePath();
 
     if (filePath.isEmpty())
     {

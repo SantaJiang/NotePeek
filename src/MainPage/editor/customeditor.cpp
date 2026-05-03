@@ -7,6 +7,16 @@ CustomEditor::CustomEditor(QWidget *parent)
     setAcceptDrops(true);
 }
 
+void CustomEditor::setFilePath(const QString &path)
+{
+    m_filePath = path;
+}
+
+QString CustomEditor::filePath() const
+{
+    return m_filePath;
+}
+
 void CustomEditor::dragEnterEvent(QDragEnterEvent *e)
 {
     if (e->mimeData()->hasUrls())
