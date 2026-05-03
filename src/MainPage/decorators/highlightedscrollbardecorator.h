@@ -17,6 +17,7 @@ public:
     void notify(const void *notificationData = nullptr) override;
 
     HighlightedScrollBar *getScrollBar() const { return scrollBar; }
+    int getSearchIndicator() const { return searchIndicator; }
 
 public slots:
     void updateScrollBar();

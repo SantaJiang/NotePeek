@@ -1,7 +1,7 @@
 #include "highlightedscrollbar.h"
 #include <Qsci/qsciscintilla.h>
 #include <QDebug>
-#include "../find/findreplacewidget.h"
+#include <QTimer>
 
 HighlightedScrollBar::HighlightedScrollBar(QsciScintilla *editor, Qt::Orientation orientation, QWidget *parent)
     : QScrollBar(orientation, parent),

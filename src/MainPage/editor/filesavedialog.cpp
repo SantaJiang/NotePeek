@@ -48,8 +48,8 @@ FileSaveDialog::FileSaveDialog(const QMap<CustomEditor*, QString> &files, QWidge
     connect(cancelButton, &QPushButton::clicked, this, &QDialog::reject);
     connect(dontSaveButton, &QPushButton::clicked, this, [this]()
     {
-        done(2);
-    }); // 使用2表示不保存..
+        done(FileSaveDialog::DontSave);
+    });
 }
 
 QList<CustomEditor*> FileSaveDialog::selectedEditors() const

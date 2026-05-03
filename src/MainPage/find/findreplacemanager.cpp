@@ -2,6 +2,7 @@
 #include "../editor/multieditor.h"
 #include "../editor/customeditor.h"
 #include "../decorators/highlightedscrollbardecorator.h"
+#include "../decorators/highlightedscrollbar.h"
 #include <QMessageBox>
 #include <QFileInfo>
 #include <QTimer>
@@ -15,7 +16,7 @@ FindReplaceManager::FindReplaceManager(QObject *parent)
     , m_wholeWord(false)
     , m_wrapAround(true)
     , m_backwards(false)
-    , m_highlightIndicator(8)
+    , m_highlightIndicator(-1)
     , m_savedFirstVisibleLine(0)
 {
 }
@@ -321,6 +322,17 @@ void FindReplaceManager::initializeEditor()
 {
     if (!m_editor)
         return;
+
+    // Reuse the same indicator number as the scrollbar decorator so that
+    // search-result ticks appear in the custom scrollbar.
+    QVariant decoratorVar = m_editor->property("scrollDecorator");
+    if (decoratorVar.isValid()) {
+        HighlightedScrollBarDecorator *decorator = decoratorVar.value<HighlightedScrollBarDecorator*>();
+        if (decorator)
+            m_highlightIndicator = decorator->getSearchIndicator();
+    }
+    if (m_highlightIndicator < 0)
+        m_highlightIndicator = m_editor->indicatorDefine(CustomEditor::FullBoxIndicator);
 
     m_editor->indicatorDefine(CustomEditor::FullBoxIndicator, m_highlightIndicator);
     QColor highlightColor("#F59E0B");

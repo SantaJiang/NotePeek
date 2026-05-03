@@ -3,11 +3,8 @@
 
 #include <QScrollBar>
 #include <QPainter>
-#include <QWheelEvent>
-#include <QApplication>
 
 class QsciScintilla;
-class FindReplaceWidget;
 
 class HighlightedScrollBar : public QScrollBar
 {
