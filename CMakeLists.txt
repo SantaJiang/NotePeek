@@ -4,7 +4,7 @@ project(NotePeek
     VERSION 0.1.0
     DESCRIPTION "A modern code/text editor"
     HOMEPAGE_URL "https://github.com/SantaSpeeds/NotePeek"
-    LANGUAGES CXX
+    LANGUAGES C CXX
 )
 
 set(CMAKE_CXX_STANDARD 17)

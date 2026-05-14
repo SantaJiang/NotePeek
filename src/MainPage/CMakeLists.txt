@@ -14,6 +14,10 @@ set(MAINPAGE_SOURCES
     find/findreplacewidget.cpp
     widgets/qscieditorinfostatusbar.cpp
     tool/cpp/headersourcemanager.cpp
+    tool/markdown/markdownpreviewer.cpp
+    ../third_party/md4c/entity.c
+    ../third_party/md4c/md4c.c
+    ../third_party/md4c/md4c-html.c
 )
 
 set(MAINPAGE_HEADERS
@@ -31,6 +35,7 @@ set(MAINPAGE_HEADERS
     find/findreplacewidget.h
     widgets/qscieditorinfostatusbar.h
     tool/cpp/headersourcemanager.h
+    tool/markdown/markdownpreviewer.h
 )
 
 set(MAINPAGE_FORMS
@@ -66,6 +71,7 @@ endif()
 
 target_include_directories(notepeek PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/../third_party/md4c
     ${CMAKE_CURRENT_SOURCE_DIR}/../QScintilla
     ${CMAKE_CURRENT_SOURCE_DIR}/../QScintilla/scintilla/include
 )

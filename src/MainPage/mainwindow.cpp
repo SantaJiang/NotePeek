@@ -21,6 +21,7 @@ MainWindow::MainWindow(QWidget *parent)
     , m_pFileModel(nullptr)
     , m_findReplaceManager(new FindReplaceManager(this))
     , m_headerSourceManager(new HeaderSourceManager(this))
+    , m_markdownPreviewer(new MarkdownPreviewer(this))
 {
     ui->setupUi(this);
     setAcceptDrops(false);  // 主窗口不处理拖拽
@@ -69,6 +70,7 @@ MainWindow::MainWindow(QWidget *parent)
         ui->multieditor->setFindReplaceManagerForCurrentEditor(m_findReplaceManager);
 
         refreshHighlights();
+        updateToolActions();
     });
 
     // 连接查找替换部件的可见性变化
@@ -80,6 +82,9 @@ MainWindow::MainWindow(QWidget *parent)
     });
 
     connect(ui->multieditor, &MultiEditor::modificationChanged, this, &MainWindow::updateWindowTitle);
+    connect(ui->multieditor, &MultiEditor::currentFileChanged, this, [this](CustomEditor *, const QString &) {
+        updateToolActions();
+    });
     connect(ui->multieditor, &MultiEditor::copyAvailable, this, &MainWindow::updateEditActions);
     connect(ui->multieditor, &MultiEditor::filesDropped, this, &MainWindow::onFileDraged);
 
@@ -90,6 +95,7 @@ MainWindow::MainWindow(QWidget *parent)
 
     // 初始化编辑动作状态..
     updateEditActions(false);
+    updateToolActions();
 
     // 如果有文件参数，打开文件..
     if (hasFileArg && !filePath.isEmpty())
@@ -349,6 +355,17 @@ void MainWindow::on_action_switchHeaderSource_triggered()
     }
 }
 
+void MainWindow::on_action_markdownPreview_triggered()
+{
+    CustomEditor *editor = ui->multieditor->currentEditor();
+    if (!editor) return;
+
+    const QString currentFilePath = editor->filePath();
+    if (!m_markdownPreviewer->isMarkdownFile(currentFilePath)) return;
+
+    m_markdownPreviewer->showPreview(editor->text(), currentFilePath, this);
+}
+
 void MainWindow::onFileDraged(const QList<QUrl> &urls)
 {
     for (const QUrl &url : urls)
@@ -405,6 +422,21 @@ void MainWindow::updateWindowTitle(bool modified)
         setWindowTitle(tr("%1 - %2").arg(appName, title));
         setWindowModified(false);
     }
+}
+
+void MainWindow::updateToolActions()
+{
+    CustomEditor *editor = ui->multieditor->currentEditor();
+    const QString filePath = editor ? editor->filePath() : QString();
+
+    const bool cppSupported = !filePath.isEmpty() && m_headerSourceManager->isCppFile(filePath);
+    const bool markdownSupported = !filePath.isEmpty() && m_markdownPreviewer->isMarkdownFile(filePath);
+
+    ui->action_switchHeaderSource->setEnabled(cppSupported);
+    ui->menuToolCpp->setEnabled(cppSupported);
+    ui->action_markdownPreview->setEnabled(markdownSupported);
+    ui->menuToolMarkdown->setEnabled(markdownSupported);
+    ui->menuTool->setEnabled(cppSupported || markdownSupported);
 }
 
 void MainWindow::onSearchResultsChanged()

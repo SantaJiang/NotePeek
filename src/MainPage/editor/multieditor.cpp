@@ -286,6 +286,7 @@ void MultiEditor::setCurrentFile(CustomEditor *editor, const QString &filePath)
     }
 
     emit modificationChanged(false);
+    emit currentFileChanged(editor, filePath);
 }
 
 void MultiEditor::createDefaultDoc()

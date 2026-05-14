@@ -8,6 +8,7 @@
 #include "./editor/multieditor.h"
 #include "./find/findreplacemanager.h"
 #include "./tool/cpp/headersourcemanager.h"
+#include "./tool/markdown/markdownpreviewer.h"
 
 namespace Ui
 {
@@ -44,6 +45,7 @@ private slots:
     void on_action_paste_triggered();
     void on_action_find_triggered();
     void on_action_switchHeaderSource_triggered();
+    void on_action_markdownPreview_triggered();
 
     void onFileDraged(const QList<QUrl> &urls);
     void onFileClicked(const QModelIndex &index);
@@ -57,6 +59,7 @@ private:
     void setRootDirectory(const QString &dirPath);
     void refreshHighlights();
     void openFileAndSetRootDirectory(const QString &fileName);
+    void updateToolActions();
 
     Ui::MainWindow *ui;
     QFileSystemModel *m_pFileModel;
@@ -64,6 +67,7 @@ private:
     QDockWidget *m_pDock;
     FindReplaceManager *m_findReplaceManager;
     HeaderSourceManager *m_headerSourceManager;
+    MarkdownPreviewer *m_markdownPreviewer;
 };
 
 #endif // MAINWINDOW_H
