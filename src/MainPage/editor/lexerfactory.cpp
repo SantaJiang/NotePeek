@@ -5,6 +5,7 @@
 #include "../QScintilla/Qsci/qscilexerjavascript.h"
 #include "../QScintilla/Qsci/qscilexerhtml.h"
 #include "../QScintilla/Qsci/qscilexerxml.h"
+#include "../QScintilla/Qsci/qscilexerqml.h"
 #include "../QScintilla/Qsci/qscilexerjson.h"
 #include "../QScintilla/Qsci/qscilexersql.h"
 #include "../QScintilla/Qsci/qscilexercmake.h"
@@ -14,6 +15,7 @@
 #include "../QScintilla/Qsci/qscilexertex.h"
 #include "../QScintilla/Qsci/qscilexerbash.h"
 #include "../QScintilla/Qsci/qscilexeryaml.h"
+#include "../QScintilla/Qsci/qscilexerrust.h"
 #include "../QScintilla/Qsci/qscilexerruby.h"
 #include "../QScintilla/Qsci/qscilexeravs.h"
 #include "../QScintilla/Qsci/qscilexerbatch.h"
@@ -52,6 +54,8 @@ QsciLexer* LexerFactory::createLexer(Language lang)
         return new QsciLexerHTML();
     case XML:
         return new QsciLexerXML();
+    case QML:
+        return new QsciLexerQML();
     case JSON:
         return new QsciLexerJSON();
     case SQL:
@@ -70,6 +74,8 @@ QsciLexer* LexerFactory::createLexer(Language lang)
         return new QsciLexerBash();
     case YAML:
         return new QsciLexerYAML();
+    case Rust:
+        return new QsciLexerRust();
     case RUBY:
         return new QsciLexerRuby();
     case AVS:
@@ -132,6 +138,7 @@ static const QHash<QString, LexerFactory::Language>& extensionMap()
         {"html", LexerFactory::HTML}, {"htm", LexerFactory::HTML},
         {"xml", LexerFactory::XML}, {"ui", LexerFactory::XML}, {"qrc", LexerFactory::XML},
         {"svg", LexerFactory::XML}, {"ts", LexerFactory::XML},
+        {"qml", LexerFactory::QML}, {"qmltypes", LexerFactory::QML},
         {"json", LexerFactory::JSON},
         {"sql", LexerFactory::SQL},
         {"cmake", LexerFactory::CMAKE},
@@ -141,6 +148,7 @@ static const QHash<QString, LexerFactory::Language>& extensionMap()
         {"tex", LexerFactory::TEX},
         {"sh", LexerFactory::SHELL}, {"bash", LexerFactory::SHELL},
         {"yaml", LexerFactory::YAML}, {"yml", LexerFactory::YAML},
+        {"rs", LexerFactory::Rust},
         {"rb", LexerFactory::RUBY},
         {"avs", LexerFactory::AVS},
         {"bat", LexerFactory::BATCH}, {"cmd", LexerFactory::BATCH},
@@ -185,6 +193,7 @@ QString LexerFactory::languageName(Language lang)
     case JavaScript: return "JavaScript";
     case HTML: return "HTML";
     case XML: return "XML";
+    case QML: return "QML";
     case JSON: return "JSON";
     case SQL: return "SQL";
     case CMAKE: return "CMake";
@@ -194,6 +203,7 @@ QString LexerFactory::languageName(Language lang)
     case TEX: return "TeX";
     case SHELL: return "Shell";
     case YAML: return "YAML";
+    case Rust: return "Rust";
     case RUBY: return "Ruby";
     case AVS: return "AVS";
     case BATCH: return "Batch";
