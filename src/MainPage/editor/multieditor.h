@@ -52,6 +52,7 @@ signals:
     void editorCreated(CustomEditor *editor);
     void editorClosed(CustomEditor *editor);
     void fileOpened(CustomEditor *editor, const QString &filePath);
+    void currentFileChanged(CustomEditor *editor, const QString &filePath);
     void modificationChanged(bool modified);
     void copyAvailable(bool available);
     void filesDropped(const QList<QUrl> &urls);

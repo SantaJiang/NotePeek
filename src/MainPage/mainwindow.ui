@@ -118,7 +118,14 @@
      </property>
      <addaction name="action_switchHeaderSource"/>
     </widget>
+    <widget class="QMenu" name="menuToolMarkdown">
+     <property name="title">
+      <string>Markdown</string>
+     </property>
+     <addaction name="action_markdownPreview"/>
+    </widget>
     <addaction name="menuToolCpp"/>
+    <addaction name="menuToolMarkdown"/>
    </widget>
    <addaction name="menuFile"/>
    <addaction name="menuEdit"/>
@@ -258,6 +265,11 @@
    </property>
    <property name="shortcut">
     <string>F4</string>
+   </property>
+  </action>
+  <action name="action_markdownPreview">
+   <property name="text">
+    <string>Preview Markdown</string>
    </property>
   </action>
  </widget>
