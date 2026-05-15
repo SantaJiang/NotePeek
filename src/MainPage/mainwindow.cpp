@@ -71,6 +71,7 @@ MainWindow::MainWindow(QWidget *parent)
 
         refreshHighlights();
         updateToolActions();
+        updateEditActions(editor && editor->hasSelectedText());
     });
 
     // 连接查找替换部件的可见性变化
@@ -273,6 +274,8 @@ void MainWindow::on_action_showSlideBar_triggered(bool checked)
 
 void MainWindow::on_action_undo_triggered()
 {
+    if (ui->multieditor->isCurrentEditorPreviewVisible()) return;
+
     CustomEditor *editor = ui->multieditor->currentEditor();
     if (editor)
     {
@@ -282,6 +285,8 @@ void MainWindow::on_action_undo_triggered()
 
 void MainWindow::on_action_redo_triggered()
 {
+    if (ui->multieditor->isCurrentEditorPreviewVisible()) return;
+
     CustomEditor *editor = ui->multieditor->currentEditor();
     if (editor)
     {
@@ -291,6 +296,8 @@ void MainWindow::on_action_redo_triggered()
 
 void MainWindow::on_action_cut_triggered()
 {
+    if (ui->multieditor->isCurrentEditorPreviewVisible()) return;
+
     CustomEditor *editor = ui->multieditor->currentEditor();
     if (editor)
     {
@@ -300,15 +307,13 @@ void MainWindow::on_action_cut_triggered()
 
 void MainWindow::on_action_copy_triggered()
 {
-    CustomEditor *editor = ui->multieditor->currentEditor();
-    if (editor)
-    {
-        editor->copy();
-    }
+    ui->multieditor->copyCurrentSelection();
 }
 
 void MainWindow::on_action_paste_triggered()
 {
+    if (ui->multieditor->isCurrentEditorPreviewVisible()) return;
+
     CustomEditor *editor = ui->multieditor->currentEditor();
     if (editor)
     {
@@ -318,6 +323,8 @@ void MainWindow::on_action_paste_triggered()
 
 void MainWindow::on_action_find_triggered()
 {
+    if (ui->multieditor->isCurrentEditorPreviewVisible()) return;
+
     CustomEditor *editor = ui->multieditor->currentEditor();
     if (!editor) return;
 
@@ -363,7 +370,14 @@ void MainWindow::on_action_markdownPreview_triggered()
     const QString currentFilePath = editor->filePath();
     if (!m_markdownPreviewer->isMarkdownFile(currentFilePath)) return;
 
-    m_markdownPreviewer->showPreview(editor->text(), currentFilePath, this);
+    const bool previewVisible = ui->multieditor->toggleMarkdownPreview(m_markdownPreviewer);
+    if (previewVisible)
+    {
+        ui->widget_findreplace->setVisible(false);
+    }
+
+    updateEditActions(editor->hasSelectedText());
+    updateToolActions();
 }
 
 void MainWindow::onFileDraged(const QList<QUrl> &urls)
@@ -390,8 +404,13 @@ void MainWindow::onFileClicked(const QModelIndex &index)
 
 void MainWindow::updateEditActions(bool available)
 {
-    ui->action_cut->setEnabled(available);
+    const bool editingAvailable = !ui->multieditor->isCurrentEditorPreviewVisible();
+    ui->action_cut->setEnabled(editingAvailable && available);
     ui->action_copy->setEnabled(available);
+    ui->action_paste->setEnabled(editingAvailable);
+    ui->action_undo->setEnabled(editingAvailable);
+    ui->action_redo->setEnabled(editingAvailable);
+    ui->action_find->setEnabled(editingAvailable);
 }
 
 void MainWindow::updateWindowTitle(bool modified)
@@ -428,15 +447,18 @@ void MainWindow::updateToolActions()
 {
     CustomEditor *editor = ui->multieditor->currentEditor();
     const QString filePath = editor ? editor->filePath() : QString();
+    const bool previewVisible = ui->multieditor->isCurrentEditorPreviewVisible();
 
     const bool cppSupported = !filePath.isEmpty() && m_headerSourceManager->isCppFile(filePath);
     const bool markdownSupported = !filePath.isEmpty() && m_markdownPreviewer->isMarkdownFile(filePath);
 
-    ui->action_switchHeaderSource->setEnabled(cppSupported);
-    ui->menuToolCpp->setEnabled(cppSupported);
+    ui->action_switchHeaderSource->setEnabled(cppSupported && !previewVisible);
+    ui->menuToolCpp->setEnabled(cppSupported && !previewVisible);
     ui->action_markdownPreview->setEnabled(markdownSupported);
+    ui->action_markdownPreview->setChecked(markdownSupported && previewVisible);
+    ui->action_markdownPreview->setText(previewVisible ? tr("Show Markdown Source") : tr("Preview Markdown"));
     ui->menuToolMarkdown->setEnabled(markdownSupported);
-    ui->menuTool->setEnabled(cppSupported || markdownSupported);
+    ui->menuTool->setEnabled(true);
 }
 
 void MainWindow::onSearchResultsChanged()

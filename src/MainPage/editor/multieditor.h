@@ -3,10 +3,13 @@
 
 #include <QWidget>
 #include <QUrl>
+#include <QHash>
 #include "editormanager.h"
 
 class EditorSwitchPopup;
 class FindReplaceManager;
+class MarkdownPreviewer;
+class QTextBrowser;
 
 namespace Ui
 {
@@ -23,10 +26,14 @@ public:
 
     // 编辑器管理..
     CustomEditor *currentEditor() const;
+    bool isCurrentEditorPreviewVisible() const;
     int findEditorIndex(CustomEditor *editor) const;
     void switchToEditor(CustomEditor *editor);
     void setCreateDefault(bool createDefault);
     void setFindReplaceManagerForCurrentEditor(FindReplaceManager *manager);
+    bool toggleMarkdownPreview(MarkdownPreviewer *previewer);
+    void hideMarkdownPreview(CustomEditor *editor);
+    void copyCurrentSelection();
 
     // tab管理..
     void addTab(const QString &text, const QString &filePath = "");
@@ -78,11 +85,16 @@ private:
     void setEditorFont(CustomEditor *editor);
     void connectEditorSignals(CustomEditor *editor);
     QString promptSaveFileName(QWidget *parent = nullptr);
+    CustomEditor *editorForWidget(QWidget *widget) const;
+    bool copyAvailableForWidget(QWidget *widget) const;
+    void replaceTabWidget(int index, QWidget *widget);
 
     Ui::MultiEditor *ui;
     EditorManager *m_editorManager;
     CustomEditor *m_defaultEditor; // 指向默认空白编辑器的指针..
     EditorSwitchPopup *m_switchPopup;
+    QHash<CustomEditor *, QTextBrowser *> m_markdownPreviews;
+    QHash<QTextBrowser *, CustomEditor *> m_previewEditors;
 };
 
 #endif // MULTIEDITOR_H

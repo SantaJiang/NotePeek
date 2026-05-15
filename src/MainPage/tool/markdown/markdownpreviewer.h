@@ -5,6 +5,7 @@
 #include <QString>
 
 class QWidget;
+class QTextBrowser;
 
 class MarkdownPreviewer : public QObject
 {
@@ -14,6 +15,8 @@ public:
     explicit MarkdownPreviewer(QObject *parent = nullptr);
 
     bool isMarkdownFile(const QString &filePath) const;
+    QTextBrowser *createPreviewWidget(const QString &markdown, const QString &filePath, QWidget *parent);
+    void updatePreview(QTextBrowser *browser, const QString &markdown, const QString &filePath);
     void showPreview(const QString &markdown, const QString &filePath, QWidget *parent);
 
 private:

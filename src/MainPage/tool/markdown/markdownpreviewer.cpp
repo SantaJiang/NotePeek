@@ -37,20 +37,12 @@ bool MarkdownPreviewer::isMarkdownFile(const QString &filePath) const
 
 void MarkdownPreviewer::showPreview(const QString &markdown, const QString &filePath, QWidget *parent)
 {
-    auto *browser = new QTextBrowser;
+    auto *browser = createPreviewWidget(markdown, filePath, nullptr);
     browser->setAttribute(Qt::WA_DeleteOnClose);
-    browser->setReadOnly(true);
-    browser->setOpenExternalLinks(true);
     browser->setWindowTitle(filePath.isEmpty()
                             ? tr("Markdown Preview")
                             : tr("Markdown Preview - %1").arg(QFileInfo(filePath).fileName()));
 
-    if (!filePath.isEmpty())
-    {
-        browser->document()->setBaseUrl(QUrl::fromLocalFile(QFileInfo(filePath).absolutePath() + QLatin1Char('/')));
-    }
-
-    browser->setHtml(buildHtmlDocument(markdownToHtml(markdown)));
     browser->resize(900, 700);
 
     if (parent)
@@ -60,6 +52,31 @@ void MarkdownPreviewer::showPreview(const QString &markdown, const QString &file
     }
 
     browser->show();
+}
+
+QTextBrowser *MarkdownPreviewer::createPreviewWidget(const QString &markdown, const QString &filePath, QWidget *parent)
+{
+    auto *browser = new QTextBrowser(parent);
+    browser->setReadOnly(true);
+    browser->setOpenExternalLinks(true);
+    updatePreview(browser, markdown, filePath);
+    return browser;
+}
+
+void MarkdownPreviewer::updatePreview(QTextBrowser *browser, const QString &markdown, const QString &filePath)
+{
+    if (!browser) return;
+
+    if (!filePath.isEmpty())
+    {
+        browser->document()->setBaseUrl(QUrl::fromLocalFile(QFileInfo(filePath).absolutePath() + QLatin1Char('/')));
+    }
+    else
+    {
+        browser->document()->setBaseUrl(QUrl());
+    }
+
+    browser->setHtml(buildHtmlDocument(markdownToHtml(markdown)));
 }
 
 QString MarkdownPreviewer::markdownToHtml(const QString &markdown) const
