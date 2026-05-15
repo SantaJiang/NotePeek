@@ -67,7 +67,7 @@
      <x>0</x>
      <y>0</y>
      <width>968</width>
-     <height>39</height>
+     <height>21</height>
     </rect>
    </property>
    <widget class="QMenu" name="menuFile">
@@ -268,6 +268,9 @@
    </property>
   </action>
   <action name="action_markdownPreview">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
    <property name="text">
     <string>Preview Markdown</string>
    </property>

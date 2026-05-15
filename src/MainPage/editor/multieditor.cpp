@@ -4,6 +4,7 @@
 #include "lexerfactory.h"
 #include "editorswitchpopup.h"
 #include "../find/findreplacemanager.h"
+#include "../tool/markdown/markdownpreviewer.h"
 #include <QTabBar>
 #include <QShortcut>
 #include <QFileDialog>
@@ -16,6 +17,8 @@
 #include <QMessageBox>
 #include <QCoreApplication>
 #include <QRegularExpression>
+#include <QTextBrowser>
+#include <QIcon>
 #include "customeditor.h"
 #include "../decorators/highlightedscrollbardecorator.h"
 
@@ -85,14 +88,19 @@ CustomEditor *MultiEditor::currentEditor() const
         return nullptr;
     }
 
-    return qobject_cast<CustomEditor *>(ui->tabWidget->currentWidget());
+    return editorForWidget(ui->tabWidget->currentWidget());
+}
+
+bool MultiEditor::isCurrentEditorPreviewVisible() const
+{
+    return qobject_cast<QTextBrowser *>(ui->tabWidget->currentWidget()) != nullptr;
 }
 
 int MultiEditor::findEditorIndex(CustomEditor *editor) const
 {
     for (int i = 0; i < ui->tabWidget->count(); ++i)
     {
-        if (ui->tabWidget->widget(i) == editor)
+        if (editorForWidget(ui->tabWidget->widget(i)) == editor)
         {
             return i;
         }
@@ -111,7 +119,7 @@ void MultiEditor::switchToEditor(CustomEditor *editor)
         // 切换到对应的标签页..
         ui->tabWidget->setCurrentIndex(index);
         // 确保编辑器获得焦点..
-        editor->setFocus();
+        ui->tabWidget->currentWidget()->setFocus();
     }
 }
 
@@ -154,6 +162,9 @@ bool MultiEditor::saveFile(CustomEditor *editor, const QString &filePath)
 {
     if (!editor) return false;
 
+    const bool previewWasVisible = m_markdownPreviews.contains(editor);
+    const QString oldFilePath = QFileInfo(editor->filePath()).absoluteFilePath();
+
     QFile file(filePath);
     if (!file.open(QFile::WriteOnly | QFile::Text))
     {
@@ -177,6 +188,10 @@ bool MultiEditor::saveFile(CustomEditor *editor, const QString &filePath)
 
     setCurrentFile(editor, filePath);
     m_editorManager->updateEditorSyntax(editor, filePath);
+    if (previewWasVisible && QFileInfo(filePath).absoluteFilePath() != oldFilePath)
+    {
+        hideMarkdownPreview(editor);
+    }
     return true;
 }
 
@@ -443,7 +458,7 @@ void MultiEditor::clear()
 
 void MultiEditor::tabCloseRequested(int index)
 {
-    CustomEditor *editor = qobject_cast<CustomEditor *>(ui->tabWidget->widget(index));
+    CustomEditor *editor = editorForWidget(ui->tabWidget->widget(index));
     if (!editor) return;
 
     // 如果关闭的是默认编辑器，清除指针..
@@ -454,6 +469,7 @@ void MultiEditor::tabCloseRequested(int index)
 
     if (maybeSave(editor))
     {
+        hideMarkdownPreview(editor);
         ui->tabWidget->removeTab(index);
         // 从下拉框中移除对应项..
         removeTab(index);
@@ -475,7 +491,7 @@ void MultiEditor::currentTabChanged(int index)
 {
     if (index == -1) return;
 
-    CustomEditor *editor = qobject_cast<CustomEditor *>(ui->tabWidget->widget(index));
+    CustomEditor *editor = editorForWidget(ui->tabWidget->widget(index));
     if (!editor) return;
 
     // 发出当前编辑器改变信号..
@@ -497,7 +513,7 @@ void MultiEditor::currentTabChanged(int index)
     }
 
     // Update edit actions
-    emit copyAvailable(editor->hasSelectedText());
+    emit copyAvailable(copyAvailableForWidget(ui->tabWidget->widget(index)));
 }
 
 void MultiEditor::documentWasModified()
@@ -688,10 +704,10 @@ void MultiEditor::switchToEditorByIndex(int index)
     {
         ui->tabWidget->setCurrentIndex(index);
         // 确保编辑器获得焦点
-        CustomEditor *editor = qobject_cast<CustomEditor *>(ui->tabWidget->widget(index));
-        if (editor)
+        QWidget *widget = ui->tabWidget->widget(index);
+        if (widget)
         {
-            editor->setFocus();
+            widget->setFocus();
         }
     }
 }
@@ -699,4 +715,129 @@ void MultiEditor::switchToEditorByIndex(int index)
 void MultiEditor::onSwitchPopupClosed()
 {
     // 弹出窗口关闭后的清理工作（如果需要）
+}
+
+bool MultiEditor::toggleMarkdownPreview(MarkdownPreviewer *previewer)
+{
+    CustomEditor *editor = currentEditor();
+    if (!editor || !previewer)
+    {
+        return false;
+    }
+
+    if (m_markdownPreviews.contains(editor))
+    {
+        hideMarkdownPreview(editor);
+        editor->setFocus();
+        return false;
+    }
+
+    int index = findEditorIndex(editor);
+    if (index == -1)
+    {
+        return false;
+    }
+
+    QTextBrowser *browser = previewer->createPreviewWidget(editor->text(), editor->filePath(), ui->tabWidget);
+    connect(browser, &QTextBrowser::copyAvailable, this, &MultiEditor::copyAvailable);
+    m_markdownPreviews.insert(editor, browser);
+    m_previewEditors.insert(browser, editor);
+    replaceTabWidget(index, browser);
+    browser->setFocus();
+    return true;
+}
+
+void MultiEditor::copyCurrentSelection()
+{
+    QWidget *widget = ui->tabWidget->currentWidget();
+    if (auto *browser = qobject_cast<QTextBrowser *>(widget))
+    {
+        browser->copy();
+        return;
+    }
+
+    if (CustomEditor *editor = editorForWidget(widget))
+    {
+        editor->copy();
+    }
+}
+
+void MultiEditor::hideMarkdownPreview(CustomEditor *editor)
+{
+    if (!editor)
+    {
+        return;
+    }
+
+    QTextBrowser *browser = m_markdownPreviews.take(editor);
+    if (!browser)
+    {
+        return;
+    }
+
+    m_previewEditors.remove(browser);
+    int index = ui->tabWidget->indexOf(browser);
+    if (index != -1)
+    {
+        replaceTabWidget(index, editor);
+    }
+    browser->deleteLater();
+}
+
+CustomEditor *MultiEditor::editorForWidget(QWidget *widget) const
+{
+    if (!widget)
+    {
+        return nullptr;
+    }
+
+    if (auto *editor = qobject_cast<CustomEditor *>(widget))
+    {
+        return editor;
+    }
+
+    if (auto *browser = qobject_cast<QTextBrowser *>(widget))
+    {
+        return m_previewEditors.value(browser, nullptr);
+    }
+
+    return nullptr;
+}
+
+bool MultiEditor::copyAvailableForWidget(QWidget *widget) const
+{
+    if (auto *browser = qobject_cast<QTextBrowser *>(widget))
+    {
+        return !browser->textCursor().selectedText().isEmpty();
+    }
+
+    if (CustomEditor *editor = editorForWidget(widget))
+    {
+        return editor->hasSelectedText();
+    }
+
+    return false;
+}
+
+void MultiEditor::replaceTabWidget(int index, QWidget *widget)
+{
+    if (index < 0 || index >= ui->tabWidget->count() || !widget)
+    {
+        return;
+    }
+
+    const QString tabText = ui->tabWidget->tabText(index);
+    const QString tabToolTip = ui->tabWidget->tabToolTip(index);
+    const QIcon tabIcon = ui->tabWidget->tabIcon(index);
+    const bool tabsWereBlocked = ui->tabWidget->blockSignals(true);
+
+    ui->tabWidget->removeTab(index);
+    ui->tabWidget->insertTab(index, widget, tabIcon, tabText);
+    ui->tabWidget->setTabToolTip(index, tabToolTip);
+    ui->tabWidget->setCurrentIndex(index);
+
+    ui->tabWidget->blockSignals(tabsWereBlocked);
+    CustomEditor *editor = editorForWidget(widget);
+    emit currentEditorChanged(editor);
+    emit copyAvailable(copyAvailableForWidget(widget));
 }
