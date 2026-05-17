@@ -3,6 +3,8 @@ set(MAINPAGE_SOURCES
     mainwindow.cpp
     savelog.cpp
     editor/customeditor.cpp
+    editor/documentio.cpp
+    editor/documentpage.cpp
     editor/editormanager.cpp
     editor/editorswitchpopup.cpp
     editor/filesavedialog.cpp
@@ -24,6 +26,8 @@ set(MAINPAGE_HEADERS
     mainwindow.h
     savelog.h
     editor/customeditor.h
+    editor/documentio.h
+    editor/documentpage.h
     editor/editormanager.h
     editor/editorswitchpopup.h
     editor/filesavedialog.h
@@ -88,6 +92,7 @@ endif()
 if(Qt6_FOUND)
     qt_add_translations(notepeek
         TS_FILES ${CMAKE_SOURCE_DIR}/i18n/notepeek_zh_CN.ts
+        RESOURCE_PREFIX "/i18n"
     )
 else()
     qt5_add_translation(QM_FILES
@@ -105,8 +110,14 @@ endif()
 # ---- Platform-specific ----
 
 if(WIN32)
+    set(NOTEPEEK_WINDOWS_ICON "${CMAKE_SOURCE_DIR}/deploy/win/notepeek.ico")
+    configure_file(
+        ${CMAKE_SOURCE_DIR}/deploy/win/app.rc.in
+        ${CMAKE_CURRENT_BINARY_DIR}/app.rc
+        @ONLY
+    )
     set_target_properties(notepeek PROPERTIES WIN32_EXECUTABLE ON)
-    target_sources(notepeek PRIVATE ${CMAKE_SOURCE_DIR}/deploy/win/app.rc)
+    target_sources(notepeek PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/app.rc)
 elseif(APPLE)
     set_target_properties(notepeek PROPERTIES
         MACOSX_BUNDLE ON
@@ -119,7 +130,7 @@ elseif(APPLE)
         INSTALL_RPATH "@executable_path/../Frameworks"
     )
     set_source_files_properties(
-        ${CMAKE_SOURCE_DIR}/deploy/mac/Info.plist PROPERTIES
+        ${CMAKE_SOURCE_DIR}/src/MainPage/resource/notepeek.icns PROPERTIES
         MACOSX_PACKAGE_LOCATION Resources
     )
     target_sources(notepeek PRIVATE
@@ -132,6 +143,12 @@ elseif(UNIX)
     )
 endif()
 
+# ---- Install ----
+install(TARGETS notepeek
+    BUNDLE DESTINATION .
+    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+)
+
 # ---- Deploy (Qt6 only) ----
 if(Qt6_FOUND)
     qt_generate_deploy_app_script(
@@ -142,15 +159,12 @@ if(Qt6_FOUND)
     install(SCRIPT ${deploy_script})
 endif()
 
-# ---- Install ----
-install(TARGETS notepeek
-    BUNDLE DESTINATION .
-    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
-)
-
 if(UNIX AND NOT APPLE)
     install(FILES ${CMAKE_SOURCE_DIR}/deploy/linux/notepeek.desktop
         DESTINATION share/applications
+    )
+    install(FILES ${CMAKE_SOURCE_DIR}/deploy/linux/notepeek.appdata.xml
+        DESTINATION share/metainfo
     )
     install(FILES ${CMAKE_SOURCE_DIR}/src/MainPage/resource/notepeek.svg
         DESTINATION share/icons/hicolor/scalable/apps

@@ -3,13 +3,12 @@
 
 #include <QWidget>
 #include <QUrl>
-#include <QHash>
 #include "editormanager.h"
 
+class DocumentPage;
 class EditorSwitchPopup;
 class FindReplaceManager;
 class MarkdownPreviewer;
-class QTextBrowser;
 
 namespace Ui
 {
@@ -85,16 +84,16 @@ private:
     void setEditorFont(CustomEditor *editor);
     void connectEditorSignals(CustomEditor *editor);
     QString promptSaveFileName(QWidget *parent = nullptr);
-    CustomEditor *editorForWidget(QWidget *widget) const;
-    bool copyAvailableForWidget(QWidget *widget) const;
-    void replaceTabWidget(int index, QWidget *widget);
+    DocumentPage *createDocumentPage(CustomEditor *editor, const QString &filePath);
+    void refreshDocumentPageForFile(CustomEditor *editor, const QString &filePath);
+    DocumentPage *currentPage() const;
+    DocumentPage *pageForWidget(QWidget *widget) const;
+    DocumentPage *pageForEditor(CustomEditor *editor) const;
 
     Ui::MultiEditor *ui;
     EditorManager *m_editorManager;
     CustomEditor *m_defaultEditor; // 指向默认空白编辑器的指针..
     EditorSwitchPopup *m_switchPopup;
-    QHash<CustomEditor *, QTextBrowser *> m_markdownPreviews;
-    QHash<QTextBrowser *, CustomEditor *> m_previewEditors;
 };
 
 #endif // MULTIEDITOR_H

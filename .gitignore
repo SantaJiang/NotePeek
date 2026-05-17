@@ -11,6 +11,7 @@
 *.dylib
 *.DS_Store
 *.plist
+!deploy/mac/*.plist
 *.idx
 *.stash
 

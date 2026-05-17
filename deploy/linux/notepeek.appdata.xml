@@ -2,7 +2,7 @@
 <component type="desktop-application">
     <id>com.santa.notepeek</id>
     <metadata_license>CC0-1.0</metadata_license>
-    <project_license>GPL-3.0</project_license>
+    <project_license>GPL-3.0-or-later</project_license>
     <name>NotePeek</name>
     <summary>A modern code/text editor</summary>
     <description>
@@ -11,6 +11,6 @@
     </description>
     <url type="homepage">https://github.com/SantaSpeeds/NotePeek</url>
     <releases>
-        <release version="0.1.0" date="2025-09-25"/>
+        <release version="0.1.0" date="2026-05-17"/>
     </releases>
 </component>

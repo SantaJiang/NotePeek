@@ -1,14 +1,12 @@
 [Desktop Entry]
 Type=Application
 Name=NotePeek
-Comment=A modern note-taking application
-Comment[zh_CN]=方便快捷的笔记本应用
+Comment=A modern code/text editor
+Comment[zh_CN]=现代代码和文本编辑器
 Icon=notepeek
-Exec=notepeek
-StartupNotify=false
-MimeType=text/plain;application/x-python;
-Categories=Office;
+Exec=notepeek %F
+StartupNotify=true
+MimeType=text/plain;text/markdown;text/x-csrc;text/x-c++src;text/x-python;application/x-shellscript;
+Categories=Development;TextEditor;Utility;
 Terminal=false
-X-UKUI-AutoRestart=true
-X-UKUI-Autostart-Phase=Application
 
