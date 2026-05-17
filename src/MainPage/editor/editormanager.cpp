@@ -125,6 +125,20 @@ QList<CustomEditor *> EditorManager::getEditors() const
     return list;
 }
 
+void EditorManager::forgetEditor(CustomEditor *editor)
+{
+    if (!editor)
+        return;
+
+    for (int i = m_editors.size() - 1; i >= 0; --i)
+    {
+        if (m_editors.at(i).data() == editor)
+        {
+            m_editors.removeAt(i);
+        }
+    }
+}
+
 void EditorManager::setupEditor(CustomEditor *editor)
 {
     // Basic editor setup

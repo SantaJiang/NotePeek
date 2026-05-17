@@ -90,9 +90,18 @@ if(APPLE)
     set_target_properties(qscintilla2 PROPERTIES DEBUG_POSTFIX "d")
 endif()
 
-install(TARGETS qscintilla2
-    EXPORT NotePeekTargets
-    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
-    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
-    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
-)
+if(APPLE)
+    install(TARGETS qscintilla2
+        EXPORT NotePeekTargets
+        LIBRARY DESTINATION notepeek.app/Contents/Frameworks
+        RUNTIME DESTINATION notepeek.app/Contents/MacOS
+        ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    )
+else()
+    install(TARGETS qscintilla2
+        EXPORT NotePeekTargets
+        LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+        RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+        ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    )
+endif()

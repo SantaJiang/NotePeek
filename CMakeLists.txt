@@ -7,6 +7,8 @@ project(NotePeek
     LANGUAGES C CXX
 )
 
+set(NOTEPEEK_APP_ID "com.santa.notepeek" CACHE STRING "Reverse-DNS application identifier")
+
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
@@ -14,6 +16,8 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTOUIC ON)
 set(CMAKE_AUTORCC ON)
+
+include(GNUInstallDirs)
 
 # Try Qt6 first, fall back to Qt5
 find_package(Qt6 QUIET COMPONENTS Widgets PrintSupport Svg Network LinguistTools)
@@ -26,8 +30,6 @@ else()
 endif()
 
 add_subdirectory(src)
-
-include(GNUInstallDirs)
 
 # ---- CPack ----
 set(CPACK_PACKAGE_NAME "NotePeek")
@@ -46,10 +48,10 @@ elseif(WIN32)
     set(CPACK_NSIS_INSTALL_ROOT "$PROGRAMFILES64")
     set(CPACK_NSIS_DISPLAY_NAME "NotePeek")
     set(CPACK_NSIS_CREATE_ICONS_EXTRA
-        "CreateShortCut '$SMPROGRAMS\\\\$STARTMENU_FOLDER\\\\NotePeek.lnk' '$INSTDIR\\\\bin\\\\notepeek.exe'"
+        "CreateShortCut '$SMPROGRAMS\\\\$STARTMENU_FOLDER\\\\NotePeek.lnk' '$INSTDIR\\\\${CMAKE_INSTALL_BINDIR}\\\\notepeek.exe'"
     )
     set(CPACK_NSIS_DELETE_ICONS_EXTRA
-        "Delete '$SMPROGRAMS\\\\$START_MENU_FOLDER\\\\NotePeek.lnk'"
+        "Delete '$SMPROGRAMS\\\\$STARTMENU_FOLDER\\\\NotePeek.lnk'"
     )
 elseif(UNIX)
     set(CPACK_GENERATOR "DEB;RPM")

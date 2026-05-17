@@ -19,6 +19,7 @@ public:
     CustomEditor *createEditorFromFile(const QString &filePath, bool tryToCreate = false);
     CustomEditor *getEditorByFilePath(const QString &filePath);
     QList<CustomEditor *> getEditors() const;
+    void forgetEditor(CustomEditor *editor);
 
     void setupEditor(CustomEditor *editor);
     void updateLineNumberMarginWidth(CustomEditor *editor);

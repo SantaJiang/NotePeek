@@ -1,5 +1,7 @@
 ﻿#include "multieditor.h"
 #include "ui_multieditor.h"
+#include "documentio.h"
+#include "documentpage.h"
 #include "filesavedialog.h"
 #include "lexerfactory.h"
 #include "editorswitchpopup.h"
@@ -11,16 +13,28 @@
 #include <QFontDatabase>
 #include <QApplication>
 #include <QFileInfo>
-#include <QTextStream>
 #include <QMap>
 #include <QDebug>
 #include <QMessageBox>
 #include <QCoreApplication>
 #include <QRegularExpression>
-#include <QTextBrowser>
 #include <QIcon>
 #include "customeditor.h"
 #include "../decorators/highlightedscrollbardecorator.h"
+
+namespace {
+
+bool isMarkdownPath(const QString &filePath)
+{
+    const QString suffix = QFileInfo(filePath).suffix().toLower();
+    return suffix == QStringLiteral("md")
+           || suffix == QStringLiteral("markdown")
+           || suffix == QStringLiteral("mdown")
+           || suffix == QStringLiteral("mkd")
+           || suffix == QStringLiteral("mkdn");
+}
+
+} // namespace
 
 MultiEditor::MultiEditor(QWidget *parent, bool createDefault) : QWidget(parent),
     ui(new Ui::MultiEditor),
@@ -88,19 +102,22 @@ CustomEditor *MultiEditor::currentEditor() const
         return nullptr;
     }
 
-    return editorForWidget(ui->tabWidget->currentWidget());
+    DocumentPage *page = currentPage();
+    return page ? page->editor() : nullptr;
 }
 
 bool MultiEditor::isCurrentEditorPreviewVisible() const
 {
-    return qobject_cast<QTextBrowser *>(ui->tabWidget->currentWidget()) != nullptr;
+    DocumentPage *page = currentPage();
+    return page && page->isPreviewVisible();
 }
 
 int MultiEditor::findEditorIndex(CustomEditor *editor) const
 {
     for (int i = 0; i < ui->tabWidget->count(); ++i)
     {
-        if (editorForWidget(ui->tabWidget->widget(i)) == editor)
+        DocumentPage *page = pageForWidget(ui->tabWidget->widget(i));
+        if (page && page->editor() == editor)
         {
             return i;
         }
@@ -162,42 +179,33 @@ bool MultiEditor::saveFile(CustomEditor *editor, const QString &filePath)
 {
     if (!editor) return false;
 
-    const bool previewWasVisible = m_markdownPreviews.contains(editor);
     const QString oldFilePath = QFileInfo(editor->filePath()).absoluteFilePath();
 
-    QFile file(filePath);
-    if (!file.open(QFile::WriteOnly | QFile::Text))
+    QApplication::setOverrideCursor(Qt::WaitCursor);
+    QString errorMessage;
+    const bool saved = DocumentIO::saveTextFile(filePath, editor->text(), &errorMessage);
+    QApplication::restoreOverrideCursor();
+
+    if (!saved)
     {
         QMessageBox::warning(this, tr("NotePeek"),
                              tr("Cannot write file %1:\n%2.")
                              .arg(filePath)
-                             .arg(file.errorString()));
+                             .arg(errorMessage));
         return false;
     }
 
-    QTextStream out(&file);
-#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
-    out.setEncoding(QStringConverter::Utf8);
-#else
-    out.setCodec("UTF-8");
-#endif
-
-    QApplication::setOverrideCursor(Qt::WaitCursor);
-    out << editor->text();
-    QApplication::restoreOverrideCursor();
-
     setCurrentFile(editor, filePath);
     m_editorManager->updateEditorSyntax(editor, filePath);
-    if (previewWasVisible && QFileInfo(filePath).absoluteFilePath() != oldFilePath)
+    if (QFileInfo(filePath).absoluteFilePath() != oldFilePath)
     {
-        hideMarkdownPreview(editor);
+        refreshDocumentPageForFile(editor, filePath);
     }
     return true;
 }
 
 void MultiEditor::openFile(const QString &filePath)
 {
-    qDebug()<<Q_FUNC_INFO<<filePath;
     // 检查是否有默认空白编辑器且未修改..
     if (m_defaultEditor && !m_defaultEditor->isModified() && m_defaultEditor->text().isEmpty())
     {
@@ -205,10 +213,19 @@ void MultiEditor::openFile(const QString &filePath)
         if (index != -1)
         {
             // 关闭空白编辑器，不提醒..
-            ui->tabWidget->removeTab(index);
-            removeTab(index);
-            emit editorClosed(m_defaultEditor);
-            m_defaultEditor->deleteLater();
+            DocumentPage *page = pageForEditor(m_defaultEditor);
+        ui->tabWidget->removeTab(index);
+        removeTab(index);
+        emit editorClosed(m_defaultEditor);
+        m_editorManager->forgetEditor(m_defaultEditor);
+        if (page)
+        {
+            page->deleteLater();
+            }
+            else
+            {
+                m_defaultEditor->deleteLater();
+            }
             m_defaultEditor = nullptr;
         }
     }
@@ -235,7 +252,8 @@ void MultiEditor::openFile(const QString &filePath)
 
     // Add to tab widget
     QFileInfo fileInfo(filePath);
-    int tabIndex = ui->tabWidget->addTab(editor, fileInfo.fileName());
+    DocumentPage *page = createDocumentPage(editor, filePath);
+    int tabIndex = ui->tabWidget->addTab(page, fileInfo.fileName());
     ui->tabWidget->setCurrentIndex(tabIndex);
 
     // 添加到下拉框..
@@ -244,26 +262,33 @@ void MultiEditor::openFile(const QString &filePath)
     // 确保下拉框当前项同步..
     setCurrentTabIndex(tabIndex);
 
-    QFile file(filePath);
-    if (!file.open(QFile::ReadOnly | QFile::Text))
+    QApplication::setOverrideCursor(Qt::WaitCursor);
+    QString content;
+    QString errorMessage;
+    const bool loaded = DocumentIO::loadTextFile(filePath, &content, &errorMessage);
+    QApplication::restoreOverrideCursor();
+
+    if (!loaded)
     {
+        ui->tabWidget->removeTab(tabIndex);
+        removeTab(tabIndex);
+        emit editorClosed(editor);
+        m_editorManager->forgetEditor(editor);
+        page->deleteLater();
+
+        if (ui->tabWidget->count() == 0)
+        {
+            createDefaultDoc();
+        }
+
         QMessageBox::warning(this, tr("NotePeek"),
                              tr("Cannot read file %1:\n%2.")
                              .arg(filePath)
-                             .arg(file.errorString()));
+                             .arg(errorMessage));
         return;
     }
 
-    QTextStream in(&file);
-#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
-    in.setEncoding(QStringConverter::Utf8);
-#else
-    in.setCodec("UTF-8");
-#endif
-
-    QApplication::setOverrideCursor(Qt::WaitCursor);
-    editor->setText(in.readAll());
-    QApplication::restoreOverrideCursor();
+    editor->setText(content);
 
     setCurrentFile(editor, filePath);
     m_editorManager->updateLineNumberMarginWidth(editor);
@@ -307,7 +332,8 @@ void MultiEditor::setCurrentFile(CustomEditor *editor, const QString &filePath)
 void MultiEditor::createDefaultDoc()
 {
     CustomEditor *editor = m_editorManager->createEditor(tr("Untitled"));
-    int tabIndex = ui->tabWidget->addTab(editor, tr("Untitled"));
+    DocumentPage *page = createDocumentPage(editor, QString());
+    int tabIndex = ui->tabWidget->addTab(page, tr("Untitled"));
     ui->tabWidget->setCurrentIndex(tabIndex);
 
     // 设置为默认编辑器..
@@ -458,7 +484,8 @@ void MultiEditor::clear()
 
 void MultiEditor::tabCloseRequested(int index)
 {
-    CustomEditor *editor = editorForWidget(ui->tabWidget->widget(index));
+    DocumentPage *page = pageForWidget(ui->tabWidget->widget(index));
+    CustomEditor *editor = page ? page->editor() : nullptr;
     if (!editor) return;
 
     // 如果关闭的是默认编辑器，清除指针..
@@ -469,7 +496,6 @@ void MultiEditor::tabCloseRequested(int index)
 
     if (maybeSave(editor))
     {
-        hideMarkdownPreview(editor);
         ui->tabWidget->removeTab(index);
         // 从下拉框中移除对应项..
         removeTab(index);
@@ -477,7 +503,8 @@ void MultiEditor::tabCloseRequested(int index)
         // 发出编辑器关闭信号..
         emit editorClosed(editor);
 
-        editor->deleteLater();
+        m_editorManager->forgetEditor(editor);
+        page->deleteLater();
 
         // If no tabs left, create a new empty editor
         if (ui->tabWidget->count() == 0)
@@ -491,7 +518,8 @@ void MultiEditor::currentTabChanged(int index)
 {
     if (index == -1) return;
 
-    CustomEditor *editor = editorForWidget(ui->tabWidget->widget(index));
+    DocumentPage *page = pageForWidget(ui->tabWidget->widget(index));
+    CustomEditor *editor = page ? page->editor() : nullptr;
     if (!editor) return;
 
     // 发出当前编辑器改变信号..
@@ -513,7 +541,7 @@ void MultiEditor::currentTabChanged(int index)
     }
 
     // Update edit actions
-    emit copyAvailable(copyAvailableForWidget(ui->tabWidget->widget(index)));
+    emit copyAvailable(page->hasCopySelection());
 }
 
 void MultiEditor::documentWasModified()
@@ -646,10 +674,19 @@ void MultiEditor::setCreateDefault(bool createDefault)
         int index = findEditorIndex(m_defaultEditor);
         if (index != -1)
         {
+            DocumentPage *page = pageForEditor(m_defaultEditor);
             ui->tabWidget->removeTab(index);
             removeTab(index);
             emit editorClosed(m_defaultEditor);
-            m_defaultEditor->deleteLater();
+            m_editorManager->forgetEditor(m_defaultEditor);
+            if (page)
+            {
+                page->deleteLater();
+            }
+            else
+            {
+                m_defaultEditor->deleteLater();
+            }
             m_defaultEditor = nullptr;
         }
     }
@@ -719,46 +756,20 @@ void MultiEditor::onSwitchPopupClosed()
 
 bool MultiEditor::toggleMarkdownPreview(MarkdownPreviewer *previewer)
 {
-    CustomEditor *editor = currentEditor();
-    if (!editor || !previewer)
+    DocumentPage *page = currentPage();
+    if (!page || !previewer)
     {
         return false;
     }
 
-    if (m_markdownPreviews.contains(editor))
-    {
-        hideMarkdownPreview(editor);
-        editor->setFocus();
-        return false;
-    }
-
-    int index = findEditorIndex(editor);
-    if (index == -1)
-    {
-        return false;
-    }
-
-    QTextBrowser *browser = previewer->createPreviewWidget(editor->text(), editor->filePath(), ui->tabWidget);
-    connect(browser, &QTextBrowser::copyAvailable, this, &MultiEditor::copyAvailable);
-    m_markdownPreviews.insert(editor, browser);
-    m_previewEditors.insert(browser, editor);
-    replaceTabWidget(index, browser);
-    browser->setFocus();
-    return true;
+    return page->togglePreview(previewer);
 }
 
 void MultiEditor::copyCurrentSelection()
 {
-    QWidget *widget = ui->tabWidget->currentWidget();
-    if (auto *browser = qobject_cast<QTextBrowser *>(widget))
+    if (DocumentPage *page = currentPage())
     {
-        browser->copy();
-        return;
-    }
-
-    if (CustomEditor *editor = editorForWidget(widget))
-    {
-        editor->copy();
+        page->copyCurrentSelection();
     }
 }
 
@@ -769,59 +780,42 @@ void MultiEditor::hideMarkdownPreview(CustomEditor *editor)
         return;
     }
 
-    QTextBrowser *browser = m_markdownPreviews.take(editor);
-    if (!browser)
+    DocumentPage *page = pageForEditor(editor);
+    if (!page)
     {
         return;
     }
 
-    m_previewEditors.remove(browser);
-    int index = ui->tabWidget->indexOf(browser);
-    if (index != -1)
-    {
-        replaceTabWidget(index, editor);
-    }
-    browser->deleteLater();
+    page->hidePreview();
 }
 
-CustomEditor *MultiEditor::editorForWidget(QWidget *widget) const
+DocumentPage *MultiEditor::createDocumentPage(CustomEditor *editor, const QString &filePath)
 {
-    if (!widget)
-    {
-        return nullptr;
-    }
-
-    if (auto *editor = qobject_cast<CustomEditor *>(widget))
-    {
-        return editor;
-    }
-
-    if (auto *browser = qobject_cast<QTextBrowser *>(widget))
-    {
-        return m_previewEditors.value(browser, nullptr);
-    }
-
-    return nullptr;
+    DocumentPage *page = isMarkdownPath(filePath)
+                             ? static_cast<DocumentPage *>(new MarkdownDocumentPage(editor, ui->tabWidget))
+                             : static_cast<DocumentPage *>(new PlainDocumentPage(editor, ui->tabWidget));
+    connect(page, &DocumentPage::copyAvailableChanged, this, &MultiEditor::copyAvailable);
+    return page;
 }
 
-bool MultiEditor::copyAvailableForWidget(QWidget *widget) const
+void MultiEditor::refreshDocumentPageForFile(CustomEditor *editor, const QString &filePath)
 {
-    if (auto *browser = qobject_cast<QTextBrowser *>(widget))
+    DocumentPage *oldPage = pageForEditor(editor);
+    if (!oldPage)
     {
-        return !browser->textCursor().selectedText().isEmpty();
+        return;
     }
 
-    if (CustomEditor *editor = editorForWidget(widget))
+    const bool needsMarkdownPage = isMarkdownPath(filePath);
+    const bool hasMarkdownPage = qobject_cast<MarkdownDocumentPage *>(oldPage) != nullptr;
+    if (needsMarkdownPage == hasMarkdownPage)
     {
-        return editor->hasSelectedText();
+        oldPage->hidePreview();
+        return;
     }
 
-    return false;
-}
-
-void MultiEditor::replaceTabWidget(int index, QWidget *widget)
-{
-    if (index < 0 || index >= ui->tabWidget->count() || !widget)
+    const int index = ui->tabWidget->indexOf(oldPage);
+    if (index == -1)
     {
         return;
     }
@@ -829,15 +823,50 @@ void MultiEditor::replaceTabWidget(int index, QWidget *widget)
     const QString tabText = ui->tabWidget->tabText(index);
     const QString tabToolTip = ui->tabWidget->tabToolTip(index);
     const QIcon tabIcon = ui->tabWidget->tabIcon(index);
-    const bool tabsWereBlocked = ui->tabWidget->blockSignals(true);
+    CustomEditor *ownedEditor = oldPage->takeEditor();
+    if (!ownedEditor)
+    {
+        return;
+    }
 
+    DocumentPage *newPage = createDocumentPage(ownedEditor, filePath);
+    const bool tabsWereBlocked = ui->tabWidget->blockSignals(true);
     ui->tabWidget->removeTab(index);
-    ui->tabWidget->insertTab(index, widget, tabIcon, tabText);
+    ui->tabWidget->insertTab(index, newPage, tabIcon, tabText);
     ui->tabWidget->setTabToolTip(index, tabToolTip);
     ui->tabWidget->setCurrentIndex(index);
-
     ui->tabWidget->blockSignals(tabsWereBlocked);
-    CustomEditor *editor = editorForWidget(widget);
-    emit currentEditorChanged(editor);
-    emit copyAvailable(copyAvailableForWidget(widget));
+    oldPage->deleteLater();
+
+    emit currentEditorChanged(ownedEditor);
+    emit copyAvailable(newPage->hasCopySelection());
+}
+
+DocumentPage *MultiEditor::currentPage() const
+{
+    return pageForWidget(ui->tabWidget->currentWidget());
+}
+
+DocumentPage *MultiEditor::pageForWidget(QWidget *widget) const
+{
+    return qobject_cast<DocumentPage *>(widget);
+}
+
+DocumentPage *MultiEditor::pageForEditor(CustomEditor *editor) const
+{
+    if (!editor)
+    {
+        return nullptr;
+    }
+
+    for (int i = 0; i < ui->tabWidget->count(); ++i)
+    {
+        DocumentPage *page = pageForWidget(ui->tabWidget->widget(i));
+        if (page && page->editor() == editor)
+        {
+            return page;
+        }
+    }
+
+    return nullptr;
 }

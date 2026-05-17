@@ -84,14 +84,15 @@ int main(int argc, char *argv[])
 #endif
 
     //style
-    QStringList styles = QStyleFactory::keys();
-    qDebug() << "Available styles:" << styles;
 #ifdef Q_OS_WIN
-    a.setStyle(QStyleFactory::create("windowsvista"));
+    if (QStyle *style = QStyleFactory::create("windowsvista"))
+        a.setStyle(style);
 #elif defined(Q_OS_MAC)
-    a.setStyle(QStyleFactory::create("Fusion"));
+    if (QStyle *style = QStyleFactory::create("Fusion"))
+        a.setStyle(style);
 #elif defined(Q_OS_LINUX)
-    a.setStyle(QStyleFactory::create("Fusion"));
+    if (QStyle *style = QStyleFactory::create("Fusion"))
+        a.setStyle(style);
 #else
     qDebug() << "Running on unknown platform";
 #endif
