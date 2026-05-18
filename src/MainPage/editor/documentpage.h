@@ -21,6 +21,7 @@ public:
     virtual bool isPreviewVisible() const;
     virtual bool togglePreview(MarkdownPreviewer *previewer);
     virtual void hidePreview();
+    virtual void refreshPreview();
     virtual void copyCurrentSelection();
     virtual bool hasCopySelection() const;
 
@@ -50,6 +51,7 @@ public:
     CustomEditor *takeEditor() override;
     bool togglePreview(MarkdownPreviewer *previewer) override;
     void hidePreview() override;
+    void refreshPreview() override;
     void copyCurrentSelection() override;
     bool hasCopySelection() const override;
 

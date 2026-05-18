@@ -1,4 +1,5 @@
 #include "highlightedscrollbar.h"
+#include "themecolors.h"
 #include <Qsci/qsciscintilla.h>
 #include <QDebug>
 #include <QTimer>
@@ -85,7 +86,7 @@ void HighlightedScrollBar::drawSearchResults(QPainter &p)
 
         if (startPos == -1 || endPos == -1 || startPos >= endPos) break;
 
-        drawTickMark(p, posToScrollBarY(startPos), DEFAULT_TICK_HEIGHT, SEARCH_RESULT_COLOR);
+        drawTickMark(p, posToScrollBarY(startPos), DEFAULT_TICK_HEIGHT, ThemeColors::ScrollBar::searchResult());
         currentPos = endPos + 1;
     }
 }
@@ -97,7 +98,7 @@ void HighlightedScrollBar::drawBookmarks(QPainter &p)
     // 查找所有书签
     int line = 0;
     while ((line = editor->markerFindNext(line, 1 << bookmarkMarker)) != -1) {
-        drawTickMark(p, lineToScrollBarY(line), DEFAULT_TICK_HEIGHT, BOOKMARK_COLOR);
+        drawTickMark(p, lineToScrollBarY(line), DEFAULT_TICK_HEIGHT, ThemeColors::ScrollBar::bookmark());
         line++;
     }
 }
@@ -106,7 +107,7 @@ void HighlightedScrollBar::drawCurrentLine(QPainter &p)
 {
     int line, index;
     editor->getCursorPosition(&line, &index);
-    drawTickMark(p, lineToScrollBarY(line), DEFAULT_TICK_HEIGHT, CURRENT_LINE_COLOR);
+    drawTickMark(p, lineToScrollBarY(line), DEFAULT_TICK_HEIGHT, ThemeColors::ScrollBar::currentLine());
 }
 
 void HighlightedScrollBar::drawTickMark(QPainter &p, int y, int height, const QColor &color)

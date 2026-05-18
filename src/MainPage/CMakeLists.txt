@@ -25,6 +25,7 @@ set(MAINPAGE_SOURCES
 set(MAINPAGE_HEADERS
     mainwindow.h
     savelog.h
+    themecolors.h
     editor/customeditor.h
     editor/documentio.h
     editor/documentpage.h

@@ -1,4 +1,5 @@
 #include "markdownpreviewer.h"
+#include "themecolors.h"
 
 #include <QByteArray>
 #include <QFileInfo>
@@ -100,37 +101,55 @@ QString MarkdownPreviewer::markdownToHtml(const QString &markdown) const
 
 QString MarkdownPreviewer::buildHtmlDocument(const QString &bodyHtml) const
 {
+    namespace MP = ThemeColors::MarkdownPreview;
+
+    // Build colour strings in CSS format
+    auto cssColor = [](const QColor &c) -> QString {
+        return c.name(QColor::HexRgb);
+    };
+
+    const QString sBodyBg       = cssColor(MP::bodyBg());
+    const QString sBodyFg       = cssColor(MP::bodyFg());
+    const QString sHeadingFg    = cssColor(MP::headingFg());
+    const QString sHeadingBrd   = cssColor(MP::headingBorder());
+    const QString sCodeBg       = cssColor(MP::codeBg());
+    const QString sCodeBrd      = cssColor(MP::codeBorder());
+    const QString sBqBrd        = cssColor(MP::blockquoteBorder());
+    const QString sBqFg         = cssColor(MP::blockquoteFg());
+    const QString sTblBrd       = cssColor(MP::tableBorder());
+    const QString sLnkFg        = cssColor(MP::linkFg());
+
     return QStringLiteral(R"(<!doctype html>
 <html>
 <head>
 <meta charset="utf-8">
 <style>
 body {
-    color: #1f2328;
-    background: #ffffff;
+    color: %1;
+    background: %2;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     font-size: 15px;
     line-height: 1.6;
     margin: 28px 34px;
 }
 h1, h2, h3, h4, h5, h6 {
-    color: #111827;
+    color: %3;
     line-height: 1.25;
     margin: 1.35em 0 0.55em;
 }
 h1, h2 {
-    border-bottom: 1px solid #d0d7de;
+    border-bottom: 1px solid %4;
     padding-bottom: 0.25em;
 }
 pre {
-    background: #f6f8fa;
-    border: 1px solid #d0d7de;
+    background: %5;
+    border: 1px solid %6;
     border-radius: 6px;
     padding: 12px;
     overflow: auto;
 }
 code {
-    background: #f6f8fa;
+    background: %5;
     border-radius: 4px;
     font-family: Menlo, Consolas, monospace;
     padding: 0.12em 0.3em;
@@ -140,8 +159,8 @@ pre code {
     padding: 0;
 }
 blockquote {
-    border-left: 4px solid #d0d7de;
-    color: #57606a;
+    border-left: 4px solid %7;
+    color: %8;
     margin-left: 0;
     padding-left: 1em;
 }
@@ -149,11 +168,11 @@ table {
     border-collapse: collapse;
 }
 th, td {
-    border: 1px solid #d0d7de;
+    border: 1px solid %9;
     padding: 6px 10px;
 }
 a {
-    color: #0969da;
+    color: %10;
 }
 img {
     max-width: 100%;
@@ -161,7 +180,9 @@ img {
 </style>
 </head>
 <body>
-%1
+%11
 </body>
-</html>)").arg(bodyHtml);
+</html>)")
+        .arg(sBodyFg, sBodyBg, sHeadingFg, sHeadingBrd, sCodeBg, sCodeBrd,
+             sBqBrd, sBqFg, sTblBrd, sLnkFg, bodyHtml);
 }

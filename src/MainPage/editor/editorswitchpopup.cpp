@@ -1,4 +1,5 @@
 #include "editorswitchpopup.h"
+#include "themecolors.h"
 #include <QDebug>
 
 EditorSwitchPopup::EditorSwitchPopup(QWidget *parent)
@@ -24,10 +25,8 @@ EditorSwitchPopup::EditorSwitchPopup(QWidget *parent)
         close();
     });
 
-    // 设置样式，使其看起来像组合框的下拉列表..
-    setStyleSheet("QListWidget { border: 1px solid #C0C0C0; background-color: white; }"
-                  "QListWidget::item { padding: 2px; }"
-                  "QListWidget::item:selected { background-color: #316AC5; color: white; }");
+    // Apply theme-aware stylesheet
+    applyThemeStyleSheet();
 }
 
 void EditorSwitchPopup::setItems(const QStringList &items, const QStringList &toolTips)
@@ -66,6 +65,9 @@ QString EditorSwitchPopup::currentText() const
 
 void EditorSwitchPopup::showPopup()
 {
+    // Re-apply stylesheet in case the theme has changed since last show
+    applyThemeStyleSheet();
+
     setFocus();
     m_listWidget->setFocus();
     m_ctrlPressed = true; // 初始状态为Ctrl按下..
@@ -178,4 +180,18 @@ bool EditorSwitchPopup::eventFilter(QObject *obj, QEvent *event)
         }
     }
     return QWidget::eventFilter(obj, event);
+}
+
+void EditorSwitchPopup::applyThemeStyleSheet()
+{
+    using namespace ThemeColors::SwitchPopup;
+    setStyleSheet(
+        QStringLiteral("QListWidget { border: 1px solid %1; background-color: %2; color: %3; }"
+                       "QListWidget::item { padding: 2px; }"
+                       "QListWidget::item:selected { background-color: %4; color: %5; }")
+            .arg(border().name(QColor::HexRgb),
+                 background().name(QColor::HexRgb),
+                 text().name(QColor::HexRgb),
+                 selectedItemBg().name(QColor::HexRgb),
+                 selectedItemFg().name(QColor::HexRgb)));
 }

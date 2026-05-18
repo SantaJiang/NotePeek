@@ -25,6 +25,9 @@ public:
     void updateLineNumberMarginWidth(CustomEditor *editor);
     void updateEditorSyntax(CustomEditor *editor, const QString &filePath);
 
+    // Re-apply theme colours to every open editor (call on palette change)
+    void reapplyThemeToAllEditors();
+
 signals:
     void fileDraged(QString filePath);
     void editorCreated(CustomEditor *editor);
@@ -36,6 +39,10 @@ private:
     void setEditorFont(CustomEditor *editor);
     void setMarginsFont(CustomEditor *editor);
     void purgeOldEditorPointers();
+    void applyEditorColors(CustomEditor *editor);
+    void applyLexerTheme(class QsciLexer *lexer);
+    void reapplyEditorSyntax(CustomEditor *editor);
+    void applyBaseEditorColors(CustomEditor *editor);
 
     static constexpr qint64 LARGE_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
 

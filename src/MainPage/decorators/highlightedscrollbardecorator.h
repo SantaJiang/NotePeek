@@ -14,6 +14,7 @@ public:
     explicit HighlightedScrollBarDecorator(QsciScintilla *editor);
 
     void notify(const void *notificationData = nullptr);
+    void applyThemeColors();
 
     HighlightedScrollBar *getScrollBar() const { return m_scrollBar; }
     int getSearchIndicator() const { return m_searchIndicator; }
