@@ -32,7 +32,9 @@ public:
     void setFindReplaceManagerForCurrentEditor(FindReplaceManager *manager);
     bool toggleMarkdownPreview(MarkdownPreviewer *previewer);
     void hideMarkdownPreview(CustomEditor *editor);
+    void refreshVisibleMarkdownPreview();
     void copyCurrentSelection();
+    EditorManager *editorManager() const { return m_editorManager; }
 
     // tab管理..
     void addTab(const QString &text, const QString &filePath = "");

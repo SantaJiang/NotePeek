@@ -45,6 +45,10 @@ void DocumentPage::hidePreview()
 {
 }
 
+void DocumentPage::refreshPreview()
+{
+}
+
 void DocumentPage::copyCurrentSelection()
 {
     if (m_editor)
@@ -127,6 +131,14 @@ void MarkdownDocumentPage::hidePreview()
     m_stack->setCurrentWidget(m_editor);
     m_editor->setFocus();
     emit copyAvailableChanged(hasCopySelection());
+}
+
+void MarkdownDocumentPage::refreshPreview()
+{
+    if (isPreviewVisible())
+    {
+        updatePreview();
+    }
 }
 
 void MarkdownDocumentPage::copyCurrentSelection()

@@ -765,6 +765,14 @@ bool MultiEditor::toggleMarkdownPreview(MarkdownPreviewer *previewer)
     return page->togglePreview(previewer);
 }
 
+void MultiEditor::refreshVisibleMarkdownPreview()
+{
+    if (DocumentPage *page = currentPage())
+    {
+        page->refreshPreview();
+    }
+}
+
 void MultiEditor::copyCurrentSelection()
 {
     if (DocumentPage *page = currentPage())

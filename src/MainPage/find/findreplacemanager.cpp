@@ -1,4 +1,5 @@
 #include "findreplacemanager.h"
+#include "themecolors.h"
 #include "../editor/customeditor.h"
 #include "../decorators/highlightedscrollbardecorator.h"
 #include <QMessageBox>
@@ -320,7 +321,7 @@ void FindReplaceManager::initializeEditor()
         m_highlightIndicator = m_editor->indicatorDefine(CustomEditor::FullBoxIndicator);
 
     m_editor->indicatorDefine(CustomEditor::FullBoxIndicator, m_highlightIndicator);
-    QColor highlightColor("#F59E0B");
+    QColor highlightColor = ThemeColors::FindReplace::highlightIndicator();
     long color = (highlightColor.blue() << 16) | (highlightColor.green() << 8) | highlightColor.red();
     m_editor->SendScintilla(QsciScintillaBase::SCI_INDICSETFORE, m_highlightIndicator, color);
     m_editor->SendScintilla(QsciScintillaBase::SCI_INDICSETUNDER, m_highlightIndicator, true);

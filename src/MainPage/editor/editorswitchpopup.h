@@ -32,6 +32,7 @@ protected:
 private:
     QListWidget *m_listWidget;
     bool m_ctrlPressed;
+    void applyThemeStyleSheet();
 };
 
 #endif // EDITORSWITCHPOPUP_H

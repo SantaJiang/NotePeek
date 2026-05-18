@@ -40,13 +40,9 @@ private:
     int bookmarkMarker = -1;
     bool m_blockSignals = false;
 
-    // 常量定义
-    const int DEFAULT_TICK_HEIGHT = 3;
-    const int DEFAULT_TICK_PADDING = 3;
-    const QColor SEARCH_RESULT_COLOR = QColor(255, 200, 0, 100);    // 橙色
-    const QColor BOOKMARK_COLOR = QColor(100, 100, 255, 180);       // 蓝色
-    const QColor CURRENT_LINE_COLOR = QColor(0, 0, 0, 100);         // 半透明黑
-    const QColor SELECTION_COLOR = QColor(0, 0, 0, 25);            // 选区颜色
+    // Tick mark dimensions
+    static constexpr int DEFAULT_TICK_HEIGHT = 3;
+    static constexpr int DEFAULT_TICK_PADDING = 3;
 };
 
 #endif // HIGHLIGHTEDSCROLLBAR_H

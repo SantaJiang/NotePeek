@@ -1,5 +1,6 @@
 ﻿#include "mainwindow.h"
 #include "ui_mainwindow.h"
+#include "themecolors.h"
 #include <QFileDialog>
 #include <QDebug>
 #include <QScreen>
@@ -10,7 +11,9 @@
 #include <QScrollBar>
 #include <QMessageBox>
 #include <QCloseEvent>
+#include <QEvent>
 #include <QCoreApplication>
+#include <QStyleHints>
 #include "./editor/filesavedialog.h"
 #include "./editor/customeditor.h"
 #include "./decorators/highlightedscrollbardecorator.h"
@@ -104,6 +107,17 @@ MainWindow::MainWindow(QWidget *parent)
         openFileByArg(filePath);
     }
 
+    // Listen for system theme changes (light ↔ dark) at runtime.
+    // QEvent::PaletteChange alone is unreliable on macOS with the Fusion style,
+    // so we also connect to the dedicated colorSchemeChanged signal (Qt 6.5+).
+#if QT_VERSION >= QT_VERSION_CHECK(6, 5, 0)
+    connect(QGuiApplication::styleHints(), &QStyleHints::colorSchemeChanged,
+            this, [this]() {
+                ui->multieditor->editorManager()->reapplyThemeToAllEditors();
+                ui->multieditor->refreshVisibleMarkdownPreview();
+            });
+#endif
+
     connect(m_findReplaceManager, &FindReplaceManager::searchResultsChanged, this, &MainWindow::onSearchResultsChanged);
 }
 
@@ -132,6 +146,19 @@ void MainWindow::closeEvent(QCloseEvent *event)
     else
     {
         event->ignore();
+    }
+}
+
+void MainWindow::changeEvent(QEvent *event)
+{
+    QMainWindow::changeEvent(event);
+
+    if (event->type() == QEvent::PaletteChange)
+    {
+        // System theme changed (light ↔ dark). Re-apply theme-aware colours
+        // to all open editors and refresh the markdown preview if visible.
+        ui->multieditor->editorManager()->reapplyThemeToAllEditors();
+        ui->multieditor->refreshVisibleMarkdownPreview();
     }
 }
 
