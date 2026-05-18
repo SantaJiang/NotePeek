@@ -21,8 +21,10 @@ Requirements:
 - NSIS for Windows installer packaging
 - `rpmbuild` for RPM packaging on Linux
 
+Ensure the Qt environment is configured (e.g., by running Qt's `qtenv2.bat`/`qtenv2.sh` or setting `Qt6_ROOT`/`Qt5_DIR` environment variable).
+
 ```bash
-cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=/path/to/Qt
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build --config Release --parallel
 ```
 
@@ -32,7 +34,7 @@ cmake --build build --config Release --parallel
 # macOS: DMG
 cpack --config build/CPackConfig.cmake -G DragNDrop
 
-# Windows: NSIS installer
+# Windows: NSIS installer (requires NSIS to be installed)
 cpack --config build/CPackConfig.cmake -G NSIS
 
 # Linux: DEB + RPM
