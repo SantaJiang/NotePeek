@@ -14,7 +14,6 @@
 #include <QApplication>
 #include <QFileInfo>
 #include <QMap>
-#include <QDebug>
 #include <QMessageBox>
 #include <QCoreApplication>
 #include <QRegularExpression>
@@ -44,10 +43,12 @@ MultiEditor::MultiEditor(QWidget *parent, bool createDefault) : QWidget(parent),
     ui->setupUi(this);
     setAcceptDrops(false);
 
-    int fontId = QFontDatabase::addApplicationFont("://resource/fontawesome-webfont.ttf");
-    QString fontName = QFontDatabase::applicationFontFamilies(fontId).at(0);
-    QFont iconFont = QFont(fontName);
-    ui->pushButton_closeDoc->setFont(iconFont);
+    const int fontId = QFontDatabase::addApplicationFont("://resource/fontawesome-webfont.ttf");
+    const QStringList fontFamilies = QFontDatabase::applicationFontFamilies(fontId);
+    if (!fontFamilies.isEmpty())
+    {
+        ui->pushButton_closeDoc->setFont(QFont(fontFamilies.first()));
+    }
     ui->pushButton_closeDoc->setText(QChar(0xf00d));
 
     // 初始化编辑器管理器..
@@ -206,34 +207,11 @@ bool MultiEditor::saveFile(CustomEditor *editor, const QString &filePath)
 
 void MultiEditor::openFile(const QString &filePath)
 {
-    // 检查是否有默认空白编辑器且未修改..
-    if (m_defaultEditor && !m_defaultEditor->isModified() && m_defaultEditor->text().isEmpty())
-    {
-        int index = findEditorIndex(m_defaultEditor);
-        if (index != -1)
-        {
-            // 关闭空白编辑器，不提醒..
-            DocumentPage *page = pageForEditor(m_defaultEditor);
-        ui->tabWidget->removeTab(index);
-        removeTab(index);
-        emit editorClosed(m_defaultEditor);
-        m_editorManager->forgetEditor(m_defaultEditor);
-        if (page)
-        {
-            page->deleteLater();
-            }
-            else
-            {
-                m_defaultEditor->deleteLater();
-            }
-            m_defaultEditor = nullptr;
-        }
-    }
-
     // Check if file is already open
     CustomEditor *existingEditor = m_editorManager->getEditorByFilePath(filePath);
     if (existingEditor)
     {
+        closeDefaultEditorIfUnused();
         int index = findEditorIndex(existingEditor);
         if (index != -1)
         {
@@ -244,7 +222,7 @@ void MultiEditor::openFile(const QString &filePath)
     }
 
     // Create new editor
-    CustomEditor *editor = m_editorManager->createEditorFromFile(filePath, false);
+    CustomEditor *editor = m_editorManager->createEditorForFile(filePath, false);
     if (!editor)
     {
         return;
@@ -292,6 +270,8 @@ void MultiEditor::openFile(const QString &filePath)
 
     setCurrentFile(editor, filePath);
     m_editorManager->updateLineNumberMarginWidth(editor);
+    closeDefaultEditorIfUnused();
+    switchToEditor(editor);
 
     // 发出文件打开信号..
     emit fileOpened(editor, filePath);
@@ -325,8 +305,12 @@ void MultiEditor::setCurrentFile(CustomEditor *editor, const QString &filePath)
         setTabToolTip(index, filePath);
     }
 
-    emit modificationChanged(false);
-    emit currentFileChanged(editor, filePath);
+    emit editorModificationChanged(editor, false);
+    if (editor == currentEditor())
+    {
+        emit modificationChanged(false);
+        emit currentFileChanged(editor, filePath);
+    }
 }
 
 void MultiEditor::createDefaultDoc()
@@ -670,25 +654,7 @@ void MultiEditor::setCreateDefault(bool createDefault)
 {
     if (!createDefault && m_defaultEditor)
     {
-        // 如果不创建默认编辑器且当前有默认编辑器，则关闭它..
-        int index = findEditorIndex(m_defaultEditor);
-        if (index != -1)
-        {
-            DocumentPage *page = pageForEditor(m_defaultEditor);
-            ui->tabWidget->removeTab(index);
-            removeTab(index);
-            emit editorClosed(m_defaultEditor);
-            m_editorManager->forgetEditor(m_defaultEditor);
-            if (page)
-            {
-                page->deleteLater();
-            }
-            else
-            {
-                m_defaultEditor->deleteLater();
-            }
-            m_defaultEditor = nullptr;
-        }
+        closeDefaultEditorIfUnused();
     }
     else if (createDefault && !m_defaultEditor && ui->tabWidget->count() == 0)
     {
@@ -795,6 +761,40 @@ void MultiEditor::hideMarkdownPreview(CustomEditor *editor)
     }
 
     page->hidePreview();
+}
+
+bool MultiEditor::closeDefaultEditorIfUnused()
+{
+    if (!m_defaultEditor || m_defaultEditor->isModified() || !m_defaultEditor->text().isEmpty())
+    {
+        return false;
+    }
+
+    const int index = findEditorIndex(m_defaultEditor);
+    if (index == -1)
+    {
+        m_defaultEditor = nullptr;
+        return false;
+    }
+
+    CustomEditor *editor = m_defaultEditor;
+    DocumentPage *page = pageForEditor(editor);
+    ui->tabWidget->removeTab(index);
+    removeTab(index);
+    emit editorClosed(editor);
+    m_editorManager->forgetEditor(editor);
+
+    if (page)
+    {
+        page->deleteLater();
+    }
+    else
+    {
+        editor->deleteLater();
+    }
+
+    m_defaultEditor = nullptr;
+    return true;
 }
 
 DocumentPage *MultiEditor::createDocumentPage(CustomEditor *editor, const QString &filePath)

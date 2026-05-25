@@ -3,11 +3,9 @@
 #include <QTranslator>
 #include <QDebug>
 #include <QStyleFactory>
-#include <QStandardPaths>
 #include <QFontDatabase>
 #include <QEvent>
 #include <QFileOpenEvent>
-#include "savelog.h"
 
 class MacFileOpenEventFilter : public QObject
 {
@@ -40,30 +38,6 @@ private:
     MainWindow *m_window = nullptr;
 };
 
-QString getLogDirectory()
-{
-    QString logDir;
-
-#if defined(Q_OS_WIN)
-    // Windows: AppData/Roaming/AppName/log
-    logDir = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation) + "/log";
-
-#elif defined(Q_OS_MAC)
-    // macOS: ~/Library/Logs/AppName
-    logDir = QStandardPaths::writableLocation(QStandardPaths::HomeLocation) + "/Library/Logs";
-
-#elif defined(Q_OS_LINUX)
-    // Linux: ~/.local/share/AppName/log
-    logDir = QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation) + "/log";
-
-#else
-    // 其他平台使用AppDataLocation
-    logDir = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation) + "/log";
-#endif
-
-    return logDir;
-}
-
 int main(int argc, char *argv[])
 {
     //high dpi
@@ -76,12 +50,6 @@ int main(int argc, char *argv[])
     QCoreApplication::setOrganizationName("NotePeek");
     QCoreApplication::setApplicationName("NotePeek");
     QCoreApplication::setApplicationVersion(APP_VERSION);
-
-#ifdef QT_NO_DEBUG
-    SaveLog::Instance()->setUseContext(false);
-    SaveLog::Instance()->setPath(getLogDirectory());
-    //SaveLog::Instance()->start();
-#endif
 
     //style
 #ifdef Q_OS_WIN

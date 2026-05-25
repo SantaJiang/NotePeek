@@ -16,7 +16,7 @@ public:
     ~EditorManager();
 
     CustomEditor *createEditor(const QString &name = QString());
-    CustomEditor *createEditorFromFile(const QString &filePath, bool tryToCreate = false);
+    CustomEditor *createEditorForFile(const QString &filePath, bool tryToCreate = false);
     CustomEditor *getEditorByFilePath(const QString &filePath);
     QList<CustomEditor *> getEditors() const;
     void forgetEditor(CustomEditor *editor);
@@ -29,7 +29,6 @@ public:
     void reapplyThemeToAllEditors();
 
 signals:
-    void fileDraged(QString filePath);
     void editorCreated(CustomEditor *editor);
     void editorClosed(CustomEditor *editor);
     void filesDropped(const QList<QUrl> &urls);

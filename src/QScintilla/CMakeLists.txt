@@ -49,6 +49,14 @@ target_compile_definitions(qscintilla2 PRIVATE
     INCLUDE_DEPRECATED_FEATURES
 )
 
+if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
+    target_compile_options(qscintilla2 PRIVATE
+        -Wno-deprecated-declarations
+        -Wno-deprecated-pragma
+        -Wno-defaulted-function-deleted
+    )
+endif()
+
 target_include_directories(qscintilla2 PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/Qsci>

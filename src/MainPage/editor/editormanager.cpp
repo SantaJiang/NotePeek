@@ -1,7 +1,6 @@
 #include "editormanager.h"
 #include "themecolors.h"
 #include <QFileInfo>
-#include <QDebug>
 #include <QFontDatabase>
 #include <QApplication>
 #include <QScreen>
@@ -51,7 +50,7 @@ CustomEditor *EditorManager::createEditor(const QString &name)
     return editor;
 }
 
-CustomEditor *EditorManager::createEditorFromFile(const QString &filePath, bool tryToCreate)
+CustomEditor *EditorManager::createEditorForFile(const QString &filePath, bool tryToCreate)
 {
     QFileInfo fileInfo(filePath);
     if (!fileInfo.exists() && !tryToCreate)
@@ -262,6 +261,7 @@ void EditorManager::updateEditorSyntax(CustomEditor *editor, const QString &file
 {
     if (!editor) return;
 
+    QsciLexer *oldLexer = editor->lexer();
     QFileInfo fileInfo(filePath);
     QString extension = fileInfo.suffix();
 
@@ -278,12 +278,21 @@ void EditorManager::updateEditorSyntax(CustomEditor *editor, const QString &file
 
         applyLexerTheme(lexer);
 
+        lexer->setParent(editor);
         editor->setLexer(lexer);
+        if (oldLexer && oldLexer != lexer)
+        {
+            oldLexer->deleteLater();
+        }
         editor->setAutoIndent(true);
     }
     else
     {
         editor->setLexer(nullptr);
+        if (oldLexer)
+        {
+            oldLexer->deleteLater();
+        }
         editor->setAutoIndent(false);
         setEditorFont(editor);
     }

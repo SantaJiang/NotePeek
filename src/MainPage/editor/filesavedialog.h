@@ -2,15 +2,12 @@
 #define FILESAVEDIALOG_H
 
 #include <QDialog>
-#include <QMap>
 #include <QList>
-#include <QPushButton>
-#include <QVBoxLayout>
-#include <QLabel>
-#include <QScrollArea>
-#include <QCheckBox>
+#include <QMap>
 
+class QCheckBox;
 class CustomEditor;
+
 class FileSaveDialog : public QDialog
 {
     Q_OBJECT

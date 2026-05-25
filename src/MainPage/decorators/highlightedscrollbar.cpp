@@ -1,7 +1,6 @@
 #include "highlightedscrollbar.h"
 #include "themecolors.h"
 #include <Qsci/qsciscintilla.h>
-#include <QDebug>
 #include <QTimer>
 
 HighlightedScrollBar::HighlightedScrollBar(QsciScintilla *editor, Qt::Orientation orientation, QWidget *parent)

@@ -1,5 +1,4 @@
 #include "headersourcemanager.h"
-#include <QDebug>
 
 HeaderSourceManager::HeaderSourceManager(QObject *parent)
     : QObject(parent)

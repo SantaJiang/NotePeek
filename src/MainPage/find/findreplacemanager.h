@@ -5,6 +5,7 @@
 #include <QString>
 #include <QList>
 #include <QColor>
+#include <QPointer>
 
 class CustomEditor;
 class HighlightedScrollBarDecorator;
@@ -67,7 +68,7 @@ private:
 
     static constexpr qint64 LARGE_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
 
-    CustomEditor *m_editor;
+    QPointer<CustomEditor> m_editor;
     QString m_findText;
     QString m_replaceText;
     bool m_caseSensitive;
