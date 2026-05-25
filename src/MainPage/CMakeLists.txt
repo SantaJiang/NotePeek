@@ -1,7 +1,6 @@
 set(MAINPAGE_SOURCES
     main.cpp
     mainwindow.cpp
-    savelog.cpp
     editor/customeditor.cpp
     editor/documentio.cpp
     editor/documentpage.cpp
@@ -24,7 +23,6 @@ set(MAINPAGE_SOURCES
 
 set(MAINPAGE_HEADERS
     mainwindow.h
-    savelog.h
     themecolors.h
     editor/customeditor.h
     editor/documentio.h
@@ -62,7 +60,6 @@ if(Qt6_FOUND)
         Qt6::Widgets
         Qt6::PrintSupport
         Qt6::Svg
-        Qt6::Network
     )
 else()
     target_link_libraries(notepeek PRIVATE
@@ -70,7 +67,6 @@ else()
         Qt5::Widgets
         Qt5::PrintSupport
         Qt5::Svg
-        Qt5::Network
     )
 endif()
 

@@ -15,7 +15,7 @@ A modern cross-platform code/text editor powered by Qt (5.15+ or 6.2+) and QScin
 
 Requirements:
 
-- Qt 5.15+ or Qt 6.2+ with Widgets, PrintSupport, Svg, Network, and LinguistTools
+- Qt 5.15+ or Qt 6.2+ with Widgets, PrintSupport, Svg, and LinguistTools
 - CMake 3.16+
 - C++17 compiler
 - NSIS for Windows installer packaging

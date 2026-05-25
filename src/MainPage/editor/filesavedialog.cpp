@@ -1,6 +1,13 @@
 #include "filesavedialog.h"
 #include "customeditor.h"
 
+#include <QCheckBox>
+#include <QHBoxLayout>
+#include <QLabel>
+#include <QPushButton>
+#include <QScrollArea>
+#include <QVBoxLayout>
+
 FileSaveDialog::FileSaveDialog(const QMap<CustomEditor*, QString> &files, QWidget *parent)
     : QDialog(parent)
 {

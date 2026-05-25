@@ -37,6 +37,7 @@
 #include "../QScintilla/Qsci/qscilexertcl.h"
 #include "../QScintilla/Qsci/qscilexerverilog.h"
 #include "../QScintilla/Qsci/qscilexervhdl.h"
+#include <algorithm>
 
 QsciLexer* LexerFactory::createLexer(Language lang)
 {
@@ -233,5 +234,7 @@ QString LexerFactory::languageName(Language lang)
 
 QStringList LexerFactory::supportedExtensions()
 {
-    return extensionMap().keys();
+    QStringList extensions = extensionMap().keys();
+    std::sort(extensions.begin(), extensions.end());
+    return extensions;
 }

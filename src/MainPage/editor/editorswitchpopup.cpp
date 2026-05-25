@@ -1,6 +1,5 @@
 #include "editorswitchpopup.h"
 #include "themecolors.h"
-#include <QDebug>
 
 EditorSwitchPopup::EditorSwitchPopup(QWidget *parent)
     : QDialog(parent), m_ctrlPressed(false)

@@ -2,7 +2,6 @@
 #include "ui_mainwindow.h"
 #include "themecolors.h"
 #include <QFileDialog>
-#include <QDebug>
 #include <QScreen>
 #include <QScroller>
 #include <QHeaderView>

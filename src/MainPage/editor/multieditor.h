@@ -83,9 +83,9 @@ private slots:
     void on_comboBox_files_currentIndexChanged(int index);
 
 private:
-    void setEditorFont(CustomEditor *editor);
     void connectEditorSignals(CustomEditor *editor);
     QString promptSaveFileName(QWidget *parent = nullptr);
+    bool closeDefaultEditorIfUnused();
     DocumentPage *createDocumentPage(CustomEditor *editor, const QString &filePath);
     void refreshDocumentPageForFile(CustomEditor *editor, const QString &filePath);
     DocumentPage *currentPage() const;

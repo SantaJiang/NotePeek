@@ -14,10 +14,11 @@ FindReplaceWidget::FindReplaceWidget(QWidget *parent)
 {
     ui->setupUi(this);
 
-    int fontId = QFontDatabase::addApplicationFont("://resource/fontawesome-webfont.ttf");
-    QString fontName = QFontDatabase::applicationFontFamilies(fontId).at(0);
-    QFont iconFont = QFont(fontName);
-    ui->buttonClose->setFont(iconFont);
+    const int fontId = QFontDatabase::addApplicationFont("://resource/fontawesome-webfont.ttf");
+    const QStringList fontFamilies = QFontDatabase::applicationFontFamilies(fontId);
+    if (!fontFamilies.isEmpty()) {
+        ui->buttonClose->setFont(QFont(fontFamilies.first()));
+    }
     ui->buttonClose->setText(QChar(0xf00d));
 
     // 连接 UI 信号到槽函数

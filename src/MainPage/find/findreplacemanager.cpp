@@ -25,8 +25,16 @@ FindReplaceManager::~FindReplaceManager()
 
 void FindReplaceManager::setCurrentEditor(CustomEditor *editor)
 {
+    if (m_editor == editor)
+        return;
+
+    clearHighlights();
     m_editor = editor;
     initializeEditor();
+    if (!m_findText.isEmpty())
+    {
+        refreshHighlights();
+    }
 }
 
 void FindReplaceManager::find(const QString &text)
@@ -45,6 +53,11 @@ void FindReplaceManager::find(const QString &text)
         setFindText(selectedText);
         m_initialFindText = selectedText;
         highlightAllMatches();
+    }
+
+    if (m_findText.isEmpty()) {
+        clearHighlights();
+        return;
     }
 
     addToFindHistory(m_findText);
@@ -93,6 +106,16 @@ void FindReplaceManager::replace(const QString &replaceText)
         return;
     }
 
+    if (m_findText.isEmpty()) {
+        const QString selectedText = m_editor->selectedText();
+        if (!selectedText.isEmpty()) {
+            setFindText(selectedText);
+        } else {
+            QMessageBox::information(nullptr, tr("Replace"), tr("The search field is empty."));
+            return;
+        }
+    }
+
     addToReplaceHistory(m_replaceText);
 
     if (m_editor->hasSelectedText()) {
@@ -121,6 +144,7 @@ void FindReplaceManager::replaceAll()
 
     int currentLine, currentIndex;
     m_editor->getCursorPosition(&currentLine, &currentIndex);
+    const int firstVisibleLine = m_editor->SendScintilla(QsciScintillaBase::SCI_GETFIRSTVISIBLELINE);
 
     bool re, cs, wo, wrap, forward;
     prepareFindOptions(re, cs, wo, wrap, forward, false);
@@ -138,6 +162,7 @@ void FindReplaceManager::replaceAll()
     }
 
     m_editor->setCursorPosition(currentLine, currentIndex);
+    m_editor->SendScintilla(QsciScintillaBase::SCI_SETFIRSTVISIBLELINE, firstVisibleLine);
 
     QMessageBox::information(nullptr, tr("Replace All"),
                              tr("Replaced %1 occurrence(s).").arg(replaceCount));
@@ -221,6 +246,9 @@ void FindReplaceManager::clearHighlights()
 void FindReplaceManager::refreshHighlights()
 {
     QTimer::singleShot(0, this, [this]() {
+        if (!m_editor)
+            return;
+
         clearHighlights();
         highlightAllMatches();
         emit highlightsRefreshed();
