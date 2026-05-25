@@ -1,60 +1,156 @@
 # NotePeek
 
-A modern cross-platform code/text editor powered by Qt (5.15+ or 6.2+) and QScintilla.
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
+[![Platforms: macOS | Windows | Linux](https://img.shields.io/badge/Platforms-macOS%20%7C%20Windows%20%7C%20Linux-lightgrey)](https://github.com/SantaSpeeds/NotePeek/releases)
+[![Qt](https://img.shields.io/badge/Qt-5.15%2B%20%7C%206.2%2B-green)](https://www.qt.io/)
 
-## Features
+**NotePeek** is a modern, lightweight, cross-platform code/text editor built with Qt and QScintilla. It provides a clean interface, essential editing features, and native packaging for macOS, Windows, and Linux.
 
-- Multi-tab text/code editing
-- Syntax highlighting via bundled QScintilla
-- Find/replace with scrollbar result markers
-- Markdown preview for `.md` files
-- Header/source switching for C/C++ files
-- Native packaging for macOS, Windows, and Linux
+## ✨ Features
 
-## Build
+### 📝 Core Editing
+- **Multi-tab editing** – Open multiple files in tabs, with drag‑and‑drop reordering
+- **Syntax highlighting** – Supports **43+ programming/markup languages** (see list below)
+- **Find & Replace** – Full‑featured search with scroll‑bar result markers
+- **C/C++ header‑source switching** – Quick jump between `.h` and `.cpp/.cxx` files
+- **File‑system browser** – Integrated directory tree (dock) for quick file opening
 
-Requirements:
+### 🎨 Markdown & Preview
+- **Live Markdown preview** – Real‑time rendering of `.md` files using the embedded md4c parser
+- **Side‑by‑side view** – Edit Markdown on the left, see formatted output on the right
 
-- Qt 5.15+ or Qt 6.2+ with Widgets, PrintSupport, Svg, and LinguistTools
-- CMake 3.16+
-- C++17 compiler
-- NSIS for Windows installer packaging
-- `rpmbuild` for RPM packaging on Linux
+### 🌍 Cross‑Platform
+- **Native look & feel** – Fusion style on macOS/Linux, Windows Vista style on Windows
+- **High‑DPI support** – Automatically adapts to Retina and Hi‑DPI displays
+- **System integration** – macOS: double‑click files in Finder; Windows: Start‑menu shortcut; Linux: desktop entry & AppStream metadata
+- **Internationalization** – Built‑in translation system (Chinese included)
 
-Ensure the Qt environment is configured (e.g., by running Qt's `qtenv2.bat`/`qtenv2.sh` or setting `Qt6_ROOT`/`Qt5_DIR` environment variable).
+### 📦 Packaging & Deployment
+- **Single‑click installers** – DMG for macOS, NSIS for Windows, DEB/RPM for Linux
+- **Bundled dependencies** – QScintilla and md4c are embedded, no external runtime required
+- **Direct‑install script** – Quick `/usr/local` installation on Linux without a package manager
+
+## 📋 Supported Languages
+
+NotePeek’s syntax highlighting covers **43 languages** via the integrated QScintilla lexer:
+
+| Category | Languages |
+|----------|-----------|
+| **General‑purpose** | C, C++, C#, D, Java, Python, Rust, Ruby, Pascal, Fortran, Fortran77, Octave, MATLAB, Lua, Perl, Tcl, Verilog, VHDL, IDL, SPICE, POV‑Ray |
+| **Web & markup** | HTML, XML, QML, JSON, JSONL, YAML, TOML, Markdown, TeX, CSS, Properties, PO |
+| **Scripting** | Shell (Bash), Batch, CoffeeScript, AVS, Diff |
+| **Build systems** | CMake, Makefile |
+| **Miscellaneous** | SQL, PostScript |
+
+## 🖥️ Supported Platforms
+
+| Platform | Package Format | Minimum System |
+|----------|----------------|----------------|
+| **macOS** | `.dmg` (Drag‑and‑Drop disk image) | macOS 13.0+ |
+| **Windows** | NSIS installer (`.exe`) | Windows 10/11 (64‑bit) |
+| **Linux** | DEB (Debian/Ubuntu) & RPM (Fedora/openSUSE) | glibc 2.28+ |
+
+## 🚀 Getting Started
+
+### Prerequisites
+
+- **Qt** 5.15+ or Qt 6.2+ (with components: Widgets, PrintSupport, Svg, LinguistTools)
+- **CMake** 3.16+
+- **C++17** compiler (GCC/Clang/MSVC)
+- **Optional for packaging**:
+  - macOS: `hdiutil` (built‑in)
+  - Windows: [NSIS](https://nsis.sourceforge.io/)
+  - Linux: `dpkg‑deb` & `rpmbuild` (for DEB/RPM)
+
+### Build from Source
 
 ```bash
+# Configure
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+
+# Compile
 cmake --build build --config Release --parallel
 ```
 
-## Package
+The executable will be placed in `build/src/MainPage/` (or `build/src/MainPage/Release` on Windows).
+
+### Package for Distribution
 
 ```bash
-# macOS: DMG
+# macOS → DMG
 cpack --config build/CPackConfig.cmake -G DragNDrop
 
-# Windows: NSIS installer (requires NSIS to be installed)
+# Windows → NSIS installer (requires NSIS installed)
 cpack --config build/CPackConfig.cmake -G NSIS
 
-# Linux: DEB + RPM
+# Linux → DEB + RPM
 cpack --config build/CPackConfig.cmake -G "DEB;RPM"
 ```
 
-## Linux Direct Install
-
-The direct install scripts wrap CMake install and use `/usr/local` by default.
+### Direct Install on Linux (without packages)
 
 ```bash
+# Install to /usr/local
 sudo env PREFIX=/usr/local ./deploy/linux/install.sh
 
+# Uninstall
 sudo env PREFIX=/usr/local ./deploy/linux/uninstall.sh
 ```
 
-For normal distribution, prefer the generated DEB/RPM packages.
+## 🏗️ Project Structure
 
-## Notes
+```
+NotePeek/
+├── CMakeLists.txt              # Root CMake + CPack configuration
+├── LICENSE                     # GPL‑3.0‑or‑later
+├── README.md                   # This file
+├── i18n/                       # Translation files (notepeek_zh_CN.ts)
+├── deploy/                     # Platform‑specific deployment assets
+│   ├── mac/Info.plist          # macOS Bundle plist
+│   ├── win/app.rc.in           # Windows resource template
+│   ├── win/notepeek.ico        # Windows icon
+│   └── linux/                  # Linux desktop integration
+│       ├── notepeek.desktop    # Desktop entry
+│       ├── notepeek.appdata.xml# AppStream metadata
+│       ├── install.sh          # Direct‑install script
+│       └── uninstall.sh        # Uninstall script
+└── src/                        # Source code
+    ├── CMakeLists.txt          # Sub‑directory aggregation
+    ├── QScintilla/             # Embedded QScintilla library
+    ├── third_party/md4c/       # Embedded md4c Markdown parser
+    └── MainPage/               # Main application
+        ├── CMakeLists.txt      # Build, link, package, deploy
+        ├── main.cpp            # Entry point (high‑DPI, style, translation, font)
+        ├── mainwindow.h/.cpp/.ui  # Main window
+        ├── editor/             # Editor core (CustomEditor, MultiEditor, LexerFactory…)
+        ├── find/               # Find‑replace manager & widget
+        ├── decorators/         # Scroll‑bar result markers
+        ├── widgets/            # Status‑bar components
+        ├── tool/cpp/           # C/C++ header‑source switching
+        ├── tool/markdown/      # Markdown previewer
+        ├── resource/           # Icons (.icns, .svg)
+        └── rec.qrc             # Qt resource file
+```
 
-- Translations are embedded into the application resource system and loaded from `:/i18n`.
-- The bundled QScintilla library is installed inside the macOS app bundle for DMG packaging.
-- On Linux, CPack packages install the executable, bundled QScintilla library, desktop entry, AppStream metadata, and icon.
+## 📄 License
+
+NotePeek is licensed under the **GNU General Public License v3.0 (or later)** – see the [LICENSE](LICENSE) file for details.
+
+## 🤝 Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
+
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing‑feature`)
+3. Commit your changes (`git commit -m 'Add some amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing‑feature`)
+5. Open a Pull Request
+
+## 📬 Contact
+
+- **GitHub**: [SantaSpeeds/NotePeek](https://github.com/SantaSpeeds/NotePeek)
+- **Issues**: [GitHub Issues](https://github.com/SantaSpeeds/NotePeek/issues)
+
+---
+
+*NotePeek – a peek at your notes, code, and text, everywhere.*

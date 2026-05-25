@@ -58,6 +58,7 @@ QsciLexer* LexerFactory::createLexer(Language lang)
     case QML:
         return new QsciLexerQML();
     case JSON:
+    case JSONL:
         return new QsciLexerJSON();
     case SQL:
         return new QsciLexerSQL();
@@ -110,6 +111,7 @@ QsciLexer* LexerFactory::createLexer(Language lang)
     case POV:
         return new QsciLexerPOV();
     case PROPERTIES:
+    case TOML:
         return new QsciLexerProperties();
     case SPICE:
         return new QsciLexerSpice();
@@ -140,7 +142,7 @@ static const QHash<QString, LexerFactory::Language>& extensionMap()
         {"xml", LexerFactory::XML}, {"ui", LexerFactory::XML}, {"qrc", LexerFactory::XML},
         {"svg", LexerFactory::XML}, {"ts", LexerFactory::XML},
         {"qml", LexerFactory::QML}, {"qmltypes", LexerFactory::QML},
-        {"json", LexerFactory::JSON},
+        {"json", LexerFactory::JSON}, {"jsonl", LexerFactory::JSONL},
         {"sql", LexerFactory::SQL},
         {"cmake", LexerFactory::CMAKE},
         {"css", LexerFactory::CSS},
@@ -169,6 +171,7 @@ static const QHash<QString, LexerFactory::Language>& extensionMap()
         {"pov", LexerFactory::POV}, {"inc", LexerFactory::POV},
         {"properties", LexerFactory::PROPERTIES}, {"prop", LexerFactory::PROPERTIES},
         {"ini", LexerFactory::PROPERTIES}, {"cfg", LexerFactory::PROPERTIES},
+        {"toml", LexerFactory::TOML},
         {"spice", LexerFactory::SPICE}, {"cir", LexerFactory::SPICE},
         {"tcl", LexerFactory::TCL}, {"tk", LexerFactory::TCL},
         {"v", LexerFactory::VERILOG},
@@ -196,6 +199,7 @@ QString LexerFactory::languageName(Language lang)
     case XML: return "XML";
     case QML: return "QML";
     case JSON: return "JSON";
+    case JSONL: return "JSON Lines";
     case SQL: return "SQL";
     case CMAKE: return "CMake";
     case CSS: return "CSS";
@@ -222,6 +226,7 @@ QString LexerFactory::languageName(Language lang)
     case POSTSCRIPT: return "PostScript";
     case POV: return "POV";
     case PROPERTIES: return "Properties";
+    case TOML: return "TOML";
     case SPICE: return "Spice";
     case TCL: return "TCL";
     case VERILOG: return "Verilog";
