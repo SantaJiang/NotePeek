@@ -57,6 +57,7 @@ add_executable(notepeek
 if(Qt6_FOUND)
     target_link_libraries(notepeek PRIVATE
         qscintilla2
+        qlitehtml
         Qt6::Widgets
         Qt6::PrintSupport
         Qt6::Svg
@@ -64,6 +65,7 @@ if(Qt6_FOUND)
 else()
     target_link_libraries(notepeek PRIVATE
         qscintilla2
+        qlitehtml
         Qt5::Widgets
         Qt5::PrintSupport
         Qt5::Svg

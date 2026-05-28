@@ -406,6 +406,41 @@ void MainWindow::on_action_markdownPreview_triggered()
     updateToolActions();
 }
 
+void MainWindow::on_action_markdownExportPdf_triggered()
+{
+    CustomEditor *editor = ui->multieditor->currentEditor();
+    if (!editor) return;
+
+    const QString currentFilePath = editor->filePath();
+    if (!m_markdownPreviewer->isMarkdownFile(currentFilePath)) return;
+
+    const QFileInfo fileInfo(currentFilePath);
+    const QString defaultPath = fileInfo.absolutePath()
+                                + QDir::separator()
+                                + fileInfo.completeBaseName()
+                                + QStringLiteral(".pdf");
+    QString outputPath = QFileDialog::getSaveFileName(this,
+                                                      tr("Export Markdown to PDF"),
+                                                      defaultPath,
+                                                      tr("PDF Files (*.pdf)"));
+    if (outputPath.isEmpty())
+    {
+        return;
+    }
+
+    if (QFileInfo(outputPath).suffix().isEmpty())
+    {
+        outputPath += QStringLiteral(".pdf");
+    }
+
+    if (!m_markdownPreviewer->exportToPdf(editor->text(), currentFilePath, outputPath))
+    {
+        QMessageBox::warning(this,
+                             tr("Export Failed"),
+                             tr("Could not export Markdown to PDF."));
+    }
+}
+
 void MainWindow::onFileDraged(const QList<QUrl> &urls)
 {
     for (const QUrl &url : urls)
@@ -483,6 +518,7 @@ void MainWindow::updateToolActions()
     ui->action_markdownPreview->setEnabled(markdownSupported);
     ui->action_markdownPreview->setChecked(markdownSupported && previewVisible);
     ui->action_markdownPreview->setText(previewVisible ? tr("Show Markdown Source") : tr("Preview Markdown"));
+    ui->action_markdownExportPdf->setEnabled(markdownSupported);
     ui->menuToolMarkdown->setEnabled(markdownSupported);
     ui->menuTool->setEnabled(true);
 }

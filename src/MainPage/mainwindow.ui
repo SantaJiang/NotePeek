@@ -120,9 +120,10 @@
     </widget>
     <widget class="QMenu" name="menuToolMarkdown">
      <property name="title">
-      <string>Markdown</string>
+     <string>Markdown</string>
      </property>
      <addaction name="action_markdownPreview"/>
+     <addaction name="action_markdownExportPdf"/>
     </widget>
     <addaction name="menuToolCpp"/>
     <addaction name="menuToolMarkdown"/>
@@ -276,6 +277,11 @@
    </property>
    <property name="shortcut">
     <string>F5</string>
+   </property>
+  </action>
+  <action name="action_markdownExportPdf">
+   <property name="text">
+    <string>Export to PDF...</string>
    </property>
   </action>
  </widget>

@@ -5,7 +5,7 @@
 
 class CustomEditor;
 class MarkdownPreviewer;
-class QTextBrowser;
+class QLiteHtmlWidget;
 class QStackedWidget;
 
 class DocumentPage : public QWidget
@@ -60,7 +60,7 @@ private:
     void updatePreview();
 
     QStackedWidget *m_stack;
-    QTextBrowser *m_preview;
+    QLiteHtmlWidget *m_preview;
     MarkdownPreviewer *m_previewer;
 };
 
