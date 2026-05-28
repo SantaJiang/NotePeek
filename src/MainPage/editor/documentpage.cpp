@@ -3,10 +3,12 @@
 #include "customeditor.h"
 #include "../tool/markdown/markdownpreviewer.h"
 
+#include <QClipboard>
+#include <QGuiApplication>
 #include <QStackedWidget>
-#include <QTextBrowser>
-#include <QTextCursor>
 #include <QVBoxLayout>
+
+#include "qlitehtmlwidget.h"
 
 DocumentPage::DocumentPage(CustomEditor *editor, QWidget *parent)
     : QWidget(parent)
@@ -145,7 +147,11 @@ void MarkdownDocumentPage::copyCurrentSelection()
 {
     if (isPreviewVisible())
     {
-        m_preview->copy();
+        const QString selectedText = m_preview->selectedText();
+        if (!selectedText.isEmpty())
+        {
+            QGuiApplication::clipboard()->setText(selectedText);
+        }
         return;
     }
 
@@ -156,7 +162,7 @@ bool MarkdownDocumentPage::hasCopySelection() const
 {
     if (isPreviewVisible())
     {
-        return !m_preview->textCursor().selectedText().isEmpty();
+        return !m_preview->selectedText().isEmpty();
     }
 
     return DocumentPage::hasCopySelection();
@@ -171,10 +177,8 @@ void MarkdownDocumentPage::ensurePreview(MarkdownPreviewer *previewer)
     }
 
     m_previewer = previewer;
-    m_preview = new QTextBrowser(this);
-    m_preview->setReadOnly(true);
-    m_preview->setOpenExternalLinks(true);
-    connect(m_preview, &QTextBrowser::copyAvailable,
+    m_preview = m_previewer->createPreviewWidget(QString(), QString(), this);
+    connect(m_preview, &QLiteHtmlWidget::copyAvailable,
             this, &DocumentPage::copyAvailableChanged);
     m_stack->addWidget(m_preview);
 }

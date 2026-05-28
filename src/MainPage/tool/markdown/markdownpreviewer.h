@@ -5,7 +5,7 @@
 #include <QString>
 
 class QWidget;
-class QTextBrowser;
+class QLiteHtmlWidget;
 
 class MarkdownPreviewer : public QObject
 {
@@ -15,13 +15,20 @@ public:
     explicit MarkdownPreviewer(QObject *parent = nullptr);
 
     bool isMarkdownFile(const QString &filePath) const;
-    QTextBrowser *createPreviewWidget(const QString &markdown, const QString &filePath, QWidget *parent);
-    void updatePreview(QTextBrowser *browser, const QString &markdown, const QString &filePath);
+    QLiteHtmlWidget *createPreviewWidget(const QString &markdown, const QString &filePath, QWidget *parent);
+    void updatePreview(QLiteHtmlWidget *preview, const QString &markdown, const QString &filePath);
     void showPreview(const QString &markdown, const QString &filePath, QWidget *parent);
+    bool exportToPdf(const QString &markdown, const QString &filePath, const QString &outputPath);
 
 private:
+    enum class RenderMode
+    {
+        Screen,
+        Pdf
+    };
+
     QString markdownToHtml(const QString &markdown) const;
-    QString buildHtmlDocument(const QString &bodyHtml) const;
+    QString buildHtmlDocument(const QString &bodyHtml, RenderMode mode) const;
 };
 
 #endif // MARKDOWNPREVIEWER_H

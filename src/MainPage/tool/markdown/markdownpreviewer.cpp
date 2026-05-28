@@ -2,10 +2,17 @@
 #include "themecolors.h"
 
 #include <QByteArray>
+#include <QDesktopServices>
+#include <QDir>
+#include <QFile>
 #include <QFileInfo>
+#include <QPageLayout>
+#include <QPageSize>
+#include <QPrinter>
+#include <QTemporaryFile>
 #include <QUrl>
-#include <QTextBrowser>
-#include <QTextDocument>
+
+#include "qlitehtmlwidget.h"
 
 extern "C" {
 #include "../../../third_party/md4c/md4c-html.h"
@@ -17,6 +24,75 @@ void appendHtmlFragment(const MD_CHAR *data, MD_SIZE size, void *userData)
 {
     auto *html = static_cast<QByteArray *>(userData);
     html->append(data, static_cast<int>(size));
+}
+
+QByteArray loadDataUrl(const QUrl &url)
+{
+    const QString data = url.toString();
+    if (!data.startsWith(QStringLiteral("data:"), Qt::CaseInsensitive))
+    {
+        return {};
+    }
+
+    const int comma = data.indexOf(QLatin1Char(','));
+    if (comma < 0)
+    {
+        return {};
+    }
+
+    const QString meta = data.left(comma);
+    const QByteArray payload = data.mid(comma + 1).toUtf8();
+    if (meta.contains(QStringLiteral(";base64"), Qt::CaseInsensitive))
+    {
+        return QByteArray::fromBase64(payload);
+    }
+
+    return QUrl::fromPercentEncoding(payload).toUtf8();
+}
+
+bool isInsideDirectory(const QString &filePath, const QString &rootPath)
+{
+    if (rootPath.isEmpty())
+    {
+        return false;
+    }
+
+    const QString canonicalFile = QFileInfo(filePath).canonicalFilePath();
+    const QString canonicalRoot = QDir(rootPath).canonicalPath();
+    if (canonicalFile.isEmpty() || canonicalRoot.isEmpty())
+    {
+        return false;
+    }
+
+    return canonicalFile == canonicalRoot
+           || canonicalFile.startsWith(canonicalRoot + QLatin1Char('/'));
+}
+
+QByteArray loadPreviewResource(const QUrl &url, const QString &rootPath)
+{
+    if (url.scheme() == QStringLiteral("data"))
+    {
+        return loadDataUrl(url);
+    }
+
+    if (!url.isLocalFile())
+    {
+        return {};
+    }
+
+    const QString filePath = url.toLocalFile();
+    if (!isInsideDirectory(filePath, rootPath))
+    {
+        return {};
+    }
+
+    QFile file(filePath);
+    if (!file.open(QIODevice::ReadOnly))
+    {
+        return {};
+    }
+
+    return file.readAll();
 }
 
 } // namespace
@@ -38,46 +114,161 @@ bool MarkdownPreviewer::isMarkdownFile(const QString &filePath) const
 
 void MarkdownPreviewer::showPreview(const QString &markdown, const QString &filePath, QWidget *parent)
 {
-    auto *browser = createPreviewWidget(markdown, filePath, nullptr);
-    browser->setAttribute(Qt::WA_DeleteOnClose);
-    browser->setWindowTitle(filePath.isEmpty()
+    auto *preview = createPreviewWidget(markdown, filePath, nullptr);
+    preview->setAttribute(Qt::WA_DeleteOnClose);
+    preview->setWindowTitle(filePath.isEmpty()
                             ? tr("Markdown Preview")
                             : tr("Markdown Preview - %1").arg(QFileInfo(filePath).fileName()));
 
-    browser->resize(900, 700);
+    preview->resize(900, 700);
 
     if (parent)
     {
-        const QPoint center = parent->geometry().center() - browser->rect().center();
-        browser->move(center);
+        const QPoint center = parent->geometry().center() - preview->rect().center();
+        preview->move(center);
     }
 
-    browser->show();
+    preview->show();
 }
 
-QTextBrowser *MarkdownPreviewer::createPreviewWidget(const QString &markdown, const QString &filePath, QWidget *parent)
+QLiteHtmlWidget *MarkdownPreviewer::createPreviewWidget(const QString &markdown, const QString &filePath, QWidget *parent)
 {
-    auto *browser = new QTextBrowser(parent);
-    browser->setReadOnly(true);
-    browser->setOpenExternalLinks(true);
-    updatePreview(browser, markdown, filePath);
-    return browser;
+    auto *preview = new QLiteHtmlWidget(parent);
+    preview->setFocusPolicy(Qt::StrongFocus);
+    connect(preview, &QLiteHtmlWidget::linkClicked, preview, [preview](const QUrl &url) {
+        QUrl current = preview->url();
+        QUrl target = url;
+        current.setFragment({});
+        target.setFragment({});
+
+        if (!url.fragment().isEmpty() && (target == current || target.isEmpty()))
+        {
+            preview->scrollToAnchor(url.fragment());
+            return;
+        }
+
+        QDesktopServices::openUrl(url);
+    });
+    updatePreview(preview, markdown, filePath);
+    return preview;
 }
 
-void MarkdownPreviewer::updatePreview(QTextBrowser *browser, const QString &markdown, const QString &filePath)
+void MarkdownPreviewer::updatePreview(QLiteHtmlWidget *preview, const QString &markdown, const QString &filePath)
 {
-    if (!browser) return;
+    if (!preview) return;
 
+    QString rootPath;
     if (!filePath.isEmpty())
     {
-        browser->document()->setBaseUrl(QUrl::fromLocalFile(QFileInfo(filePath).absolutePath() + QLatin1Char('/')));
+        const QFileInfo info(filePath);
+        rootPath = info.absolutePath();
+        preview->setUrl(QUrl::fromLocalFile(info.absoluteFilePath()));
     }
     else
     {
-        browser->document()->setBaseUrl(QUrl());
+        preview->setUrl(QUrl());
     }
 
-    browser->setHtml(buildHtmlDocument(markdownToHtml(markdown)));
+    preview->setResourceHandler([rootPath](const QUrl &url) {
+        return loadPreviewResource(url, rootPath);
+    });
+
+    preview->setHtml(buildHtmlDocument(markdownToHtml(markdown), RenderMode::Screen));
+}
+
+bool MarkdownPreviewer::exportToPdf(const QString &markdown, const QString &filePath, const QString &outputPath)
+{
+    if (outputPath.isEmpty())
+    {
+        return false;
+    }
+
+    QLiteHtmlWidget preview;
+    QString rootPath;
+    if (!filePath.isEmpty())
+    {
+        const QFileInfo info(filePath);
+        rootPath = info.absolutePath();
+        preview.setUrl(QUrl::fromLocalFile(info.absoluteFilePath()));
+    }
+
+    preview.setResourceHandler([rootPath](const QUrl &url) {
+        return loadPreviewResource(url, rootPath);
+    });
+    preview.setHtml(buildHtmlDocument(markdownToHtml(markdown), RenderMode::Pdf));
+
+    const QFileInfo outputInfo(outputPath);
+    QTemporaryFile tempFile(outputInfo.absolutePath()
+                            + QDir::separator()
+                            + QStringLiteral(".notepeek-pdf-XXXXXX.pdf"));
+    tempFile.setAutoRemove(false);
+    if (!tempFile.open())
+    {
+        return false;
+    }
+
+    const QString tempPath = tempFile.fileName();
+    tempFile.close();
+
+    QPrinter printer(QPrinter::ScreenResolution);
+    printer.setOutputFormat(QPrinter::PdfFormat);
+    printer.setOutputFileName(tempPath);
+    printer.setResolution(96);
+    printer.setPageLayout(QPageLayout(QPageSize(QPageSize::A4),
+                                      QPageLayout::Portrait,
+                                      QMarginsF(10.0, 10.0, 10.0, 10.0),
+                                      QPageLayout::Millimeter));
+
+    preview.print(&printer);
+
+    const QFileInfo tempInfo(tempPath);
+    if (!tempInfo.exists() || tempInfo.size() <= 0)
+    {
+        QFile::remove(tempPath);
+        return false;
+    }
+
+    QString backupPath;
+    const bool targetExists = QFileInfo::exists(outputPath);
+    if (targetExists)
+    {
+        QTemporaryFile backupFile(outputInfo.absolutePath()
+                                  + QDir::separator()
+                                  + QStringLiteral(".notepeek-pdf-backup-XXXXXX.pdf"));
+        backupFile.setAutoRemove(false);
+        if (!backupFile.open())
+        {
+            QFile::remove(tempPath);
+            return false;
+        }
+
+        backupPath = backupFile.fileName();
+        backupFile.close();
+        QFile::remove(backupPath);
+
+        if (!QFile::rename(outputPath, backupPath))
+        {
+            QFile::remove(tempPath);
+            return false;
+        }
+    }
+
+    if (!QFile::rename(tempPath, outputPath))
+    {
+        if (targetExists)
+        {
+            QFile::rename(backupPath, outputPath);
+        }
+        QFile::remove(tempPath);
+        return false;
+    }
+
+    if (targetExists)
+    {
+        QFile::remove(backupPath);
+    }
+
+    return true;
 }
 
 QString MarkdownPreviewer::markdownToHtml(const QString &markdown) const
@@ -99,7 +290,7 @@ QString MarkdownPreviewer::markdownToHtml(const QString &markdown) const
     return QString::fromUtf8(html);
 }
 
-QString MarkdownPreviewer::buildHtmlDocument(const QString &bodyHtml) const
+QString MarkdownPreviewer::buildHtmlDocument(const QString &bodyHtml, RenderMode mode) const
 {
     namespace MP = ThemeColors::MarkdownPreview;
 
@@ -108,16 +299,18 @@ QString MarkdownPreviewer::buildHtmlDocument(const QString &bodyHtml) const
         return c.name(QColor::HexRgb);
     };
 
-    const QString sBodyBg       = cssColor(MP::bodyBg());
-    const QString sBodyFg       = cssColor(MP::bodyFg());
-    const QString sHeadingFg    = cssColor(MP::headingFg());
-    const QString sHeadingBrd   = cssColor(MP::headingBorder());
-    const QString sCodeBg       = cssColor(MP::codeBg());
-    const QString sCodeBrd      = cssColor(MP::codeBorder());
-    const QString sBqBrd        = cssColor(MP::blockquoteBorder());
-    const QString sBqFg         = cssColor(MP::blockquoteFg());
-    const QString sTblBrd       = cssColor(MP::tableBorder());
-    const QString sLnkFg        = cssColor(MP::linkFg());
+    const bool pdfMode = mode == RenderMode::Pdf;
+    const QString sBodyBg       = pdfMode ? QStringLiteral("#ffffff") : cssColor(MP::bodyBg());
+    const QString sBodyFg       = pdfMode ? QStringLiteral("#1f2328") : cssColor(MP::bodyFg());
+    const QString sHeadingFg    = pdfMode ? QStringLiteral("#111827") : cssColor(MP::headingFg());
+    const QString sHeadingBrd   = pdfMode ? QStringLiteral("#d0d7de") : cssColor(MP::headingBorder());
+    const QString sCodeBg       = pdfMode ? QStringLiteral("#f6f8fa") : cssColor(MP::codeBg());
+    const QString sCodeBrd      = pdfMode ? QStringLiteral("#d0d7de") : cssColor(MP::codeBorder());
+    const QString sBqBrd        = pdfMode ? QStringLiteral("#d0d7de") : cssColor(MP::blockquoteBorder());
+    const QString sBqFg         = pdfMode ? QStringLiteral("#57606a") : cssColor(MP::blockquoteFg());
+    const QString sTblBrd       = pdfMode ? QStringLiteral("#d0d7de") : cssColor(MP::tableBorder());
+    const QString sLnkFg        = pdfMode ? QStringLiteral("#0969da") : cssColor(MP::linkFg());
+    const QString sBodyMargin   = pdfMode ? QStringLiteral("0") : QStringLiteral("28px 34px");
 
     return QStringLiteral(R"(<!doctype html>
 <html>
@@ -130,7 +323,7 @@ body {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     font-size: 15px;
     line-height: 1.6;
-    margin: 28px 34px;
+    margin: %11;
 }
 h1, h2, h3, h4, h5, h6 {
     color: %3;
@@ -180,9 +373,19 @@ img {
 </style>
 </head>
 <body>
-%11
+%12
 </body>
 </html>)")
-        .arg(sBodyFg, sBodyBg, sHeadingFg, sHeadingBrd, sCodeBg, sCodeBrd,
-             sBqBrd, sBqFg, sTblBrd, sLnkFg, bodyHtml);
+        .arg(sBodyFg)
+        .arg(sBodyBg)
+        .arg(sHeadingFg)
+        .arg(sHeadingBrd)
+        .arg(sCodeBg)
+        .arg(sCodeBrd)
+        .arg(sBqBrd)
+        .arg(sBqFg)
+        .arg(sTblBrd)
+        .arg(sLnkFg)
+        .arg(sBodyMargin)
+        .arg(bodyHtml);
 }

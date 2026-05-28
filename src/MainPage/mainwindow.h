@@ -47,6 +47,7 @@ private slots:
     void on_action_find_triggered();
     void on_action_switchHeaderSource_triggered();
     void on_action_markdownPreview_triggered();
+    void on_action_markdownExportPdf_triggered();
 
     void onFileDraged(const QList<QUrl> &urls);
     void onFileClicked(const QModelIndex &index);
