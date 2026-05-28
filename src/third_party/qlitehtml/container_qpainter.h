@@ -53,6 +53,7 @@ public: // outside API
     void draw(QPainter *painter, const QRect &clip);
     int documentWidth() const;
     int documentHeight() const;
+    QVector<QRect> textRects();
     int anchorY(const QString &anchorName) const;
 
     enum class MediaType
