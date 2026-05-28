@@ -15,7 +15,39 @@
 #include <QtPrintSupport/qprinter.h>
 #endif
 
+#include <algorithm>
+
 const int kScrollBarStep = 40;
+
+static int nextPrintPageTop(int pageTop,
+                            int pageHeight,
+                            int documentHeight,
+                            const QVector<QRect> &textRects)
+{
+    const int idealBreak = std::min(pageTop + pageHeight, documentHeight);
+    if (idealBreak >= documentHeight)
+        return documentHeight;
+
+    int adjustedBreak = idealBreak;
+    while (true) {
+        int candidate = adjustedBreak;
+        for (const QRect &rect : textRects) {
+            if (rect.top() < adjustedBreak && adjustedBreak < rect.top() + rect.height())
+                candidate = std::min(candidate, rect.top());
+        }
+
+        if (candidate == adjustedBreak)
+            break;
+
+        adjustedBreak = candidate;
+    }
+
+    const int minPageContentHeight = pageHeight / 3;
+    if (adjustedBreak - pageTop < minPageContentHeight)
+        return idealBreak;
+
+    return adjustedBreak;
+}
 
 // copied from include/litehtml/master_css.h
 const char master_css[] = R"##(
@@ -578,18 +610,28 @@ void QLiteHtmlWidget::print(QPrinter *printer)
 
     const QRect pageRect = printer->pageRect(QPrinter::DevicePixel).toRect();
     dc.render(pageRect.width(), pageRect.height());
+    const QVector<QRect> textRects = dc.textRects();
 
     QRect drawRect = pageRect;
     drawRect.moveTo(0, 0);
-    painter.setClipping(true);
-    painter.setClipRect(drawRect);
 
     QPoint scrollPosition(0, 0);
     while (true) {
+        const int documentHeight = dc.documentHeight();
+        const int nextPageTop = nextPrintPageTop(scrollPosition.y(),
+                                                 drawRect.height(),
+                                                 documentHeight,
+                                                 textRects);
+        QRect pageClip = drawRect;
+        pageClip.setHeight(std::min(drawRect.height(), nextPageTop - scrollPosition.y()));
+
+        painter.setClipping(true);
+        painter.setClipRect(pageClip);
         dc.setScrollPosition(scrollPosition);
-        dc.draw(&painter, drawRect);
-        scrollPosition.ry() += drawRect.height();
-        if (scrollPosition.y() < dc.documentHeight())
+        dc.draw(&painter, pageClip);
+
+        scrollPosition.setY(nextPageTop);
+        if (scrollPosition.y() < documentHeight)
             printer->newPage();
         else
             break;

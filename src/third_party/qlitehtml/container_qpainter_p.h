@@ -124,7 +124,9 @@ public: // document_container API
     QFont m_defaultFont = QFont(sansSerifFont(), 16);
     QByteArray m_defaultFontFamilyName = m_defaultFont.family().toUtf8();
     bool m_antialias = true;
+    bool m_collectTextRects = false;
     QHash<QUrl, QPixmap> m_pixmaps;
+    QVector<QRect> m_textRects;
     Selection m_selection;
     DocumentContainer::DataCallback m_dataCallback;
     DocumentContainer::CursorCallback m_cursorCallback;

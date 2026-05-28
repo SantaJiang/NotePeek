@@ -15,6 +15,7 @@
 #include <QFontMetrics>
 #include <QGuiApplication>
 #include <QLoggingCategory>
+#include <QImage>
 #include <QPainter>
 #include <QPalette>
 #include <QRegularExpression>
@@ -525,6 +526,11 @@ void DocumentContainerPrivate::draw_text(litehtml::uint_ptr hdc,
                                          const litehtml::position &pos)
 {
     auto painter = toQPainter(hdc);
+    if (m_collectTextRects) {
+        m_textRects.append(toQRect(pos));
+        return;
+    }
+
     painter->setFont(toQFont(hFont));
     painter->setPen(toQColor(color));
     painter->drawText(toQRect(pos), 0, QString::fromUtf8(text));
@@ -997,6 +1003,29 @@ int DocumentContainer::documentWidth() const
 int DocumentContainer::documentHeight() const
 {
     return d->m_document->height();
+}
+
+QVector<QRect> DocumentContainer::textRects()
+{
+    if (!d->m_document)
+        return {};
+
+    const QPoint scrollPosition = d->m_scrollPosition;
+    d->m_scrollPosition = {};
+    d->m_textRects.clear();
+    d->m_collectTextRects = true;
+
+    QImage scratch(1, 1, QImage::Format_ARGB32_Premultiplied);
+    QPainter painter(&scratch);
+    draw(&painter, QRect(0, 0, documentWidth(), documentHeight()));
+    painter.end();
+
+    d->m_collectTextRects = false;
+    d->m_scrollPosition = scrollPosition;
+
+    QVector<QRect> rects = d->m_textRects;
+    d->m_textRects.clear();
+    return rects;
 }
 
 int DocumentContainer::anchorY(const QString &anchorName) const
