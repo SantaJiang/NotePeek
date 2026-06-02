@@ -154,8 +154,6 @@ void MainWindow::changeEvent(QEvent *event)
 
     if (event->type() == QEvent::PaletteChange)
     {
-        // System theme changed (light ↔ dark). Re-apply theme-aware colours
-        // to all open editors and refresh the markdown preview if visible.
         ui->multieditor->editorManager()->reapplyThemeToAllEditors();
         ui->multieditor->refreshVisibleMarkdownPreview();
     }

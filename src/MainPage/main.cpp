@@ -53,7 +53,7 @@ int main(int argc, char *argv[])
 
     //style
 #ifdef Q_OS_WIN
-    if (QStyle *style = QStyleFactory::create("windowsvista"))
+    if (QStyle *style = QStyleFactory::create("Fusion"))
         a.setStyle(style);
 #elif defined(Q_OS_MAC)
     if (QStyle *style = QStyleFactory::create("Fusion"))
