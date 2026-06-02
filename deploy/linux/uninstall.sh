@@ -7,7 +7,7 @@ files=(
     "$PREFIX/bin/notepeek"
     "$PREFIX/lib/libqscintilla2.so"
     "$PREFIX/lib/libqscintilla2.so.15"
-    "$PREFIX/lib/libqscintilla2.so.0.1.0"
+    "$PREFIX/lib/libqscintilla2.so.1.0.0"
     "$PREFIX/share/applications/notepeek.desktop"
     "$PREFIX/share/metainfo/notepeek.appdata.xml"
     "$PREFIX/share/icons/hicolor/scalable/apps/notepeek.svg"
