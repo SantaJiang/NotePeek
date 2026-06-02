@@ -174,6 +174,12 @@ void MarkdownPreviewer::updatePreview(QLiteHtmlWidget *preview, const QString &m
     });
 
     preview->setHtml(buildHtmlDocument(markdownToHtml(markdown), RenderMode::Screen));
+
+    QPalette vpPalette = preview->viewport()->palette();
+    vpPalette.setColor(QPalette::Base, ThemeColors::MarkdownPreview::bodyBg());
+    vpPalette.setColor(QPalette::Window, ThemeColors::MarkdownPreview::bodyBg());
+    preview->viewport()->setPalette(vpPalette);
+    preview->viewport()->setAutoFillBackground(true);
 }
 
 bool MarkdownPreviewer::exportToPdf(const QString &markdown, const QString &filePath, const QString &outputPath)
