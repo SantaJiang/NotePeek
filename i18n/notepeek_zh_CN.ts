@@ -384,8 +384,8 @@ Do you want to save your changes?</source>
     </message>
     <message>
         <location filename="../src/MainPage/mainwindow.cpp" line="263"/>
-        <source>Made for my baby, Yueyue</source>
-        <translation>献给我的宝宝，玥玥</translation>
+        <source>For Yueyue</source>
+        <translation>致玥玥</translation>
     </message>
 </context>
 <context>
