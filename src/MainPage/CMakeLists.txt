@@ -2,6 +2,7 @@ set(MAINPAGE_SOURCES
     main.cpp
     mainwindow.cpp
     editor/customeditor.cpp
+    editor/customsyntaxlexers.cpp
     editor/documentio.cpp
     editor/documentpage.cpp
     editor/editormanager.cpp
@@ -25,6 +26,7 @@ set(MAINPAGE_HEADERS
     mainwindow.h
     themecolors.h
     editor/customeditor.h
+    editor/customsyntaxlexers.h
     editor/documentio.h
     editor/documentpage.h
     editor/editormanager.h

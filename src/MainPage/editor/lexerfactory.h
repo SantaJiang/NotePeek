@@ -52,13 +52,22 @@ public:
         VERILOG,
         VHDL,
         IDL,
-        OCTAVE
+        OCTAVE,
+        DOCKERFILE,
+        GROOVY,
+        STARLARK,
+        MESON,
+        QMAKE,
+        IGNORE
     };
 
     static QsciLexer* createLexer(Language lang);
     static Language languageFromExtension(const QString& ext);
+    static Language languageFromFileName(const QString& fileName);
+    static Language languageFromFilePath(const QString& filePath);
     static QString languageName(Language lang);
     static QStringList supportedExtensions();
+    static QStringList supportedFileNames();
 };
 
 #endif // LEXERFACTORY_H

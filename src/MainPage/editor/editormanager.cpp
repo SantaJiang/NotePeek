@@ -262,10 +262,7 @@ void EditorManager::updateEditorSyntax(CustomEditor *editor, const QString &file
     if (!editor) return;
 
     QsciLexer *oldLexer = editor->lexer();
-    QFileInfo fileInfo(filePath);
-    QString extension = fileInfo.suffix();
-
-    LexerFactory::Language lang = LexerFactory::languageFromExtension(extension);
+    LexerFactory::Language lang = LexerFactory::languageFromFilePath(filePath);
     QsciLexer* lexer = LexerFactory::createLexer(lang);
 
     if(lexer)

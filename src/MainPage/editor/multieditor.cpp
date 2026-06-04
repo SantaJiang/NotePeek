@@ -390,6 +390,8 @@ QString MultiEditor::promptSaveFileName(QWidget *parent)
     filters.append(tr("Text Files (*.txt)"));
     for (const QString &ext : LexerFactory::supportedExtensions())
         filters.append(QStringLiteral("%1 (*.%2)").arg(LexerFactory::languageName(LexerFactory::languageFromExtension(ext)), ext));
+    for (const QString &fileName : LexerFactory::supportedFileNames())
+        filters.append(QStringLiteral("%1 (%2)").arg(LexerFactory::languageName(LexerFactory::languageFromFileName(fileName)), fileName));
     filters.append(tr("All Files (*)"));
     QString selectedFilter;
 
