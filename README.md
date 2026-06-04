@@ -10,7 +10,7 @@
 
 ### 📝 Core Editing
 - **Multi-tab editing** – Open multiple files in tabs, with drag‑and‑drop reordering
-- **Syntax highlighting** – Supports **43+ programming/markup languages** (see list below)
+- **Syntax highlighting** – Supports **50+ programming/markup/configuration languages and file formats** (see list below)
 - **Find & Replace** – Full‑featured search with scroll‑bar result markers
 - **C/C++ header‑source switching** – Quick jump between `.h` and `.cpp/.cxx` files
 - **File‑system browser** – Integrated directory tree (dock) for quick file opening
@@ -32,15 +32,15 @@
 
 ## 📋 Supported Languages
 
-NotePeek’s syntax highlighting covers **43 languages** via the integrated QScintilla lexer:
+NotePeek’s syntax highlighting covers **50+ languages and file formats** via integrated QScintilla lexers plus lightweight built-in lexers for common project files:
 
 | Category | Languages |
 |----------|-----------|
 | **General‑purpose** | C, C++, C#, D, Java, Python, Rust, Ruby, Pascal, Fortran, Fortran77, Octave, MATLAB, Lua, Perl, Tcl, Verilog, VHDL, IDL, SPICE, POV‑Ray |
 | **Web & markup** | HTML, XML, QML, JSON, JSONL, YAML, TOML, Markdown, TeX, CSS, Properties, PO |
-| **Scripting** | Shell (Bash), Batch, CoffeeScript, AVS, Diff |
-| **Build systems** | CMake, Makefile |
-| **Miscellaneous** | SQL, PostScript |
+| **Scripting** | Shell (Bash), Batch, CoffeeScript, Groovy/Jenkinsfile, AVS, Diff |
+| **Build systems** | CMake, Makefile, Dockerfile/Containerfile, Bazel/Starlark, Meson, qmake |
+| **Miscellaneous** | SQL, PostScript, ignore files (`.gitignore`, `.dockerignore`, etc.) |
 
 ## 🖥️ Supported Platforms
 
