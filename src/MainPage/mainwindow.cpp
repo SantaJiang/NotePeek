@@ -288,7 +288,7 @@ void MainWindow::on_action_about_triggered()
                        QStringLiteral("<h3>%1 v%2</h3>"
                                       "<p>%3</p>"
                                       R"(<p>%4</p>)")
-                       .arg(QApplication::applicationDisplayName(), QApplication::applicationVersion(), "Copyright © 2026 Santa.", tr("Made for my baby, Yueyue")));
+                       .arg(QApplication::applicationDisplayName(), QApplication::applicationVersion(), "Copyright © 2026 Santa.", tr("For Yueyue")));
 }
 
 void MainWindow::on_action_showSlideBar_triggered(bool checked)
