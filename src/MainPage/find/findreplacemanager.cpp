@@ -63,7 +63,17 @@ void FindReplaceManager::find(const QString &text)
     bool re, cs, wo, wrap, forward;
     prepareFindOptions(re, cs, wo, wrap, forward, m_wrapAround);
 
-    m_editor->findFirst(m_findText, re, cs, wo, wrap, forward);
+    int originalLine, originalIndex;
+    m_editor->getCursorPosition(&originalLine, &originalIndex);
+    const int firstVisibleLine = m_editor->SendScintilla(QsciScintillaBase::SCI_GETFIRSTVISIBLELINE);
+    const int xOffset = m_editor->SendScintilla(QsciScintillaBase::SCI_GETXOFFSET);
+    const bool found = m_editor->findFirst(m_findText, re, cs, wo, wrap, forward);
+    if (!found)
+    {
+        m_editor->setCursorPosition(originalLine, originalIndex);
+        m_editor->SendScintilla(QsciScintillaBase::SCI_SETFIRSTVISIBLELINE, firstVisibleLine);
+        m_editor->SendScintilla(QsciScintillaBase::SCI_SETXOFFSET, xOffset);
+    }
     emit findRequested();
 }
 
@@ -188,9 +198,16 @@ void FindReplaceManager::highlightAllMatches()
     const int firstVisibleLine = m_editor->SendScintilla(QsciScintillaBase::SCI_GETFIRSTVISIBLELINE);
     const int xOffset = m_editor->SendScintilla(QsciScintillaBase::SCI_GETXOFFSET);
     bool hadSelection = m_editor->hasSelectedText();
-    int selLineFrom, selIndexFrom, selLineTo, selIndexTo;
+    int selLineFrom = 0;
+    int selIndexFrom = 0;
+    int selLineTo = 0;
+    int selIndexTo = 0;
+    int selectionPosition = -1;
+    int selectionLength = 0;
     if (hadSelection) {
         m_editor->getSelection(&selLineFrom, &selIndexFrom, &selLineTo, &selIndexTo);
+        selectionPosition = m_editor->positionFromLineIndex(selLineFrom, selIndexFrom);
+        selectionLength = m_editor->positionFromLineIndex(selLineTo, selIndexTo) - selectionPosition;
     }
 
     bool re, cs, wo, wrap, forward;
@@ -218,7 +235,7 @@ void FindReplaceManager::highlightAllMatches()
         found = m_editor->findNext();
     }
 
-    if (hadSelection) {
+    if (hadSelection && selectionMatchesSearchResults(selectionPosition, selectionLength)) {
         m_editor->setSelection(selLineFrom, selIndexFrom, selLineTo, selIndexTo);
     } else {
         m_editor->setCursorPosition(originalLine, originalIndex);
@@ -351,6 +368,19 @@ bool FindReplaceManager::isLargeFile() const
     QString filePath = m_editor->filePath();
     QFileInfo fileInfo(filePath);
     return (fileInfo.size() > LARGE_FILE_SIZE);
+}
+
+bool FindReplaceManager::selectionMatchesSearchResults(int position, int length) const
+{
+    for (const SearchResult &result : m_searchResults)
+    {
+        if (result.position == position && result.length == length)
+        {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 void FindReplaceManager::prepareFindOptions(bool &re, bool &cs, bool &wo, bool &wrap, bool &forward, bool wrapAround) const

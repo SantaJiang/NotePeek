@@ -15,6 +15,8 @@ namespace Ui
 class MainWindow;
 }
 
+class FileTypeFilterProxyModel;
+
 class MainWindow : public QMainWindow
 {
     Q_OBJECT
@@ -70,6 +72,7 @@ private:
     void setSplitViewEnabled(bool enabled);
     void syncOpenedFileToOtherPanes(MultiEditor *source, const QString &filePath);
     void syncClosedFileToOtherPanes(MultiEditor *source, const QString &filePath);
+    void syncRenamedFileToOtherPanes(MultiEditor *source, const QString &oldFilePath, const QString &newFilePath);
     void showSameFileInRightPane();
     bool closeAllEditorPanes();
     void reapplyThemeToEditorPanes();
@@ -77,6 +80,7 @@ private:
 
     Ui::MainWindow *ui;
     QFileSystemModel *m_pFileModel;
+    FileTypeFilterProxyModel *m_fileFilterProxy;
     QTreeView *m_pTreeView;
     QDockWidget *m_pDock;
     MultiEditor *m_activeMultiEditor;

@@ -201,7 +201,10 @@ bool MultiEditor::saveFile(CustomEditor *editor, const QString &filePath)
 {
     if (!editor) return false;
 
-    const QString oldFilePath = QFileInfo(editor->filePath()).absoluteFilePath();
+    const QString oldFilePath = editor->filePath().isEmpty()
+                                    ? QString()
+                                    : QFileInfo(editor->filePath()).absoluteFilePath();
+    const QString newFilePath = QFileInfo(filePath).absoluteFilePath();
 
     QApplication::setOverrideCursor(Qt::WaitCursor);
     QString errorMessage;
@@ -219,9 +222,10 @@ bool MultiEditor::saveFile(CustomEditor *editor, const QString &filePath)
 
     setCurrentFile(editor, filePath);
     m_editorManager->updateEditorSyntax(editor, filePath);
-    if (QFileInfo(filePath).absoluteFilePath() != oldFilePath)
+    if (newFilePath != oldFilePath)
     {
         refreshDocumentPageForFile(editor, filePath);
+        emit filePathChanged(oldFilePath, newFilePath);
     }
     return true;
 }
@@ -608,6 +612,40 @@ void MultiEditor::on_pushButton_closeDoc_clicked()
     {
         tabCloseRequested(currentIndex);
     }
+}
+
+bool MultiEditor::closeFileIfUnmodified(const QString &filePath)
+{
+    const int index = findFileIndex(filePath);
+    if (index == -1)
+    {
+        return true;
+    }
+
+    DocumentPage *page = pageForWidget(ui->tabWidget->widget(index));
+    CustomEditor *editor = page ? page->editor() : nullptr;
+    if (!editor || editor->isModified())
+    {
+        return false;
+    }
+
+    if (editor == m_defaultEditor)
+    {
+        m_defaultEditor = nullptr;
+    }
+
+    ui->tabWidget->removeTab(index);
+    removeTab(index);
+    emit editorClosed(editor);
+    m_editorManager->forgetEditor(editor);
+    page->deleteLater();
+
+    if (ui->tabWidget->count() == 0)
+    {
+        createDefaultDoc();
+    }
+
+    return true;
 }
 
 void MultiEditor::on_pushButton_splitView_clicked(bool checked)
