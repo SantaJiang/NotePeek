@@ -27,6 +27,9 @@ public:
     CustomEditor *currentEditor() const;
     bool isCurrentEditorPreviewVisible() const;
     int findEditorIndex(CustomEditor *editor) const;
+    int findFileIndex(const QString &filePath) const;
+    int currentIndex() const;
+    QString filePathAt(int index) const;
     void switchToEditor(CustomEditor *editor);
     void setCreateDefault(bool createDefault);
     void setFindReplaceManagerForCurrentEditor(FindReplaceManager *manager);
@@ -34,6 +37,7 @@ public:
     void hideMarkdownPreview(CustomEditor *editor);
     void refreshVisibleMarkdownPreview();
     void copyCurrentSelection();
+    void setSplitViewButtonChecked(bool checked);
     EditorManager *editorManager() const { return m_editorManager; }
 
     // tab管理..
@@ -47,7 +51,7 @@ public:
     // 文件操作..
     bool maybeSave(CustomEditor *editor);
     bool saveFile(CustomEditor *editor, const QString &filePath);
-    void openFile(const QString &filePath);
+    void openFile(const QString &filePath, bool activate = true);
     void setCurrentFile(CustomEditor *editor, const QString &filePath);
     void createDefaultDoc();
 
@@ -64,6 +68,7 @@ signals:
     void modificationChanged(bool modified);
     void copyAvailable(bool available);
     void filesDropped(const QList<QUrl> &urls);
+    void splitViewToggled(bool checked);
 
 public slots:
     void onNewFile();
@@ -80,6 +85,7 @@ public slots:
 
 private slots:
     void on_pushButton_closeDoc_clicked();
+    void on_pushButton_splitView_clicked(bool checked);
     void on_comboBox_files_currentIndexChanged(int index);
 
 private:

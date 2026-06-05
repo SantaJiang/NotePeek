@@ -15,7 +15,6 @@ FindReplaceManager::FindReplaceManager(QObject *parent)
     , m_wrapAround(true)
     , m_backwards(false)
     , m_highlightIndicator(-1)
-    , m_savedFirstVisibleLine(0)
 {
 }
 
@@ -51,7 +50,6 @@ void FindReplaceManager::find(const QString &text)
     QString selectedText = m_editor->selectedText();
     if (!selectedText.isEmpty() && m_findText.isEmpty()) {
         setFindText(selectedText);
-        m_initialFindText = selectedText;
         highlightAllMatches();
     }
 
@@ -187,6 +185,8 @@ void FindReplaceManager::highlightAllMatches()
 
     int originalLine, originalIndex;
     m_editor->getCursorPosition(&originalLine, &originalIndex);
+    const int firstVisibleLine = m_editor->SendScintilla(QsciScintillaBase::SCI_GETFIRSTVISIBLELINE);
+    const int xOffset = m_editor->SendScintilla(QsciScintillaBase::SCI_GETXOFFSET);
     bool hadSelection = m_editor->hasSelectedText();
     int selLineFrom, selIndexFrom, selLineTo, selIndexTo;
     if (hadSelection) {
@@ -223,10 +223,8 @@ void FindReplaceManager::highlightAllMatches()
     } else {
         m_editor->setCursorPosition(originalLine, originalIndex);
     }
-
-    if (m_initialFindText.isEmpty() && !m_findText.isEmpty()) {
-        selectFirstMatch();
-    }
+    m_editor->SendScintilla(QsciScintillaBase::SCI_SETFIRSTVISIBLELINE, firstVisibleLine);
+    m_editor->SendScintilla(QsciScintillaBase::SCI_SETXOFFSET, xOffset);
 
     updateScrollBarMarkers();
     emit searchResultsChanged();
@@ -310,17 +308,6 @@ void FindReplaceManager::addToReplaceHistory(const QString &text)
 {
     // 历史记录管理实现
     Q_UNUSED(text);
-}
-
-void FindReplaceManager::selectFirstMatch()
-{
-    if (!m_editor || m_findText.isEmpty())
-        return;
-
-    bool re, cs, wo, wrap, forward;
-    prepareFindOptions(re, cs, wo, wrap, forward, m_wrapAround);
-
-    m_editor->findFirst(m_findText, re, cs, wo, wrap, forward);
 }
 
 void FindReplaceManager::updateScrollBarMarkers()

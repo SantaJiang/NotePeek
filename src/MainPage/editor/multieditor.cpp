@@ -48,8 +48,11 @@ MultiEditor::MultiEditor(QWidget *parent, bool createDefault) : QWidget(parent),
     if (!fontFamilies.isEmpty())
     {
         ui->pushButton_closeDoc->setFont(QFont(fontFamilies.first()));
+        ui->pushButton_splitView->setFont(QFont(fontFamilies.first()));
     }
     ui->pushButton_closeDoc->setText(QChar(0xf00d));
+    ui->pushButton_splitView->setText(QChar(0xf0db));
+    ui->pushButton_splitView->setToolTip(tr("Split editor"));
 
     // 初始化编辑器管理器..
     m_editorManager = new EditorManager(this);
@@ -124,6 +127,24 @@ int MultiEditor::findEditorIndex(CustomEditor *editor) const
         }
     }
     return -1;
+}
+
+int MultiEditor::findFileIndex(const QString &filePath) const
+{
+    CustomEditor *editor = m_editorManager->getEditorByFilePath(filePath);
+    return editor ? findEditorIndex(editor) : -1;
+}
+
+int MultiEditor::currentIndex() const
+{
+    return ui->tabWidget->currentIndex();
+}
+
+QString MultiEditor::filePathAt(int index) const
+{
+    DocumentPage *page = pageForWidget(ui->tabWidget->widget(index));
+    CustomEditor *editor = page ? page->editor() : nullptr;
+    return editor ? editor->filePath() : QString();
 }
 
 void MultiEditor::switchToEditor(CustomEditor *editor)
@@ -205,8 +226,10 @@ bool MultiEditor::saveFile(CustomEditor *editor, const QString &filePath)
     return true;
 }
 
-void MultiEditor::openFile(const QString &filePath)
+void MultiEditor::openFile(const QString &filePath, bool activate)
 {
+    const int previousIndex = ui->tabWidget->currentIndex();
+
     // Check if file is already open
     CustomEditor *existingEditor = m_editorManager->getEditorByFilePath(filePath);
     if (existingEditor)
@@ -215,8 +238,11 @@ void MultiEditor::openFile(const QString &filePath)
         int index = findEditorIndex(existingEditor);
         if (index != -1)
         {
-            ui->tabWidget->setCurrentIndex(index);
-            setCurrentTabIndex(index); // 确保下拉框也同步..
+            if (activate)
+            {
+                ui->tabWidget->setCurrentIndex(index);
+                setCurrentTabIndex(index); // 确保下拉框也同步..
+            }
         }
         return;
     }
@@ -271,7 +297,15 @@ void MultiEditor::openFile(const QString &filePath)
     setCurrentFile(editor, filePath);
     m_editorManager->updateLineNumberMarginWidth(editor);
     closeDefaultEditorIfUnused();
-    switchToEditor(editor);
+    if (activate)
+    {
+        switchToEditor(editor);
+    }
+    else if (previousIndex >= 0 && previousIndex < ui->tabWidget->count())
+    {
+        ui->tabWidget->setCurrentIndex(previousIndex);
+        setCurrentTabIndex(previousIndex);
+    }
 
     // 发出文件打开信号..
     emit fileOpened(editor, filePath);
@@ -576,6 +610,11 @@ void MultiEditor::on_pushButton_closeDoc_clicked()
     }
 }
 
+void MultiEditor::on_pushButton_splitView_clicked(bool checked)
+{
+    emit splitViewToggled(checked);
+}
+
 void MultiEditor::on_comboBox_files_currentIndexChanged(int index)
 {
     if(index >= 0 && index < ui->tabWidget->count())
@@ -747,6 +786,13 @@ void MultiEditor::copyCurrentSelection()
     {
         page->copyCurrentSelection();
     }
+}
+
+void MultiEditor::setSplitViewButtonChecked(bool checked)
+{
+    ui->pushButton_splitView->blockSignals(true);
+    ui->pushButton_splitView->setChecked(checked);
+    ui->pushButton_splitView->blockSignals(false);
 }
 
 void MultiEditor::hideMarkdownPreview(CustomEditor *editor)
