@@ -13,6 +13,9 @@
 #include <QEvent>
 #include <QCoreApplication>
 #include <QStyleHints>
+#include <QApplication>
+#include <QSplitter>
+#include <QScopedValueRollback>
 #include "./editor/filesavedialog.h"
 #include "./editor/customeditor.h"
 #include "./decorators/highlightedscrollbardecorator.h"
@@ -21,6 +24,8 @@ MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
     , ui(new Ui::MainWindow)
     , m_pFileModel(nullptr)
+    , m_activeMultiEditor(nullptr)
+    , m_syncingEditorPanes(false)
     , m_findReplaceManager(new FindReplaceManager(this))
     , m_headerSourceManager(new HeaderSourceManager(this))
     , m_markdownPreviewer(new MarkdownPreviewer(this))
@@ -46,9 +51,7 @@ MainWindow::MainWindow(QWidget *parent)
 
     // 根据是否有文件参数决定是否创建默认编辑器..
     ui->multieditor->setCreateDefault(!hasFileArg);
-
-    // 初始化查找替换部件..
-    ui->widget_findreplace->setMultiEditor(ui->multieditor);
+    ui->multieditorRight->setCreateDefault(false);
 
     // 设置查找替换部件和管理器的关联
     ui->widget_findreplace->setFindReplaceManager(m_findReplaceManager);
@@ -60,20 +63,25 @@ MainWindow::MainWindow(QWidget *parent)
     m_pDock->setVisible(false);
     ui->widget_findreplace->setVisible(false);
 
-    // 连接MultiEditor的信号到MainWindow的槽..
-    connect(ui->multieditor, &MultiEditor::currentEditorChanged, this, [this](CustomEditor *editor)
-    {
-        ui->statusbar->connectToEditor(editor);
+    ui->editorSplitter->setStretchFactor(0, 1);
+    ui->editorSplitter->setStretchFactor(1, 1);
+    connectMultiEditor(ui->multieditor);
+    connectMultiEditor(ui->multieditorRight);
+    setSplitViewEnabled(false);
+    setActiveMultiEditor(ui->multieditor);
 
-        // 设置当前编辑器到查找管理器
-        m_findReplaceManager->setCurrentEditor(editor);
+    connect(qApp, &QApplication::focusChanged, this, [this](QWidget *, QWidget *now) {
+        if (!now)
+            return;
 
-        // 设置查找管理器到当前编辑器的装饰器
-        ui->multieditor->setFindReplaceManagerForCurrentEditor(m_findReplaceManager);
-
-        refreshHighlights();
-        updateToolActions();
-        updateEditActions(editor && editor->hasSelectedText());
+        for (MultiEditor *multiEditor : editorPanes())
+        {
+            if (multiEditor == now || multiEditor->isAncestorOf(now))
+            {
+                setActiveMultiEditor(multiEditor);
+                break;
+            }
+        }
     });
 
     // 连接查找替换部件的可见性变化
@@ -83,13 +91,6 @@ MainWindow::MainWindow(QWidget *parent)
             m_findReplaceManager->clearHighlights();
         }
     });
-
-    connect(ui->multieditor, &MultiEditor::modificationChanged, this, &MainWindow::updateWindowTitle);
-    connect(ui->multieditor, &MultiEditor::currentFileChanged, this, [this](CustomEditor *, const QString &) {
-        updateToolActions();
-    });
-    connect(ui->multieditor, &MultiEditor::copyAvailable, this, &MainWindow::updateEditActions);
-    connect(ui->multieditor, &MultiEditor::filesDropped, this, &MainWindow::onFileDraged);
 
     // 连接编辑动作..
     connect(ui->action_cut, &QAction::triggered, this, &MainWindow::on_action_cut_triggered);
@@ -112,8 +113,8 @@ MainWindow::MainWindow(QWidget *parent)
 #if QT_VERSION >= QT_VERSION_CHECK(6, 5, 0)
     connect(QGuiApplication::styleHints(), &QStyleHints::colorSchemeChanged,
             this, [this]() {
-                ui->multieditor->editorManager()->reapplyThemeToAllEditors();
-                ui->multieditor->refreshVisibleMarkdownPreview();
+                reapplyThemeToEditorPanes();
+                refreshVisibleMarkdownPreviews();
             });
 #endif
 
@@ -133,12 +134,215 @@ void MainWindow::openFileByArg(const QString &fileName)
 
 MultiEditor *MainWindow::multiEditor()
 {
-    return ui->multieditor;
+    return activeMultiEditor();
+}
+
+MultiEditor *MainWindow::activeMultiEditor() const
+{
+    return m_activeMultiEditor ? m_activeMultiEditor : ui->multieditor;
+}
+
+QList<MultiEditor *> MainWindow::editorPanes() const
+{
+    return { ui->multieditor, ui->multieditorRight };
+}
+
+void MainWindow::connectMultiEditor(MultiEditor *multiEditor)
+{
+    if (!multiEditor)
+        return;
+
+    connect(multiEditor, &MultiEditor::currentEditorChanged, this, [this, multiEditor](CustomEditor *) {
+        if (!m_syncingEditorPanes)
+        {
+            setActiveMultiEditor(multiEditor);
+        }
+    });
+    connect(multiEditor, &MultiEditor::modificationChanged, this, [this, multiEditor](bool modified) {
+        if (multiEditor == activeMultiEditor())
+        {
+            updateWindowTitle(modified);
+        }
+    });
+    connect(multiEditor, &MultiEditor::currentFileChanged, this, [this, multiEditor](CustomEditor *, const QString &filePath) {
+        if (!m_syncingEditorPanes)
+        {
+            setActiveMultiEditor(multiEditor);
+        }
+        updateToolActions();
+        syncOpenedFileToOtherPanes(multiEditor, filePath);
+    });
+    connect(multiEditor, &MultiEditor::fileOpened, this, [this, multiEditor](CustomEditor *, const QString &filePath) {
+        syncOpenedFileToOtherPanes(multiEditor, filePath);
+    });
+    connect(multiEditor, &MultiEditor::editorClosed, this, [this, multiEditor](CustomEditor *editor) {
+        syncClosedFileToOtherPanes(multiEditor, editor ? editor->filePath() : QString());
+    });
+    connect(multiEditor, &MultiEditor::copyAvailable, this, [this, multiEditor](bool available) {
+        if (multiEditor == activeMultiEditor())
+        {
+            updateEditActions(available);
+        }
+    });
+    connect(multiEditor, &MultiEditor::filesDropped, this, [this, multiEditor](const QList<QUrl> &urls) {
+        setActiveMultiEditor(multiEditor);
+        onFileDraged(urls);
+    });
+    connect(multiEditor, &MultiEditor::splitViewToggled, this, [this, multiEditor](bool checked) {
+        setActiveMultiEditor(multiEditor);
+        setSplitViewEnabled(checked);
+    });
+}
+
+void MainWindow::setActiveMultiEditor(MultiEditor *multiEditor)
+{
+    if (!multiEditor)
+        return;
+
+    m_activeMultiEditor = multiEditor;
+    ui->widget_findreplace->setMultiEditor(multiEditor);
+
+    CustomEditor *editor = multiEditor->currentEditor();
+    ui->statusbar->connectToEditor(editor);
+    m_findReplaceManager->setCurrentEditor(editor);
+    multiEditor->setFindReplaceManagerForCurrentEditor(m_findReplaceManager);
+
+    updateToolActions();
+    updateEditActions(editor && editor->hasSelectedText());
+    if (editor)
+    {
+        updateWindowTitle(editor->isModified());
+    }
+}
+
+void MainWindow::setSplitViewEnabled(bool enabled)
+{
+    if (!enabled && activeMultiEditor() == ui->multieditorRight)
+    {
+        setActiveMultiEditor(ui->multieditor);
+    }
+
+    ui->multieditorRight->setVisible(enabled);
+    ui->multieditor->setSplitViewButtonChecked(enabled);
+    ui->multieditorRight->setSplitViewButtonChecked(enabled);
+
+    if (enabled)
+    {
+        const QList<int> sizes = ui->editorSplitter->sizes();
+        if (sizes.size() < 2 || sizes.at(1) == 0)
+        {
+            ui->editorSplitter->setSizes({ 1, 1 });
+        }
+        showSameFileInRightPane();
+    }
+}
+
+void MainWindow::syncOpenedFileToOtherPanes(MultiEditor *source, const QString &filePath)
+{
+    if (m_syncingEditorPanes || filePath.isEmpty())
+        return;
+
+    QScopedValueRollback<bool> syncing(m_syncingEditorPanes, true);
+    for (MultiEditor *multiEditor : editorPanes())
+    {
+        if (multiEditor != source && multiEditor->findFileIndex(filePath) == -1)
+        {
+            multiEditor->openFile(filePath, false);
+        }
+    }
+}
+
+void MainWindow::syncClosedFileToOtherPanes(MultiEditor *source, const QString &filePath)
+{
+    if (m_syncingEditorPanes || filePath.isEmpty())
+        return;
+
+    QScopedValueRollback<bool> syncing(m_syncingEditorPanes, true);
+    for (MultiEditor *multiEditor : editorPanes())
+    {
+        if (multiEditor == source)
+            continue;
+
+        const int index = multiEditor->findFileIndex(filePath);
+        if (index != -1)
+        {
+            multiEditor->tabCloseRequested(index);
+        }
+    }
+}
+
+void MainWindow::showSameFileInRightPane()
+{
+    CustomEditor *leftEditor = ui->multieditor->currentEditor();
+    if (!leftEditor)
+        return;
+
+    const QString currentFilePath = leftEditor->filePath();
+    if (currentFilePath.isEmpty())
+        return;
+
+    QScopedValueRollback<bool> syncing(m_syncingEditorPanes, true);
+    for (int i = 0; i < ui->multieditor->count(); ++i)
+    {
+        const QString filePath = ui->multieditor->filePathAt(i);
+        if (!filePath.isEmpty() && ui->multieditorRight->findFileIndex(filePath) == -1)
+        {
+            ui->multieditorRight->openFile(filePath, false);
+        }
+    }
+
+    int line = 0;
+    int index = 0;
+    leftEditor->getCursorPosition(&line, &index);
+    const int firstVisibleLine = leftEditor->SendScintilla(QsciScintillaBase::SCI_GETFIRSTVISIBLELINE);
+    const int xOffset = leftEditor->SendScintilla(QsciScintillaBase::SCI_GETXOFFSET);
+
+    ui->multieditorRight->openFile(currentFilePath, true);
+
+    CustomEditor *rightEditor = ui->multieditorRight->currentEditor();
+    if (rightEditor)
+    {
+        const int targetLine = qMin(line, rightEditor->lines() - 1);
+        const int targetIndex = qMin(index, rightEditor->lineLength(targetLine));
+        rightEditor->setCursorPosition(targetLine, targetIndex);
+        rightEditor->SendScintilla(QsciScintillaBase::SCI_SETFIRSTVISIBLELINE, firstVisibleLine);
+        rightEditor->SendScintilla(QsciScintillaBase::SCI_SETXOFFSET, xOffset);
+    }
+    setActiveMultiEditor(ui->multieditor);
+}
+
+bool MainWindow::closeAllEditorPanes()
+{
+    for (MultiEditor *multiEditor : editorPanes())
+    {
+        setActiveMultiEditor(multiEditor);
+        if (!multiEditor->closeAllEditors())
+        {
+            return false;
+        }
+    }
+    return true;
+}
+
+void MainWindow::reapplyThemeToEditorPanes()
+{
+    for (MultiEditor *multiEditor : editorPanes())
+    {
+        multiEditor->editorManager()->reapplyThemeToAllEditors();
+    }
+}
+
+void MainWindow::refreshVisibleMarkdownPreviews()
+{
+    for (MultiEditor *multiEditor : editorPanes())
+    {
+        multiEditor->refreshVisibleMarkdownPreview();
+    }
 }
 
 void MainWindow::closeEvent(QCloseEvent *event)
 {
-    if (ui->multieditor->closeAllEditors())
+    if (closeAllEditorPanes())
     {
         event->accept();
     }
@@ -154,8 +358,8 @@ void MainWindow::changeEvent(QEvent *event)
 
     if (event->type() == QEvent::PaletteChange)
     {
-        ui->multieditor->editorManager()->reapplyThemeToAllEditors();
-        ui->multieditor->refreshVisibleMarkdownPreview();
+        reapplyThemeToEditorPanes();
+        refreshVisibleMarkdownPreviews();
     }
 }
 
@@ -219,7 +423,7 @@ void MainWindow::setRootDirectory(const QString &dirPath)
 
 void MainWindow::openFileAndSetRootDirectory(const QString &fileName)
 {
-    ui->multieditor->openFile(fileName);
+    activeMultiEditor()->openFile(fileName);
 
     QFileInfo fileInfo(fileName);
     QString dirPath = fileInfo.absolutePath();
@@ -235,7 +439,7 @@ void MainWindow::openFileAndSetRootDirectory(const QString &fileName)
 
 void MainWindow::on_action_new_triggered()
 {
-    ui->multieditor->onNewFile();
+    activeMultiEditor()->onNewFile();
     setRootDirectory(QString());
 }
 
@@ -250,7 +454,8 @@ void MainWindow::on_action_openFile_triggered()
 
 void MainWindow::on_action_openDirectory_triggered()
 {
-    if (ui->multieditor->maybeSave(ui->multieditor->currentEditor()))
+    MultiEditor *multiEditor = activeMultiEditor();
+    if (multiEditor->maybeSave(multiEditor->currentEditor()))
     {
         QString dirPath = QFileDialog::getExistingDirectory(this, tr("Open Directory..."), ".");
         if (!dirPath.isEmpty())
@@ -269,12 +474,12 @@ void MainWindow::on_action_openDirectory_triggered()
 
 bool MainWindow::on_action_save_triggered()
 {
-    return ui->multieditor->onSave();
+    return activeMultiEditor()->onSave();
 }
 
 bool MainWindow::on_action_saveAs_triggered()
 {
-    return ui->multieditor->onSaveAs();
+    return activeMultiEditor()->onSaveAs();
 }
 
 void MainWindow::on_action_exit_triggered()
@@ -298,9 +503,10 @@ void MainWindow::on_action_showSlideBar_triggered(bool checked)
 
 void MainWindow::on_action_undo_triggered()
 {
-    if (ui->multieditor->isCurrentEditorPreviewVisible()) return;
+    MultiEditor *multiEditor = activeMultiEditor();
+    if (multiEditor->isCurrentEditorPreviewVisible()) return;
 
-    CustomEditor *editor = ui->multieditor->currentEditor();
+    CustomEditor *editor = multiEditor->currentEditor();
     if (editor)
     {
         editor->undo();
@@ -309,9 +515,10 @@ void MainWindow::on_action_undo_triggered()
 
 void MainWindow::on_action_redo_triggered()
 {
-    if (ui->multieditor->isCurrentEditorPreviewVisible()) return;
+    MultiEditor *multiEditor = activeMultiEditor();
+    if (multiEditor->isCurrentEditorPreviewVisible()) return;
 
-    CustomEditor *editor = ui->multieditor->currentEditor();
+    CustomEditor *editor = multiEditor->currentEditor();
     if (editor)
     {
         editor->redo();
@@ -320,9 +527,10 @@ void MainWindow::on_action_redo_triggered()
 
 void MainWindow::on_action_cut_triggered()
 {
-    if (ui->multieditor->isCurrentEditorPreviewVisible()) return;
+    MultiEditor *multiEditor = activeMultiEditor();
+    if (multiEditor->isCurrentEditorPreviewVisible()) return;
 
-    CustomEditor *editor = ui->multieditor->currentEditor();
+    CustomEditor *editor = multiEditor->currentEditor();
     if (editor)
     {
         editor->cut();
@@ -331,14 +539,15 @@ void MainWindow::on_action_cut_triggered()
 
 void MainWindow::on_action_copy_triggered()
 {
-    ui->multieditor->copyCurrentSelection();
+    activeMultiEditor()->copyCurrentSelection();
 }
 
 void MainWindow::on_action_paste_triggered()
 {
-    if (ui->multieditor->isCurrentEditorPreviewVisible()) return;
+    MultiEditor *multiEditor = activeMultiEditor();
+    if (multiEditor->isCurrentEditorPreviewVisible()) return;
 
-    CustomEditor *editor = ui->multieditor->currentEditor();
+    CustomEditor *editor = multiEditor->currentEditor();
     if (editor)
     {
         editor->paste();
@@ -347,9 +556,10 @@ void MainWindow::on_action_paste_triggered()
 
 void MainWindow::on_action_find_triggered()
 {
-    if (ui->multieditor->isCurrentEditorPreviewVisible()) return;
+    MultiEditor *multiEditor = activeMultiEditor();
+    if (multiEditor->isCurrentEditorPreviewVisible()) return;
 
-    CustomEditor *editor = ui->multieditor->currentEditor();
+    CustomEditor *editor = multiEditor->currentEditor();
     if (!editor) return;
 
     QString selectedText = editor->selectedText();
@@ -365,7 +575,8 @@ void MainWindow::on_action_find_triggered()
 
 void MainWindow::on_action_switchHeaderSource_triggered()
 {
-    CustomEditor *editor = ui->multieditor->currentEditor();
+    MultiEditor *multiEditor = activeMultiEditor();
+    CustomEditor *editor = multiEditor->currentEditor();
     if (!editor) return;
 
     QString currentFilePath = editor->filePath();
@@ -376,7 +587,7 @@ void MainWindow::on_action_switchHeaderSource_triggered()
 
     if (!correspondingFile.isEmpty())
     {
-        ui->multieditor->openFile(correspondingFile);
+        multiEditor->openFile(correspondingFile);
 
         QModelIndex index = m_pFileModel->index(correspondingFile);
         if (index.isValid()) {
@@ -388,13 +599,14 @@ void MainWindow::on_action_switchHeaderSource_triggered()
 
 void MainWindow::on_action_markdownPreview_triggered()
 {
-    CustomEditor *editor = ui->multieditor->currentEditor();
+    MultiEditor *multiEditor = activeMultiEditor();
+    CustomEditor *editor = multiEditor->currentEditor();
     if (!editor) return;
 
     const QString currentFilePath = editor->filePath();
     if (!m_markdownPreviewer->isMarkdownFile(currentFilePath)) return;
 
-    const bool previewVisible = ui->multieditor->toggleMarkdownPreview(m_markdownPreviewer);
+    const bool previewVisible = multiEditor->toggleMarkdownPreview(m_markdownPreviewer);
     if (previewVisible)
     {
         ui->widget_findreplace->setVisible(false);
@@ -406,7 +618,7 @@ void MainWindow::on_action_markdownPreview_triggered()
 
 void MainWindow::on_action_markdownExportPdf_triggered()
 {
-    CustomEditor *editor = ui->multieditor->currentEditor();
+    CustomEditor *editor = activeMultiEditor()->currentEditor();
     if (!editor) return;
 
     const QString currentFilePath = editor->filePath();
@@ -457,13 +669,13 @@ void MainWindow::onFileClicked(const QModelIndex &index)
     if (!m_pFileModel->isDir(index))
     {
         QString filePath = m_pFileModel->filePath(index);
-        ui->multieditor->openFile(filePath);
+        activeMultiEditor()->openFile(filePath);
     }
 }
 
 void MainWindow::updateEditActions(bool available)
 {
-    const bool editingAvailable = !ui->multieditor->isCurrentEditorPreviewVisible();
+    const bool editingAvailable = !activeMultiEditor()->isCurrentEditorPreviewVisible();
     ui->action_cut->setEnabled(editingAvailable && available);
     ui->action_copy->setEnabled(available);
     ui->action_paste->setEnabled(editingAvailable);
@@ -474,7 +686,7 @@ void MainWindow::updateEditActions(bool available)
 
 void MainWindow::updateWindowTitle(bool modified)
 {
-    CustomEditor *editor = ui->multieditor->currentEditor();
+    CustomEditor *editor = activeMultiEditor()->currentEditor();
     if (!editor) return;
 
     QString title;
@@ -504,9 +716,10 @@ void MainWindow::updateWindowTitle(bool modified)
 
 void MainWindow::updateToolActions()
 {
-    CustomEditor *editor = ui->multieditor->currentEditor();
+    MultiEditor *multiEditor = activeMultiEditor();
+    CustomEditor *editor = multiEditor->currentEditor();
     const QString filePath = editor ? editor->filePath() : QString();
-    const bool previewVisible = ui->multieditor->isCurrentEditorPreviewVisible();
+    const bool previewVisible = multiEditor->isCurrentEditorPreviewVisible();
 
     const bool cppSupported = !filePath.isEmpty() && m_headerSourceManager->isCppFile(filePath);
     const bool markdownSupported = !filePath.isEmpty() && m_markdownPreviewer->isMarkdownFile(filePath);
@@ -523,7 +736,7 @@ void MainWindow::updateToolActions()
 
 void MainWindow::onSearchResultsChanged()
 {
-    CustomEditor *editor = ui->multieditor->currentEditor();
+    CustomEditor *editor = activeMultiEditor()->currentEditor();
     if (editor)
     {
         editor->verticalScrollBar()->update();

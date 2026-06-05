@@ -35,7 +35,16 @@
      <number>0</number>
     </property>
     <item>
-     <widget class="MultiEditor" name="multieditor" native="true"/>
+     <widget class="QSplitter" name="editorSplitter">
+      <property name="orientation">
+       <enum>Qt::Orientation::Horizontal</enum>
+      </property>
+      <property name="childrenCollapsible">
+       <bool>false</bool>
+      </property>
+      <widget class="MultiEditor" name="multieditor" native="true"/>
+      <widget class="MultiEditor" name="multieditorRight" native="true"/>
+     </widget>
     </item>
     <item>
      <widget class="FindReplaceWidget" name="widget_findreplace" native="true">

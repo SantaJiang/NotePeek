@@ -60,7 +60,6 @@ signals:
 private:
     void addToFindHistory(const QString &text);
     void addToReplaceHistory(const QString &text);
-    void selectFirstMatch();
     void updateScrollBarMarkers();
     void initializeEditor();
     bool isLargeFile() const;
@@ -77,8 +76,6 @@ private:
     bool m_backwards;
     int m_highlightIndicator;
     QList<SearchResult> m_searchResults;
-    int m_savedFirstVisibleLine;
-    QString m_initialFindText;
 };
 
 #endif // FINDREPLACEMANAGER_H

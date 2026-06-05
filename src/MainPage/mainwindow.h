@@ -62,11 +62,24 @@ private:
     void refreshHighlights();
     void openFileAndSetRootDirectory(const QString &fileName);
     void updateToolActions();
+    MultiEditor *activeMultiEditor() const;
+    QList<MultiEditor *> editorPanes() const;
+    void connectMultiEditor(MultiEditor *multiEditor);
+    void setActiveMultiEditor(MultiEditor *multiEditor);
+    void setSplitViewEnabled(bool enabled);
+    void syncOpenedFileToOtherPanes(MultiEditor *source, const QString &filePath);
+    void syncClosedFileToOtherPanes(MultiEditor *source, const QString &filePath);
+    void showSameFileInRightPane();
+    bool closeAllEditorPanes();
+    void reapplyThemeToEditorPanes();
+    void refreshVisibleMarkdownPreviews();
 
     Ui::MainWindow *ui;
     QFileSystemModel *m_pFileModel;
     QTreeView *m_pTreeView;
     QDockWidget *m_pDock;
+    MultiEditor *m_activeMultiEditor;
+    bool m_syncingEditorPanes;
     FindReplaceManager *m_findReplaceManager;
     HeaderSourceManager *m_headerSourceManager;
     MarkdownPreviewer *m_markdownPreviewer;
