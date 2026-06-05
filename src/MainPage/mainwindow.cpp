@@ -16,9 +16,11 @@
 #include <QApplication>
 #include <QSplitter>
 #include <QScopedValueRollback>
+#include <QProcess>
 #include "./editor/filesavedialog.h"
 #include "./editor/customeditor.h"
 #include "./decorators/highlightedscrollbardecorator.h"
+#include "./widgets/filetreeview.h"
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
@@ -26,6 +28,7 @@ MainWindow::MainWindow(QWidget *parent)
     , m_pFileModel(nullptr)
     , m_activeMultiEditor(nullptr)
     , m_syncingEditorPanes(false)
+    , m_singleFileWindow(false)
     , m_findReplaceManager(new FindReplaceManager(this))
     , m_headerSourceManager(new HeaderSourceManager(this))
     , m_markdownPreviewer(new MarkdownPreviewer(this))
@@ -37,6 +40,7 @@ MainWindow::MainWindow(QWidget *parent)
     QStringList args = QCoreApplication::arguments();
     bool hasFileArg = false;
     QString filePath;
+    m_singleFileWindow = args.contains(QStringLiteral("--single-file-window"));
 
     // 跳过第一个参数（程序自身）..
     for (int i = 1; i < args.size(); ++i)
@@ -69,6 +73,11 @@ MainWindow::MainWindow(QWidget *parent)
     connectMultiEditor(ui->multieditorRight);
     setSplitViewEnabled(false);
     setActiveMultiEditor(ui->multieditor);
+    if (m_singleFileWindow)
+    {
+        ui->multieditor->setTopbarVisible(false);
+        ui->multieditorRight->setTopbarVisible(false);
+    }
 
     connect(qApp, &QApplication::focusChanged, this, [this](QWidget *, QWidget *now) {
         if (!now)
@@ -217,6 +226,11 @@ void MainWindow::setActiveMultiEditor(MultiEditor *multiEditor)
 
 void MainWindow::setSplitViewEnabled(bool enabled)
 {
+    if (m_singleFileWindow)
+    {
+        enabled = false;
+    }
+
     if (!enabled && activeMultiEditor() == ui->multieditorRight)
     {
         setActiveMultiEditor(ui->multieditor);
@@ -368,7 +382,8 @@ void MainWindow::createDirView()
     m_pFileModel = new QFileSystemModel(this);
     m_pFileModel->setFilter(QDir::AllEntries | QDir::NoDotAndDotDot | QDir::AllDirs);
 
-    m_pTreeView = new QTreeView(this);
+    auto *treeView = new FileTreeView(this);
+    m_pTreeView = treeView;
     m_pTreeView->setModel(m_pFileModel);
 
     m_pTreeView->setAnimated(true);
@@ -384,6 +399,7 @@ void MainWindow::createDirView()
     m_pTreeView->hideColumn(3);
 
     connect(m_pTreeView, &QTreeView::doubleClicked, this, &MainWindow::onFileClicked);
+    connect(treeView, &FileTreeView::openInNewWindowRequested, this, &MainWindow::openFileInNewWindow);
     QScroller::grabGesture(m_pTreeView, QScroller::TouchGesture);
 }
 
@@ -663,6 +679,14 @@ void MainWindow::onFileDraged(const QList<QUrl> &urls)
     }
 }
 
+void MainWindow::openFileInNewWindow(const QString &filePath)
+{
+    if (filePath.isEmpty())
+        return;
+
+    QProcess::startDetached(QCoreApplication::applicationFilePath(),
+                            { QStringLiteral("--single-file-window"), filePath });
+}
 
 void MainWindow::onFileClicked(const QModelIndex &index)
 {

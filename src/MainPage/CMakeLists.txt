@@ -14,6 +14,7 @@ set(MAINPAGE_SOURCES
     decorators/highlightedscrollbardecorator.cpp
     find/findreplacemanager.cpp
     find/findreplacewidget.cpp
+    widgets/filetreeview.cpp
     widgets/qscieditorinfostatusbar.cpp
     tool/cpp/headersourcemanager.cpp
     tool/markdown/markdownpreviewer.cpp
@@ -38,6 +39,7 @@ set(MAINPAGE_HEADERS
     decorators/highlightedscrollbardecorator.h
     find/findreplacemanager.h
     find/findreplacewidget.h
+    widgets/filetreeview.h
     widgets/qscieditorinfostatusbar.h
     tool/cpp/headersourcemanager.h
     tool/markdown/markdownpreviewer.h

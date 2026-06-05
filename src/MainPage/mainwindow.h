@@ -50,6 +50,7 @@ private slots:
     void on_action_markdownExportPdf_triggered();
 
     void onFileDraged(const QList<QUrl> &urls);
+    void openFileInNewWindow(const QString &filePath);
     void onFileClicked(const QModelIndex &index);
     void updateEditActions(bool available);
     void updateWindowTitle(bool modified);
@@ -80,6 +81,7 @@ private:
     QDockWidget *m_pDock;
     MultiEditor *m_activeMultiEditor;
     bool m_syncingEditorPanes;
+    bool m_singleFileWindow;
     FindReplaceManager *m_findReplaceManager;
     HeaderSourceManager *m_headerSourceManager;
     MarkdownPreviewer *m_markdownPreviewer;

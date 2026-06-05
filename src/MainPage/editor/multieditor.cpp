@@ -795,6 +795,11 @@ void MultiEditor::setSplitViewButtonChecked(bool checked)
     ui->pushButton_splitView->blockSignals(false);
 }
 
+void MultiEditor::setTopbarVisible(bool visible)
+{
+    ui->topbar->setVisible(visible);
+}
+
 void MultiEditor::hideMarkdownPreview(CustomEditor *editor)
 {
     if (!editor)

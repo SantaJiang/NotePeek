@@ -38,6 +38,7 @@ public:
     void refreshVisibleMarkdownPreview();
     void copyCurrentSelection();
     void setSplitViewButtonChecked(bool checked);
+    void setTopbarVisible(bool visible);
     EditorManager *editorManager() const { return m_editorManager; }
 
     // tab管理..
