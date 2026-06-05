@@ -63,6 +63,7 @@ private:
     void updateScrollBarMarkers();
     void initializeEditor();
     bool isLargeFile() const;
+    bool selectionMatchesSearchResults(int position, int length) const;
     void prepareFindOptions(bool &re, bool &cs, bool &wo, bool &wrap, bool &forward, bool wrapAround = false) const;
 
     static constexpr qint64 LARGE_FILE_SIZE = 10 * 1024 * 1024; // 10 MB

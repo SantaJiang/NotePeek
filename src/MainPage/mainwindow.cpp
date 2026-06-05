@@ -20,12 +20,14 @@
 #include "./editor/filesavedialog.h"
 #include "./editor/customeditor.h"
 #include "./decorators/highlightedscrollbardecorator.h"
+#include "./widgets/filetypefilterproxymodel.h"
 #include "./widgets/filetreeview.h"
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
     , ui(new Ui::MainWindow)
     , m_pFileModel(nullptr)
+    , m_fileFilterProxy(nullptr)
     , m_activeMultiEditor(nullptr)
     , m_syncingEditorPanes(false)
     , m_singleFileWindow(false)
@@ -184,6 +186,9 @@ void MainWindow::connectMultiEditor(MultiEditor *multiEditor)
     connect(multiEditor, &MultiEditor::fileOpened, this, [this, multiEditor](CustomEditor *, const QString &filePath) {
         syncOpenedFileToOtherPanes(multiEditor, filePath);
     });
+    connect(multiEditor, &MultiEditor::filePathChanged, this, [this, multiEditor](const QString &oldFilePath, const QString &newFilePath) {
+        syncRenamedFileToOtherPanes(multiEditor, oldFilePath, newFilePath);
+    });
     connect(multiEditor, &MultiEditor::editorClosed, this, [this, multiEditor](CustomEditor *editor) {
         syncClosedFileToOtherPanes(multiEditor, editor ? editor->filePath() : QString());
     });
@@ -285,6 +290,30 @@ void MainWindow::syncClosedFileToOtherPanes(MultiEditor *source, const QString &
     }
 }
 
+void MainWindow::syncRenamedFileToOtherPanes(MultiEditor *source,
+                                             const QString &oldFilePath,
+                                             const QString &newFilePath)
+{
+    if (m_syncingEditorPanes || newFilePath.isEmpty())
+        return;
+
+    QScopedValueRollback<bool> syncing(m_syncingEditorPanes, true);
+    for (MultiEditor *multiEditor : editorPanes())
+    {
+        if (multiEditor == source)
+            continue;
+
+        if (multiEditor->findFileIndex(newFilePath) == -1)
+        {
+            multiEditor->openFile(newFilePath, false);
+        }
+        if (!oldFilePath.isEmpty() && oldFilePath != newFilePath)
+        {
+            multiEditor->closeFileIfUnmodified(oldFilePath);
+        }
+    }
+}
+
 void MainWindow::showSameFileInRightPane()
 {
     CustomEditor *leftEditor = ui->multieditor->currentEditor();
@@ -382,9 +411,13 @@ void MainWindow::createDirView()
     m_pFileModel = new QFileSystemModel(this);
     m_pFileModel->setFilter(QDir::AllEntries | QDir::NoDotAndDotDot | QDir::AllDirs);
 
+    m_fileFilterProxy = new FileTypeFilterProxyModel(this);
+    m_fileFilterProxy->setSourceModel(m_pFileModel);
+    m_fileFilterProxy->setDynamicSortFilter(true);
+
     auto *treeView = new FileTreeView(this);
     m_pTreeView = treeView;
-    m_pTreeView->setModel(m_pFileModel);
+    m_pTreeView->setModel(m_fileFilterProxy);
 
     m_pTreeView->setAnimated(true);
     m_pTreeView->setIndentation(15);
@@ -427,9 +460,10 @@ void MainWindow::setRootDirectory(const QString &dirPath)
 {
     if (!dirPath.isEmpty())
     {
-        QModelIndex rootIndex = m_pFileModel->setRootPath(dirPath);
-        m_pTreeView->setRootIndex(rootIndex);
-        m_pTreeView->expand(rootIndex);
+        const QModelIndex rootIndex = m_pFileModel->setRootPath(dirPath);
+        const QModelIndex proxyRootIndex = m_fileFilterProxy->mapFromSource(rootIndex);
+        m_pTreeView->setRootIndex(proxyRootIndex);
+        m_pTreeView->expand(proxyRootIndex);
     }
     else
     {
@@ -448,8 +482,12 @@ void MainWindow::openFileAndSetRootDirectory(const QString &fileName)
     QModelIndex index = m_pFileModel->index(fileName);
     if (index.isValid())
     {
-        m_pTreeView->scrollTo(index);
-        m_pTreeView->setCurrentIndex(index);
+        const QModelIndex proxyIndex = m_fileFilterProxy->mapFromSource(index);
+        if (proxyIndex.isValid())
+        {
+            m_pTreeView->scrollTo(proxyIndex);
+            m_pTreeView->setCurrentIndex(proxyIndex);
+        }
     }
 }
 
@@ -482,7 +520,7 @@ void MainWindow::on_action_openDirectory_triggered()
             QModelIndex rootIndex = m_pFileModel->index(dirPath);
             if (rootIndex.isValid())
             {
-                m_pTreeView->expand(rootIndex);
+                m_pTreeView->expand(m_fileFilterProxy->mapFromSource(rootIndex));
             }
         }
     }
@@ -607,8 +645,12 @@ void MainWindow::on_action_switchHeaderSource_triggered()
 
         QModelIndex index = m_pFileModel->index(correspondingFile);
         if (index.isValid()) {
-            m_pTreeView->scrollTo(index);
-            m_pTreeView->setCurrentIndex(index);
+            const QModelIndex proxyIndex = m_fileFilterProxy->mapFromSource(index);
+            if (proxyIndex.isValid())
+            {
+                m_pTreeView->scrollTo(proxyIndex);
+                m_pTreeView->setCurrentIndex(proxyIndex);
+            }
         }
     }
 }
@@ -690,9 +732,9 @@ void MainWindow::openFileInNewWindow(const QString &filePath)
 
 void MainWindow::onFileClicked(const QModelIndex &index)
 {
-    if (!m_pFileModel->isDir(index))
+    if (!m_fileFilterProxy->isDir(index))
     {
-        QString filePath = m_pFileModel->filePath(index);
+        QString filePath = m_fileFilterProxy->filePath(index);
         activeMultiEditor()->openFile(filePath);
     }
 }

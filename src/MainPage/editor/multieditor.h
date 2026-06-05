@@ -53,6 +53,7 @@ public:
     bool maybeSave(CustomEditor *editor);
     bool saveFile(CustomEditor *editor, const QString &filePath);
     void openFile(const QString &filePath, bool activate = true);
+    bool closeFileIfUnmodified(const QString &filePath);
     void setCurrentFile(CustomEditor *editor, const QString &filePath);
     void createDefaultDoc();
 
@@ -65,6 +66,7 @@ signals:
     void editorCreated(CustomEditor *editor);
     void editorClosed(CustomEditor *editor);
     void fileOpened(CustomEditor *editor, const QString &filePath);
+    void filePathChanged(const QString &oldFilePath, const QString &newFilePath);
     void currentFileChanged(CustomEditor *editor, const QString &filePath);
     void modificationChanged(bool modified);
     void copyAvailable(bool available);

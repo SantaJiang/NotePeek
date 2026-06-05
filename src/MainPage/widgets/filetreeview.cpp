@@ -1,5 +1,7 @@
 #include "filetreeview.h"
 
+#include "filetypefilterproxymodel.h"
+
 #include <QAction>
 #include <QApplication>
 #include <QContextMenuEvent>
@@ -82,12 +84,22 @@ void FileTreeView::mouseMoveEvent(QMouseEvent *event)
 
 QString FileTreeView::filePathForIndex(const QModelIndex &index) const
 {
+    if (auto *filterModel = qobject_cast<FileTypeFilterProxyModel *>(model()))
+    {
+        return filterModel->filePath(index);
+    }
+
     auto *fileModel = qobject_cast<QFileSystemModel *>(model());
     return fileModel && index.isValid() ? fileModel->filePath(index) : QString();
 }
 
 bool FileTreeView::isFileIndex(const QModelIndex &index) const
 {
+    if (auto *filterModel = qobject_cast<FileTypeFilterProxyModel *>(model()))
+    {
+        return index.isValid() && !filterModel->isDir(index);
+    }
+
     auto *fileModel = qobject_cast<QFileSystemModel *>(model());
     return fileModel && index.isValid() && !fileModel->isDir(index);
 }
