@@ -5,7 +5,6 @@
 #include <QHash>
 #include <QSortFilterProxyModel>
 
-class QFileInfo;
 class QFileSystemModel;
 
 class FileTypeFilterProxyModel : public QSortFilterProxyModel
@@ -31,8 +30,6 @@ private:
 
     QFileSystemModel *fileSystemModel() const;
     bool isSupportedTextFile(const QString &filePath) const;
-    bool hasSupportedTextType(const QFileInfo &fileInfo) const;
-    bool looksLikeBinaryFile(const QString &filePath) const;
 
     mutable QHash<QString, CacheEntry> m_supportCache;
 };

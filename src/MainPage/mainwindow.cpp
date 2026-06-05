@@ -14,11 +14,10 @@
 #include <QCoreApplication>
 #include <QStyleHints>
 #include <QApplication>
-#include <QSplitter>
-#include <QScopedValueRollback>
 #include <QProcess>
 #include "./editor/filesavedialog.h"
 #include "./editor/customeditor.h"
+#include "./editor/spliteditorcoordinator.h"
 #include "./decorators/highlightedscrollbardecorator.h"
 #include "./widgets/filetypefilterproxymodel.h"
 #include "./widgets/filetreeview.h"
@@ -28,8 +27,7 @@ MainWindow::MainWindow(QWidget *parent)
     , ui(new Ui::MainWindow)
     , m_pFileModel(nullptr)
     , m_fileFilterProxy(nullptr)
-    , m_activeMultiEditor(nullptr)
-    , m_syncingEditorPanes(false)
+    , m_editorCoordinator(nullptr)
     , m_singleFileWindow(false)
     , m_findReplaceManager(new FindReplaceManager(this))
     , m_headerSourceManager(new HeaderSourceManager(this))
@@ -71,10 +69,32 @@ MainWindow::MainWindow(QWidget *parent)
 
     ui->editorSplitter->setStretchFactor(0, 1);
     ui->editorSplitter->setStretchFactor(1, 1);
-    connectMultiEditor(ui->multieditor);
-    connectMultiEditor(ui->multieditorRight);
-    setSplitViewEnabled(false);
-    setActiveMultiEditor(ui->multieditor);
+    m_editorCoordinator = new SplitEditorCoordinator(ui->multieditor,
+                                                     ui->multieditorRight,
+                                                     ui->editorSplitter,
+                                                     m_singleFileWindow,
+                                                     this);
+    connect(m_editorCoordinator, &SplitEditorCoordinator::activeMultiEditorChanged,
+            this, &MainWindow::applyActiveMultiEditor);
+    connect(m_editorCoordinator, &SplitEditorCoordinator::paneModificationChanged,
+            this, [this](MultiEditor *multiEditor, bool modified) {
+                if (multiEditor == activeMultiEditor())
+                {
+                    updateWindowTitle(modified);
+                }
+            });
+    connect(m_editorCoordinator, &SplitEditorCoordinator::paneCopyAvailableChanged,
+            this, [this](MultiEditor *multiEditor, bool available) {
+                if (multiEditor == activeMultiEditor())
+                {
+                    updateEditActions(available);
+                }
+            });
+    connect(m_editorCoordinator, &SplitEditorCoordinator::filesDropped,
+            this, [this](MultiEditor *, const QList<QUrl> &urls) {
+                onFileDraged(urls);
+            });
+    applyActiveMultiEditor(ui->multieditor);
     if (m_singleFileWindow)
     {
         ui->multieditor->setTopbarVisible(false);
@@ -85,14 +105,7 @@ MainWindow::MainWindow(QWidget *parent)
         if (!now)
             return;
 
-        for (MultiEditor *multiEditor : editorPanes())
-        {
-            if (multiEditor == now || multiEditor->isAncestorOf(now))
-            {
-                setActiveMultiEditor(multiEditor);
-                break;
-            }
-        }
+        m_editorCoordinator->updateActivePaneForFocus(now);
     });
 
     // 连接查找替换部件的可见性变化
@@ -124,8 +137,8 @@ MainWindow::MainWindow(QWidget *parent)
 #if QT_VERSION >= QT_VERSION_CHECK(6, 5, 0)
     connect(QGuiApplication::styleHints(), &QStyleHints::colorSchemeChanged,
             this, [this]() {
-                reapplyThemeToEditorPanes();
-                refreshVisibleMarkdownPreviews();
+                m_editorCoordinator->reapplyThemeToEditorPanes();
+                m_editorCoordinator->refreshVisibleMarkdownPreviews();
             });
 #endif
 
@@ -150,70 +163,14 @@ MultiEditor *MainWindow::multiEditor()
 
 MultiEditor *MainWindow::activeMultiEditor() const
 {
-    return m_activeMultiEditor ? m_activeMultiEditor : ui->multieditor;
+    return m_editorCoordinator ? m_editorCoordinator->activeMultiEditor() : ui->multieditor;
 }
 
-QList<MultiEditor *> MainWindow::editorPanes() const
-{
-    return { ui->multieditor, ui->multieditorRight };
-}
-
-void MainWindow::connectMultiEditor(MultiEditor *multiEditor)
+void MainWindow::applyActiveMultiEditor(MultiEditor *multiEditor)
 {
     if (!multiEditor)
         return;
 
-    connect(multiEditor, &MultiEditor::currentEditorChanged, this, [this, multiEditor](CustomEditor *) {
-        if (!m_syncingEditorPanes)
-        {
-            setActiveMultiEditor(multiEditor);
-        }
-    });
-    connect(multiEditor, &MultiEditor::modificationChanged, this, [this, multiEditor](bool modified) {
-        if (multiEditor == activeMultiEditor())
-        {
-            updateWindowTitle(modified);
-        }
-    });
-    connect(multiEditor, &MultiEditor::currentFileChanged, this, [this, multiEditor](CustomEditor *, const QString &filePath) {
-        if (!m_syncingEditorPanes)
-        {
-            setActiveMultiEditor(multiEditor);
-        }
-        updateToolActions();
-        syncOpenedFileToOtherPanes(multiEditor, filePath);
-    });
-    connect(multiEditor, &MultiEditor::fileOpened, this, [this, multiEditor](CustomEditor *, const QString &filePath) {
-        syncOpenedFileToOtherPanes(multiEditor, filePath);
-    });
-    connect(multiEditor, &MultiEditor::filePathChanged, this, [this, multiEditor](const QString &oldFilePath, const QString &newFilePath) {
-        syncRenamedFileToOtherPanes(multiEditor, oldFilePath, newFilePath);
-    });
-    connect(multiEditor, &MultiEditor::editorClosed, this, [this, multiEditor](CustomEditor *editor) {
-        syncClosedFileToOtherPanes(multiEditor, editor ? editor->filePath() : QString());
-    });
-    connect(multiEditor, &MultiEditor::copyAvailable, this, [this, multiEditor](bool available) {
-        if (multiEditor == activeMultiEditor())
-        {
-            updateEditActions(available);
-        }
-    });
-    connect(multiEditor, &MultiEditor::filesDropped, this, [this, multiEditor](const QList<QUrl> &urls) {
-        setActiveMultiEditor(multiEditor);
-        onFileDraged(urls);
-    });
-    connect(multiEditor, &MultiEditor::splitViewToggled, this, [this, multiEditor](bool checked) {
-        setActiveMultiEditor(multiEditor);
-        setSplitViewEnabled(checked);
-    });
-}
-
-void MainWindow::setActiveMultiEditor(MultiEditor *multiEditor)
-{
-    if (!multiEditor)
-        return;
-
-    m_activeMultiEditor = multiEditor;
     ui->widget_findreplace->setMultiEditor(multiEditor);
 
     CustomEditor *editor = multiEditor->currentEditor();
@@ -229,163 +186,9 @@ void MainWindow::setActiveMultiEditor(MultiEditor *multiEditor)
     }
 }
 
-void MainWindow::setSplitViewEnabled(bool enabled)
-{
-    if (m_singleFileWindow)
-    {
-        enabled = false;
-    }
-
-    if (!enabled && activeMultiEditor() == ui->multieditorRight)
-    {
-        setActiveMultiEditor(ui->multieditor);
-    }
-
-    ui->multieditorRight->setVisible(enabled);
-    ui->multieditor->setSplitViewButtonChecked(enabled);
-    ui->multieditorRight->setSplitViewButtonChecked(enabled);
-
-    if (enabled)
-    {
-        const QList<int> sizes = ui->editorSplitter->sizes();
-        if (sizes.size() < 2 || sizes.at(1) == 0)
-        {
-            ui->editorSplitter->setSizes({ 1, 1 });
-        }
-        showSameFileInRightPane();
-    }
-}
-
-void MainWindow::syncOpenedFileToOtherPanes(MultiEditor *source, const QString &filePath)
-{
-    if (m_syncingEditorPanes || filePath.isEmpty())
-        return;
-
-    QScopedValueRollback<bool> syncing(m_syncingEditorPanes, true);
-    for (MultiEditor *multiEditor : editorPanes())
-    {
-        if (multiEditor != source && multiEditor->findFileIndex(filePath) == -1)
-        {
-            multiEditor->openFile(filePath, false);
-        }
-    }
-}
-
-void MainWindow::syncClosedFileToOtherPanes(MultiEditor *source, const QString &filePath)
-{
-    if (m_syncingEditorPanes || filePath.isEmpty())
-        return;
-
-    QScopedValueRollback<bool> syncing(m_syncingEditorPanes, true);
-    for (MultiEditor *multiEditor : editorPanes())
-    {
-        if (multiEditor == source)
-            continue;
-
-        const int index = multiEditor->findFileIndex(filePath);
-        if (index != -1)
-        {
-            multiEditor->tabCloseRequested(index);
-        }
-    }
-}
-
-void MainWindow::syncRenamedFileToOtherPanes(MultiEditor *source,
-                                             const QString &oldFilePath,
-                                             const QString &newFilePath)
-{
-    if (m_syncingEditorPanes || newFilePath.isEmpty())
-        return;
-
-    QScopedValueRollback<bool> syncing(m_syncingEditorPanes, true);
-    for (MultiEditor *multiEditor : editorPanes())
-    {
-        if (multiEditor == source)
-            continue;
-
-        if (multiEditor->findFileIndex(newFilePath) == -1)
-        {
-            multiEditor->openFile(newFilePath, false);
-        }
-        if (!oldFilePath.isEmpty() && oldFilePath != newFilePath)
-        {
-            multiEditor->closeFileIfUnmodified(oldFilePath);
-        }
-    }
-}
-
-void MainWindow::showSameFileInRightPane()
-{
-    CustomEditor *leftEditor = ui->multieditor->currentEditor();
-    if (!leftEditor)
-        return;
-
-    const QString currentFilePath = leftEditor->filePath();
-    if (currentFilePath.isEmpty())
-        return;
-
-    QScopedValueRollback<bool> syncing(m_syncingEditorPanes, true);
-    for (int i = 0; i < ui->multieditor->count(); ++i)
-    {
-        const QString filePath = ui->multieditor->filePathAt(i);
-        if (!filePath.isEmpty() && ui->multieditorRight->findFileIndex(filePath) == -1)
-        {
-            ui->multieditorRight->openFile(filePath, false);
-        }
-    }
-
-    int line = 0;
-    int index = 0;
-    leftEditor->getCursorPosition(&line, &index);
-    const int firstVisibleLine = leftEditor->SendScintilla(QsciScintillaBase::SCI_GETFIRSTVISIBLELINE);
-    const int xOffset = leftEditor->SendScintilla(QsciScintillaBase::SCI_GETXOFFSET);
-
-    ui->multieditorRight->openFile(currentFilePath, true);
-
-    CustomEditor *rightEditor = ui->multieditorRight->currentEditor();
-    if (rightEditor)
-    {
-        const int targetLine = qMin(line, rightEditor->lines() - 1);
-        const int targetIndex = qMin(index, rightEditor->lineLength(targetLine));
-        rightEditor->setCursorPosition(targetLine, targetIndex);
-        rightEditor->SendScintilla(QsciScintillaBase::SCI_SETFIRSTVISIBLELINE, firstVisibleLine);
-        rightEditor->SendScintilla(QsciScintillaBase::SCI_SETXOFFSET, xOffset);
-    }
-    setActiveMultiEditor(ui->multieditor);
-}
-
-bool MainWindow::closeAllEditorPanes()
-{
-    for (MultiEditor *multiEditor : editorPanes())
-    {
-        setActiveMultiEditor(multiEditor);
-        if (!multiEditor->closeAllEditors())
-        {
-            return false;
-        }
-    }
-    return true;
-}
-
-void MainWindow::reapplyThemeToEditorPanes()
-{
-    for (MultiEditor *multiEditor : editorPanes())
-    {
-        multiEditor->editorManager()->reapplyThemeToAllEditors();
-    }
-}
-
-void MainWindow::refreshVisibleMarkdownPreviews()
-{
-    for (MultiEditor *multiEditor : editorPanes())
-    {
-        multiEditor->refreshVisibleMarkdownPreview();
-    }
-}
-
 void MainWindow::closeEvent(QCloseEvent *event)
 {
-    if (closeAllEditorPanes())
+    if (m_editorCoordinator->closeAllEditors())
     {
         event->accept();
     }
@@ -401,8 +204,8 @@ void MainWindow::changeEvent(QEvent *event)
 
     if (event->type() == QEvent::PaletteChange)
     {
-        reapplyThemeToEditorPanes();
-        refreshVisibleMarkdownPreviews();
+        m_editorCoordinator->reapplyThemeToEditorPanes();
+        m_editorCoordinator->refreshVisibleMarkdownPreviews();
     }
 }
 

@@ -16,6 +16,7 @@ class MainWindow;
 }
 
 class FileTypeFilterProxyModel;
+class SplitEditorCoordinator;
 
 class MainWindow : public QMainWindow
 {
@@ -66,25 +67,14 @@ private:
     void openFileAndSetRootDirectory(const QString &fileName);
     void updateToolActions();
     MultiEditor *activeMultiEditor() const;
-    QList<MultiEditor *> editorPanes() const;
-    void connectMultiEditor(MultiEditor *multiEditor);
-    void setActiveMultiEditor(MultiEditor *multiEditor);
-    void setSplitViewEnabled(bool enabled);
-    void syncOpenedFileToOtherPanes(MultiEditor *source, const QString &filePath);
-    void syncClosedFileToOtherPanes(MultiEditor *source, const QString &filePath);
-    void syncRenamedFileToOtherPanes(MultiEditor *source, const QString &oldFilePath, const QString &newFilePath);
-    void showSameFileInRightPane();
-    bool closeAllEditorPanes();
-    void reapplyThemeToEditorPanes();
-    void refreshVisibleMarkdownPreviews();
+    void applyActiveMultiEditor(MultiEditor *multiEditor);
 
     Ui::MainWindow *ui;
     QFileSystemModel *m_pFileModel;
     FileTypeFilterProxyModel *m_fileFilterProxy;
     QTreeView *m_pTreeView;
     QDockWidget *m_pDock;
-    MultiEditor *m_activeMultiEditor;
-    bool m_syncingEditorPanes;
+    SplitEditorCoordinator *m_editorCoordinator;
     bool m_singleFileWindow;
     FindReplaceManager *m_findReplaceManager;
     HeaderSourceManager *m_headerSourceManager;
