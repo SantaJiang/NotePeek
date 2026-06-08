@@ -41,7 +41,10 @@ private:
     void connectMultiEditor(MultiEditor *multiEditor);
     void syncOpenedFileToOtherPanes(MultiEditor *source, const QString &filePath);
     void syncClosedFileToOtherPanes(MultiEditor *source, const QString &filePath);
-    void syncRenamedFileToOtherPanes(MultiEditor *source, const QString &oldFilePath, const QString &newFilePath);
+    void syncRenamedFileToOtherPanes(MultiEditor *source,
+                                     CustomEditor *sourceEditor,
+                                     const QString &oldFilePath,
+                                     const QString &newFilePath);
     void showSameFileInRightPane();
 
     MultiEditor *m_leftEditor;

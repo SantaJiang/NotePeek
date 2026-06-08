@@ -1,10 +1,16 @@
 #include "spliteditorcoordinator.h"
 
 #include "customeditor.h"
+#include "filesavedialog.h"
 #include "multieditor.h"
 
+#include <QFileInfo>
+#include <QHash>
+#include <QMap>
 #include <QScopedValueRollback>
+#include <QSet>
 #include <QSplitter>
+#include <QWidget>
 #include <Qsci/qsciscintillabase.h>
 
 SplitEditorCoordinator::SplitEditorCoordinator(MultiEditor *leftEditor,
@@ -59,6 +65,8 @@ void SplitEditorCoordinator::setSplitViewEnabled(bool enabled)
     m_rightEditor->setVisible(enabled);
     m_leftEditor->setSplitViewButtonChecked(enabled);
     m_rightEditor->setSplitViewButtonChecked(enabled);
+    m_leftEditor->setSplitViewButtonVisible(!enabled);
+    m_rightEditor->setSplitViewButtonVisible(enabled);
 
     if (enabled)
     {
@@ -73,15 +81,68 @@ void SplitEditorCoordinator::setSplitViewEnabled(bool enabled)
 
 bool SplitEditorCoordinator::closeAllEditors()
 {
+    QMap<CustomEditor *, QString> modifiedFiles;
+    QHash<CustomEditor *, MultiEditor *> editorOwners;
+    QSet<void *> seenDocuments;
+
     for (MultiEditor *multiEditor : editorPanes())
     {
-        setActiveMultiEditor(multiEditor);
-        if (!multiEditor->closeAllEditors())
+        for (CustomEditor *editor : multiEditor->editorManager()->getEditors())
         {
-            return false;
+            if (!editor || !editor->isModified())
+            {
+                continue;
+            }
+
+            void *document = editor->SendScintillaPtrResult(QsciScintillaBase::SCI_GETDOCPOINTER);
+            if (document && seenDocuments.contains(document))
+            {
+                continue;
+            }
+            if (document)
+            {
+                seenDocuments.insert(document);
+            }
+
+            const QString filePath = editor->filePath();
+            const QString displayName = filePath.isEmpty()
+                                            ? tr("untitled.txt")
+                                            : QFileInfo(filePath).fileName();
+            modifiedFiles.insert(editor, displayName);
+            editorOwners.insert(editor, multiEditor);
         }
     }
-    return true;
+
+    if (modifiedFiles.isEmpty())
+    {
+        return true;
+    }
+
+    QWidget *dialogParent = qobject_cast<QWidget *>(parent());
+    FileSaveDialog dialog(modifiedFiles, dialogParent);
+    const int result = dialog.exec();
+
+    if (result == QDialog::Accepted)
+    {
+        for (CustomEditor *editor : dialog.selectedEditors())
+        {
+            MultiEditor *owner = editorOwners.value(editor, activeMultiEditor());
+            setActiveMultiEditor(owner);
+            if (!owner || !owner->saveEditorForClose(editor))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    if (result == FileSaveDialog::DontSave)
+    {
+        return true;
+    }
+
+    return false;
 }
 
 void SplitEditorCoordinator::reapplyThemeToEditorPanes()
@@ -139,8 +200,8 @@ void SplitEditorCoordinator::connectMultiEditor(MultiEditor *multiEditor)
     connect(multiEditor, &MultiEditor::fileOpened, this, [this, multiEditor](CustomEditor *, const QString &filePath) {
         syncOpenedFileToOtherPanes(multiEditor, filePath);
     });
-    connect(multiEditor, &MultiEditor::filePathChanged, this, [this, multiEditor](const QString &oldFilePath, const QString &newFilePath) {
-        syncRenamedFileToOtherPanes(multiEditor, oldFilePath, newFilePath);
+    connect(multiEditor, &MultiEditor::filePathChanged, this, [this, multiEditor](CustomEditor *editor, const QString &oldFilePath, const QString &newFilePath) {
+        syncRenamedFileToOtherPanes(multiEditor, editor, oldFilePath, newFilePath);
     });
     connect(multiEditor, &MultiEditor::editorClosed, this, [this, multiEditor](CustomEditor *editor) {
         syncClosedFileToOtherPanes(multiEditor, editor ? editor->filePath() : QString());
@@ -193,6 +254,7 @@ void SplitEditorCoordinator::syncClosedFileToOtherPanes(MultiEditor *source, con
 }
 
 void SplitEditorCoordinator::syncRenamedFileToOtherPanes(MultiEditor *source,
+                                                         CustomEditor *sourceEditor,
                                                          const QString &oldFilePath,
                                                          const QString &newFilePath)
 {
@@ -204,6 +266,11 @@ void SplitEditorCoordinator::syncRenamedFileToOtherPanes(MultiEditor *source,
     {
         if (multiEditor == source)
             continue;
+
+        if (multiEditor->adoptSharedDocumentPath(sourceEditor, newFilePath))
+        {
+            continue;
+        }
 
         if (multiEditor->findFileIndex(newFilePath) == -1)
         {
@@ -224,7 +291,28 @@ void SplitEditorCoordinator::showSameFileInRightPane()
 
     const QString currentFilePath = leftEditor->filePath();
     if (currentFilePath.isEmpty())
+    {
+        m_rightEditor->openSharedDocument(leftEditor, true);
+
+        CustomEditor *rightEditor = m_rightEditor->currentEditor();
+        if (rightEditor)
+        {
+            int line = 0;
+            int index = 0;
+            leftEditor->getCursorPosition(&line, &index);
+            const int firstVisibleLine = leftEditor->SendScintilla(QsciScintillaBase::SCI_GETFIRSTVISIBLELINE);
+            const int xOffset = leftEditor->SendScintilla(QsciScintillaBase::SCI_GETXOFFSET);
+
+            const int targetLine = qMin(line, rightEditor->lines() - 1);
+            const int targetIndex = qMin(index, rightEditor->lineLength(targetLine));
+            rightEditor->setCursorPosition(targetLine, targetIndex);
+            rightEditor->SendScintilla(QsciScintillaBase::SCI_SETFIRSTVISIBLELINE, firstVisibleLine);
+            rightEditor->SendScintilla(QsciScintillaBase::SCI_SETXOFFSET, xOffset);
+        }
+
+        setActiveMultiEditor(m_leftEditor);
         return;
+    }
 
     QScopedValueRollback<bool> syncing(m_syncingEditorPanes, true);
     for (int i = 0; i < m_leftEditor->count(); ++i)

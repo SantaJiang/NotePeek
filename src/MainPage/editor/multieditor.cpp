@@ -38,7 +38,8 @@ bool isMarkdownPath(const QString &filePath)
 MultiEditor::MultiEditor(QWidget *parent, bool createDefault) : QWidget(parent),
     ui(new Ui::MultiEditor),
     m_defaultEditor(nullptr),
-    m_switchPopup(nullptr)  // 初始化弹出窗口指针
+    m_switchPopup(nullptr),  // 初始化弹出窗口指针
+    m_createDefaultWhenEmpty(createDefault)
 {
     ui->setupUi(this);
     setAcceptDrops(false);
@@ -135,6 +136,12 @@ int MultiEditor::findFileIndex(const QString &filePath) const
     return editor ? findEditorIndex(editor) : -1;
 }
 
+CustomEditor *MultiEditor::editorAt(int index) const
+{
+    DocumentPage *page = pageForWidget(ui->tabWidget->widget(index));
+    return page ? page->editor() : nullptr;
+}
+
 int MultiEditor::currentIndex() const
 {
     return ui->tabWidget->currentIndex();
@@ -197,6 +204,26 @@ bool MultiEditor::maybeSave(CustomEditor *editor)
     return false;
 }
 
+bool MultiEditor::saveEditorForClose(CustomEditor *editor)
+{
+    if (!editor)
+    {
+        return false;
+    }
+
+    QString filePath = editor->filePath();
+    if (filePath.isEmpty())
+    {
+        filePath = promptSaveFileName(this->parentWidget());
+        if (filePath.isEmpty())
+        {
+            return false;
+        }
+    }
+
+    return saveFile(editor, filePath);
+}
+
 bool MultiEditor::saveFile(CustomEditor *editor, const QString &filePath)
 {
     if (!editor) return false;
@@ -225,7 +252,7 @@ bool MultiEditor::saveFile(CustomEditor *editor, const QString &filePath)
     if (newFilePath != oldFilePath)
     {
         refreshDocumentPageForFile(editor, filePath);
-        emit filePathChanged(oldFilePath, newFilePath);
+        emit filePathChanged(editor, oldFilePath, newFilePath);
     }
     return true;
 }
@@ -284,7 +311,7 @@ void MultiEditor::openFile(const QString &filePath, bool activate)
         m_editorManager->forgetEditor(editor);
         page->deleteLater();
 
-        if (ui->tabWidget->count() == 0)
+        if (m_createDefaultWhenEmpty && ui->tabWidget->count() == 0)
         {
             createDefaultDoc();
         }
@@ -370,6 +397,110 @@ void MultiEditor::createDefaultDoc()
 
     // 发出编辑器创建信号..
     emit editorCreated(editor);
+}
+
+int MultiEditor::findSharedDocumentIndex(CustomEditor *sourceEditor) const
+{
+    if (!sourceEditor)
+    {
+        return -1;
+    }
+
+    void *sourceDocument = sourceEditor->SendScintillaPtrResult(QsciScintillaBase::SCI_GETDOCPOINTER);
+    if (!sourceDocument)
+    {
+        return -1;
+    }
+
+    for (int i = 0; i < ui->tabWidget->count(); ++i)
+    {
+        DocumentPage *page = pageForWidget(ui->tabWidget->widget(i));
+        CustomEditor *editor = page ? page->editor() : nullptr;
+        if (editor && editor->SendScintillaPtrResult(QsciScintillaBase::SCI_GETDOCPOINTER) == sourceDocument)
+        {
+            return i;
+        }
+    }
+
+    return -1;
+}
+
+void MultiEditor::openSharedDocument(CustomEditor *sourceEditor, bool activate)
+{
+    if (!sourceEditor)
+    {
+        return;
+    }
+
+    const int existingIndex = findSharedDocumentIndex(sourceEditor);
+    if (existingIndex != -1)
+    {
+        if (activate)
+        {
+            ui->tabWidget->setCurrentIndex(existingIndex);
+            setCurrentTabIndex(existingIndex);
+        }
+        return;
+    }
+
+    const QString filePath = sourceEditor->filePath();
+    QString displayName = filePath.isEmpty() ? tr("Untitled") : QFileInfo(filePath).fileName();
+    if (sourceEditor->isModified())
+    {
+        displayName += '*';
+    }
+
+    CustomEditor *editor = m_editorManager->createEditorSharingDocument(sourceEditor, displayName);
+    if (!editor)
+    {
+        return;
+    }
+
+    DocumentPage *page = createDocumentPage(editor, filePath);
+    connectEditorSignals(editor);
+    const int tabIndex = ui->tabWidget->addTab(page, displayName);
+    ui->tabWidget->setTabToolTip(tabIndex, filePath);
+    addTab(displayName, filePath);
+
+    if (filePath.isEmpty() && !sourceEditor->isModified() && sourceEditor->text().isEmpty())
+    {
+        m_defaultEditor = editor;
+    }
+
+    if (activate)
+    {
+        ui->tabWidget->setCurrentIndex(tabIndex);
+        setCurrentTabIndex(tabIndex);
+    }
+
+    emit editorCreated(editor);
+    emit currentEditorChanged(editor);
+    emit modificationChanged(editor->isModified());
+}
+
+bool MultiEditor::adoptSharedDocumentPath(CustomEditor *sourceEditor, const QString &newFilePath)
+{
+    if (!sourceEditor || newFilePath.isEmpty())
+    {
+        return false;
+    }
+
+    const int index = findSharedDocumentIndex(sourceEditor);
+    if (index == -1)
+    {
+        return false;
+    }
+
+    CustomEditor *editor = editorAt(index);
+    if (!editor)
+    {
+        return false;
+    }
+
+    setCurrentFile(editor, newFilePath);
+    m_editorManager->updateEditorSyntax(editor, newFilePath);
+    refreshDocumentPageForFile(editor, newFilePath);
+    return true;
 }
 
 void MultiEditor::onNewFile()
@@ -531,7 +662,7 @@ void MultiEditor::tabCloseRequested(int index)
         page->deleteLater();
 
         // If no tabs left, create a new empty editor
-        if (ui->tabWidget->count() == 0)
+        if (m_createDefaultWhenEmpty && ui->tabWidget->count() == 0)
         {
             createDefaultDoc();
         }
@@ -640,7 +771,7 @@ bool MultiEditor::closeFileIfUnmodified(const QString &filePath)
     m_editorManager->forgetEditor(editor);
     page->deleteLater();
 
-    if (ui->tabWidget->count() == 0)
+    if (m_createDefaultWhenEmpty && ui->tabWidget->count() == 0)
     {
         createDefaultDoc();
     }
@@ -701,18 +832,7 @@ bool MultiEditor::closeAllEditors()
 
         for(CustomEditor *editor : editorsToSave)
         {
-            QString filePath = editor->filePath();
-            if (filePath.isEmpty())
-            {
-                filePath = promptSaveFileName(this->parentWidget());
-                if (filePath.isEmpty())
-                {
-                    allSaved = false;
-                    break;
-                }
-            }
-
-            if (!saveFile(editor, filePath))
+            if (!saveEditorForClose(editor))
             {
                 allSaved = false;
                 break;
@@ -731,6 +851,8 @@ bool MultiEditor::closeAllEditors()
 
 void MultiEditor::setCreateDefault(bool createDefault)
 {
+    m_createDefaultWhenEmpty = createDefault;
+
     if (!createDefault && m_defaultEditor)
     {
         closeDefaultEditorIfUnused();
@@ -831,6 +953,11 @@ void MultiEditor::setSplitViewButtonChecked(bool checked)
     ui->pushButton_splitView->blockSignals(true);
     ui->pushButton_splitView->setChecked(checked);
     ui->pushButton_splitView->blockSignals(false);
+}
+
+void MultiEditor::setSplitViewButtonVisible(bool visible)
+{
+    ui->pushButton_splitView->setVisible(visible);
 }
 
 void MultiEditor::setTopbarVisible(bool visible)

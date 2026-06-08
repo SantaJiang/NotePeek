@@ -50,6 +50,21 @@ CustomEditor *EditorManager::createEditor(const QString &name)
     return editor;
 }
 
+CustomEditor *EditorManager::createEditorSharingDocument(CustomEditor *sourceEditor, const QString &name)
+{
+    if (!sourceEditor)
+    {
+        return nullptr;
+    }
+
+    CustomEditor *editor = createEditor(name.isEmpty() ? sourceEditor->windowTitle() : name);
+    editor->setDocument(sourceEditor->document());
+    editor->setFilePath(sourceEditor->filePath());
+    updateEditorSyntax(editor, sourceEditor->filePath());
+    updateLineNumberMarginWidth(editor);
+    return editor;
+}
+
 CustomEditor *EditorManager::createEditorForFile(const QString &filePath, bool tryToCreate)
 {
     QFileInfo fileInfo(filePath);
