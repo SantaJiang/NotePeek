@@ -28,6 +28,7 @@ public:
     bool isCurrentEditorPreviewVisible() const;
     int findEditorIndex(CustomEditor *editor) const;
     int findFileIndex(const QString &filePath) const;
+    CustomEditor *editorAt(int index) const;
     int currentIndex() const;
     QString filePathAt(int index) const;
     void switchToEditor(CustomEditor *editor);
@@ -38,7 +39,11 @@ public:
     void refreshVisibleMarkdownPreview();
     void copyCurrentSelection();
     void setSplitViewButtonChecked(bool checked);
+    void setSplitViewButtonVisible(bool visible);
     void setTopbarVisible(bool visible);
+    void openSharedDocument(CustomEditor *sourceEditor, bool activate = true);
+    int findSharedDocumentIndex(CustomEditor *sourceEditor) const;
+    bool adoptSharedDocumentPath(CustomEditor *sourceEditor, const QString &newFilePath);
     EditorManager *editorManager() const { return m_editorManager; }
 
     // tab管理..
@@ -51,6 +56,7 @@ public:
 
     // 文件操作..
     bool maybeSave(CustomEditor *editor);
+    bool saveEditorForClose(CustomEditor *editor);
     bool saveFile(CustomEditor *editor, const QString &filePath);
     void openFile(const QString &filePath, bool activate = true);
     bool closeFileIfUnmodified(const QString &filePath);
@@ -66,7 +72,7 @@ signals:
     void editorCreated(CustomEditor *editor);
     void editorClosed(CustomEditor *editor);
     void fileOpened(CustomEditor *editor, const QString &filePath);
-    void filePathChanged(const QString &oldFilePath, const QString &newFilePath);
+    void filePathChanged(CustomEditor *editor, const QString &oldFilePath, const QString &newFilePath);
     void currentFileChanged(CustomEditor *editor, const QString &filePath);
     void modificationChanged(bool modified);
     void copyAvailable(bool available);
@@ -105,6 +111,7 @@ private:
     EditorManager *m_editorManager;
     CustomEditor *m_defaultEditor; // 指向默认空白编辑器的指针..
     EditorSwitchPopup *m_switchPopup;
+    bool m_createDefaultWhenEmpty;
 };
 
 #endif // MULTIEDITOR_H

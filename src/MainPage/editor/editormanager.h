@@ -16,6 +16,7 @@ public:
     ~EditorManager();
 
     CustomEditor *createEditor(const QString &name = QString());
+    CustomEditor *createEditorSharingDocument(CustomEditor *sourceEditor, const QString &name = QString());
     CustomEditor *createEditorForFile(const QString &filePath, bool tryToCreate = false);
     CustomEditor *getEditorByFilePath(const QString &filePath);
     QList<CustomEditor *> getEditors() const;
