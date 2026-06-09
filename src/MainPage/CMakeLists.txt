@@ -7,6 +7,7 @@ set(MAINPAGE_SOURCES
     editor/documentpage.cpp
     editor/editormanager.cpp
     editor/editorswitchpopup.cpp
+    editor/externalfilewatcher.cpp
     editor/filesavedialog.cpp
     editor/lexerfactory.cpp
     editor/multieditor.cpp
@@ -35,6 +36,7 @@ set(MAINPAGE_HEADERS
     editor/documentpage.h
     editor/editormanager.h
     editor/editorswitchpopup.h
+    editor/externalfilewatcher.h
     editor/filesavedialog.h
     editor/lexerfactory.h
     editor/multieditor.h

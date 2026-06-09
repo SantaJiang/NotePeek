@@ -203,6 +203,9 @@ void SplitEditorCoordinator::connectMultiEditor(MultiEditor *multiEditor)
     connect(multiEditor, &MultiEditor::filePathChanged, this, [this, multiEditor](CustomEditor *editor, const QString &oldFilePath, const QString &newFilePath) {
         syncRenamedFileToOtherPanes(multiEditor, editor, oldFilePath, newFilePath);
     });
+    connect(multiEditor, &MultiEditor::externalFileChanged, this, [this, multiEditor](const QString &filePath) {
+        reloadExternallyChangedFile(multiEditor, filePath);
+    });
     connect(multiEditor, &MultiEditor::editorClosed, this, [this, multiEditor](CustomEditor *editor) {
         syncClosedFileToOtherPanes(multiEditor, editor ? editor->filePath() : QString());
     });
@@ -279,6 +282,33 @@ void SplitEditorCoordinator::syncRenamedFileToOtherPanes(MultiEditor *source,
         if (!oldFilePath.isEmpty() && oldFilePath != newFilePath)
         {
             multiEditor->closeFileIfUnmodified(oldFilePath);
+        }
+    }
+}
+
+void SplitEditorCoordinator::reloadExternallyChangedFile(MultiEditor *source, const QString &filePath)
+{
+    if (m_syncingEditorPanes || filePath.isEmpty())
+        return;
+
+    for (MultiEditor *multiEditor : editorPanes())
+    {
+        if (multiEditor->hasModifiedEditorForFile(filePath))
+        {
+            return;
+        }
+    }
+
+    QScopedValueRollback<bool> syncing(m_syncingEditorPanes, true);
+    if (source)
+    {
+        source->reloadFileFromDiskIfUnmodified(filePath);
+    }
+    for (MultiEditor *multiEditor : editorPanes())
+    {
+        if (multiEditor != source)
+        {
+            multiEditor->reloadFileFromDiskIfUnmodified(filePath);
         }
     }
 }

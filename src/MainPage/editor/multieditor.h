@@ -3,9 +3,11 @@
 
 #include <QWidget>
 #include <QUrl>
+#include <QSet>
 #include "editormanager.h"
 
 class DocumentPage;
+class ExternalFileWatcher;
 class EditorSwitchPopup;
 class FindReplaceManager;
 class MarkdownPreviewer;
@@ -44,6 +46,8 @@ public:
     void openSharedDocument(CustomEditor *sourceEditor, bool activate = true);
     int findSharedDocumentIndex(CustomEditor *sourceEditor) const;
     bool adoptSharedDocumentPath(CustomEditor *sourceEditor, const QString &newFilePath);
+    bool hasModifiedEditorForFile(const QString &filePath) const;
+    bool reloadFileFromDiskIfUnmodified(const QString &filePath);
     EditorManager *editorManager() const { return m_editorManager; }
 
     // tab管理..
@@ -74,6 +78,7 @@ signals:
     void fileOpened(CustomEditor *editor, const QString &filePath);
     void filePathChanged(CustomEditor *editor, const QString &oldFilePath, const QString &newFilePath);
     void currentFileChanged(CustomEditor *editor, const QString &filePath);
+    void externalFileChanged(const QString &filePath);
     void modificationChanged(bool modified);
     void copyAvailable(bool available);
     void filesDropped(const QList<QUrl> &urls);
@@ -106,11 +111,16 @@ private:
     DocumentPage *currentPage() const;
     DocumentPage *pageForWidget(QWidget *widget) const;
     DocumentPage *pageForEditor(CustomEditor *editor) const;
+    QString normalizedFilePath(const QString &filePath) const;
+    QSet<QString> currentTrackedFilePaths() const;
+    void refreshWatchedFiles();
+    void recordFileState(const QString &filePath);
 
     Ui::MultiEditor *ui;
     EditorManager *m_editorManager;
     CustomEditor *m_defaultEditor; // 指向默认空白编辑器的指针..
     EditorSwitchPopup *m_switchPopup;
+    ExternalFileWatcher *m_externalFileWatcher;
     bool m_createDefaultWhenEmpty;
 };
 
