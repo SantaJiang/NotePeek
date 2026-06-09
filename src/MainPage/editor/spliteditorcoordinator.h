@@ -45,6 +45,7 @@ private:
                                      CustomEditor *sourceEditor,
                                      const QString &oldFilePath,
                                      const QString &newFilePath);
+    void reloadExternallyChangedFile(MultiEditor *source, const QString &filePath);
     void showSameFileInRightPane();
 
     MultiEditor *m_leftEditor;

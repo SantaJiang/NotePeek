@@ -5,6 +5,7 @@
 #include "filesavedialog.h"
 #include "lexerfactory.h"
 #include "editorswitchpopup.h"
+#include "externalfilewatcher.h"
 #include "../find/findreplacemanager.h"
 #include "../tool/markdown/markdownpreviewer.h"
 #include <QTabBar>
@@ -13,6 +14,8 @@
 #include <QFontDatabase>
 #include <QApplication>
 #include <QFileInfo>
+#include <QDir>
+#include <QSignalBlocker>
 #include <QMap>
 #include <QMessageBox>
 #include <QCoreApplication>
@@ -39,6 +42,7 @@ MultiEditor::MultiEditor(QWidget *parent, bool createDefault) : QWidget(parent),
     ui(new Ui::MultiEditor),
     m_defaultEditor(nullptr),
     m_switchPopup(nullptr),  // 初始化弹出窗口指针
+    m_externalFileWatcher(new ExternalFileWatcher(this)),
     m_createDefaultWhenEmpty(createDefault)
 {
     ui->setupUi(this);
@@ -58,6 +62,8 @@ MultiEditor::MultiEditor(QWidget *parent, bool createDefault) : QWidget(parent),
     // 初始化编辑器管理器..
     m_editorManager = new EditorManager(this);
     connect(m_editorManager, &EditorManager::filesDropped, this, &MultiEditor::filesDropped);
+    connect(m_externalFileWatcher, &ExternalFileWatcher::externalFileChanged,
+            this, &MultiEditor::externalFileChanged);
 
     // 设置标签页..
     ui->tabWidget->setTabsClosable(true);
@@ -247,6 +253,7 @@ bool MultiEditor::saveFile(CustomEditor *editor, const QString &filePath)
         return false;
     }
 
+    recordFileState(newFilePath);
     setCurrentFile(editor, filePath);
     m_editorManager->updateEditorSyntax(editor, filePath);
     if (newFilePath != oldFilePath)
@@ -376,6 +383,9 @@ void MultiEditor::setCurrentFile(CustomEditor *editor, const QString &filePath)
         emit modificationChanged(false);
         emit currentFileChanged(editor, filePath);
     }
+
+    recordFileState(filePath);
+    refreshWatchedFiles();
 }
 
 void MultiEditor::createDefaultDoc()
@@ -476,6 +486,8 @@ void MultiEditor::openSharedDocument(CustomEditor *sourceEditor, bool activate)
     emit editorCreated(editor);
     emit currentEditorChanged(editor);
     emit modificationChanged(editor->isModified());
+    recordFileState(filePath);
+    refreshWatchedFiles();
 }
 
 bool MultiEditor::adoptSharedDocumentPath(CustomEditor *sourceEditor, const QString &newFilePath)
@@ -660,6 +672,7 @@ void MultiEditor::tabCloseRequested(int index)
 
         m_editorManager->forgetEditor(editor);
         page->deleteLater();
+        refreshWatchedFiles();
 
         // If no tabs left, create a new empty editor
         if (m_createDefaultWhenEmpty && ui->tabWidget->count() == 0)
@@ -734,6 +747,12 @@ void MultiEditor::documentWasModified()
 
     // 发出编辑器修改状态改变信号..
     emit editorModificationChanged(editor, editor->isModified());
+
+    refreshWatchedFiles();
+    if (!editor->isModified() && !editor->filePath().isEmpty())
+    {
+        m_externalFileWatcher->requestExternalChangeCheck(editor->filePath());
+    }
 }
 
 void MultiEditor::on_pushButton_closeDoc_clicked()
@@ -770,6 +789,7 @@ bool MultiEditor::closeFileIfUnmodified(const QString &filePath)
     emit editorClosed(editor);
     m_editorManager->forgetEditor(editor);
     page->deleteLater();
+    refreshWatchedFiles();
 
     if (m_createDefaultWhenEmpty && ui->tabWidget->count() == 0)
     {
@@ -981,6 +1001,147 @@ void MultiEditor::hideMarkdownPreview(CustomEditor *editor)
     page->hidePreview();
 }
 
+QString MultiEditor::normalizedFilePath(const QString &filePath) const
+{
+    if (filePath.isEmpty())
+    {
+        return QString();
+    }
+
+    return QDir::cleanPath(QFileInfo(filePath).absoluteFilePath());
+}
+
+QSet<QString> MultiEditor::currentTrackedFilePaths() const
+{
+    QSet<QString> filePaths;
+    for (int i = 0; i < ui->tabWidget->count(); ++i)
+    {
+        const QString filePath = normalizedFilePath(filePathAt(i));
+        if (!filePath.isEmpty())
+        {
+            filePaths.insert(filePath);
+        }
+    }
+    return filePaths;
+}
+
+void MultiEditor::refreshWatchedFiles()
+{
+    m_externalFileWatcher->setTrackedFilePaths(currentTrackedFilePaths());
+}
+
+bool MultiEditor::reloadFileFromDiskIfUnmodified(const QString &filePath)
+{
+    const QString normalizedPath = normalizedFilePath(filePath);
+    if (normalizedPath.isEmpty() || !currentTrackedFilePaths().contains(normalizedPath))
+    {
+        return false;
+    }
+
+    const QFileInfo fileInfo(normalizedPath);
+    const bool exists = fileInfo.exists() && fileInfo.isFile();
+
+    if (!exists)
+    {
+        recordFileState(normalizedPath);
+        refreshWatchedFiles();
+        return false;
+    }
+
+    if (hasModifiedEditorForFile(normalizedPath))
+    {
+        return false;
+    }
+
+    QString content;
+    QString errorMessage;
+    if (!DocumentIO::loadTextFile(normalizedPath, &content, &errorMessage))
+    {
+        refreshWatchedFiles();
+        return false;
+    }
+
+    recordFileState(normalizedPath);
+
+    bool reloaded = false;
+    bool reloadedCurrentEditor = false;
+    QSet<void *> reloadedDocuments;
+    for (CustomEditor *editor : m_editorManager->getEditors())
+    {
+        if (!editor || normalizedFilePath(editor->filePath()) != normalizedPath)
+        {
+            continue;
+        }
+
+        void *document = editor->SendScintillaPtrResult(QsciScintillaBase::SCI_GETDOCPOINTER);
+        if (document && reloadedDocuments.contains(document))
+        {
+            continue;
+        }
+        if (document)
+        {
+            reloadedDocuments.insert(document);
+        }
+
+        int line = 0;
+        int index = 0;
+        editor->getCursorPosition(&line, &index);
+        const int firstVisibleLine = editor->SendScintilla(QsciScintillaBase::SCI_GETFIRSTVISIBLELINE);
+        const int xOffset = editor->SendScintilla(QsciScintillaBase::SCI_GETXOFFSET);
+
+        const QSignalBlocker blocker(editor);
+        editor->setText(content);
+        editor->setModified(false);
+
+        const int targetLine = qBound(0, line, qMax(0, editor->lines() - 1));
+        const int targetIndex = qBound(0, index, editor->lineLength(targetLine));
+        editor->setCursorPosition(targetLine, targetIndex);
+        editor->SendScintilla(QsciScintillaBase::SCI_SETFIRSTVISIBLELINE, firstVisibleLine);
+        editor->SendScintilla(QsciScintillaBase::SCI_SETXOFFSET, xOffset);
+        m_editorManager->updateLineNumberMarginWidth(editor);
+
+        if (DocumentPage *page = pageForEditor(editor))
+        {
+            page->refreshPreview();
+        }
+
+        emit editorModificationChanged(editor, false);
+        if (editor == currentEditor())
+        {
+            reloadedCurrentEditor = true;
+        }
+        reloaded = true;
+    }
+
+    if (reloadedCurrentEditor)
+    {
+        emit modificationChanged(false);
+    }
+
+    refreshWatchedFiles();
+    return reloaded;
+}
+
+bool MultiEditor::hasModifiedEditorForFile(const QString &filePath) const
+{
+    const QString normalizedPath = normalizedFilePath(filePath);
+    for (CustomEditor *editor : m_editorManager->getEditors())
+    {
+        if (editor
+            && normalizedFilePath(editor->filePath()) == normalizedPath
+            && editor->isModified())
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
+void MultiEditor::recordFileState(const QString &filePath)
+{
+    m_externalFileWatcher->recordFileState(filePath);
+}
+
 bool MultiEditor::closeDefaultEditorIfUnused()
 {
     if (!m_defaultEditor || m_defaultEditor->isModified() || !m_defaultEditor->text().isEmpty())
@@ -1012,6 +1173,7 @@ bool MultiEditor::closeDefaultEditorIfUnused()
     }
 
     m_defaultEditor = nullptr;
+    refreshWatchedFiles();
     return true;
 }
 
