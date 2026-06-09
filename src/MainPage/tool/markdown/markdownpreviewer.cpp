@@ -9,7 +9,7 @@
 #include <QPageLayout>
 #include <QPageSize>
 #include <QPrinter>
-#include <QTemporaryFile>
+#include <QUuid>
 #include <QUrl>
 
 #include "qlitehtmlwidget.h"
@@ -204,17 +204,11 @@ bool MarkdownPreviewer::exportToPdf(const QString &markdown, const QString &file
     preview.setHtml(buildHtmlDocument(markdownToHtml(markdown), RenderMode::Pdf));
 
     const QFileInfo outputInfo(outputPath);
-    QTemporaryFile tempFile(outputInfo.absolutePath()
-                            + QDir::separator()
-                            + QStringLiteral(".notepeek-pdf-XXXXXX.pdf"));
-    tempFile.setAutoRemove(false);
-    if (!tempFile.open())
-    {
-        return false;
-    }
-
-    const QString tempPath = tempFile.fileName();
-    tempFile.close();
+    const QString tempPath = outputInfo.absolutePath()
+                             + QDir::separator()
+                             + QStringLiteral(".notepeek-pdf-")
+                             + QUuid::createUuid().toString(QUuid::WithoutBraces)
+                             + QStringLiteral(".pdf");
 
     QPrinter printer(QPrinter::ScreenResolution);
     printer.setOutputFormat(QPrinter::PdfFormat);
@@ -234,26 +228,25 @@ bool MarkdownPreviewer::exportToPdf(const QString &markdown, const QString &file
         return false;
     }
 
+    // Backup existing file before overwriting (QFile::copy works on all platforms,
+    // unlike QFile::rename which cannot overwrite on Windows)
     QString backupPath;
     const bool targetExists = QFileInfo::exists(outputPath);
     if (targetExists)
     {
-        QTemporaryFile backupFile(outputInfo.absolutePath()
-                                  + QDir::separator()
-                                  + QStringLiteral(".notepeek-pdf-backup-XXXXXX.pdf"));
-        backupFile.setAutoRemove(false);
-        if (!backupFile.open())
+        backupPath = outputInfo.absolutePath()
+                     + QDir::separator()
+                     + QStringLiteral(".notepeek-pdf-backup-")
+                     + QUuid::createUuid().toString(QUuid::WithoutBraces)
+                     + QStringLiteral(".pdf");
+        if (!QFile::copy(outputPath, backupPath))
         {
             QFile::remove(tempPath);
             return false;
         }
-
-        backupPath = backupFile.fileName();
-        backupFile.close();
-        QFile::remove(backupPath);
-
-        if (!QFile::rename(outputPath, backupPath))
+        if (!QFile::remove(outputPath))
         {
+            QFile::remove(backupPath);
             QFile::remove(tempPath);
             return false;
         }
@@ -261,14 +254,17 @@ bool MarkdownPreviewer::exportToPdf(const QString &markdown, const QString &file
 
     if (!QFile::rename(tempPath, outputPath))
     {
+        // Restore from backup
         if (targetExists)
         {
+            QFile::remove(outputPath);
             QFile::rename(backupPath, outputPath);
         }
         QFile::remove(tempPath);
         return false;
     }
 
+    // Success - clean up backup
     if (targetExists)
     {
         QFile::remove(backupPath);
