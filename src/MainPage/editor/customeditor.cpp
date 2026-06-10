@@ -36,12 +36,12 @@ void CustomEditor::dropEvent(QDropEvent *e)
     if (mimeData->hasUrls())
     {
         QList<QUrl> urlList = mimeData->urls();
-        emit filesDropped(urlList);  // 发射所有文件
+        emit filesDropped(urlList);
         e->acceptProposedAction();
     }
     else
     {
-        // 不是文件拖放，交给父类处理文本拖放等
+        // Not a file drop; let the base class handle text drops etc.
         QsciScintilla::dropEvent(e);
     }
 }

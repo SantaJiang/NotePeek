@@ -42,7 +42,6 @@ CustomEditor *EditorManager::createEditor(const QString &name)
     CustomEditor *editor = new CustomEditor();
     editor->setWindowTitle(name.isEmpty() ? tr("Untitled") : name);
     setupEditor(editor);
-    // 连接 URI 拖放信号
     connect(editor, &CustomEditor::filesDropped,  this, &EditorManager::filesDropped);
 
     m_editors.append(editor);
@@ -148,8 +147,8 @@ void EditorManager::setupEditor(CustomEditor *editor)
     // Basic editor setup
     editor->setMarginType(0, CustomEditor::NumberMargin);
     editor->setMarginWidth(0, 30);
-    // 设置初始滚动宽度为最小值，避免空文档时显示横向滚动条
-    // 启用滚动宽度跟踪后，当文档内容变宽时会自动更新
+    // Start with the minimum scroll width so an empty document shows no horizontal
+    // scrollbar; with width tracking enabled it grows as the content widens
     editor->setScrollWidth(1);
     editor->setScrollWidthTracking(true);
     editor->setTabWidth(4);
@@ -170,7 +169,6 @@ void EditorManager::setupEditor(CustomEditor *editor)
         emit editor->modificationChanged(editor->isModified());
     });
 
-    // 设置高亮滚动条装饰器
     setupScrollBarDecorator(editor);
 }
 

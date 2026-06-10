@@ -122,7 +122,7 @@ NotePeek/
         ├── CMakeLists.txt      # Build, link, package, deploy
         ├── main.cpp            # Entry point (high‑DPI, style, translation, font)
         ├── mainwindow.h/.cpp/.ui  # Main window
-        ├── editor/             # Editor core (CustomEditor, MultiEditor, LexerFactory…)
+        ├── editor/             # Editor core (CustomEditor, EditorPane, DocumentController, LexerFactory…)
         ├── find/               # Find‑replace manager & widget
         ├── decorators/         # Scroll‑bar result markers
         ├── widgets/            # Status‑bar components
