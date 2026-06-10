@@ -3,8 +3,6 @@
 #include "themecolors.h"
 #include <QFileDialog>
 #include <QScreen>
-#include <QScroller>
-#include <QHeaderView>
 #include <QFileInfo>
 #include <QDir>
 #include <QScrollBar>
@@ -15,18 +13,17 @@
 #include <QStyleHints>
 #include <QApplication>
 #include <QProcess>
+#include <QDockWidget>
 #include "./editor/filesavedialog.h"
 #include "./editor/customeditor.h"
 #include "./editor/spliteditorcoordinator.h"
 #include "./decorators/highlightedscrollbardecorator.h"
-#include "./widgets/filetypefilterproxymodel.h"
-#include "./widgets/filetreeview.h"
+#include "./widgets/fileexplorerdock.h"
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
     , ui(new Ui::MainWindow)
-    , m_pFileModel(nullptr)
-    , m_fileFilterProxy(nullptr)
+    , m_fileExplorerDock(nullptr)
     , m_editorCoordinator(nullptr)
     , m_singleFileWindow(false)
     , m_findReplaceManager(new FindReplaceManager(this))
@@ -60,11 +57,16 @@ MainWindow::MainWindow(QWidget *parent)
     // 设置查找替换部件和管理器的关联
     ui->widget_findreplace->setFindReplaceManager(m_findReplaceManager);
 
-    // 初始化其他组件..
-    createDirView();
-    createDockWindows();
+    m_fileExplorerDock = new FileExplorerDock(this);
+    addDockWidget(Qt::LeftDockWidgetArea, m_fileExplorerDock->dockWidget());
+    connect(m_fileExplorerDock, &FileExplorerDock::fileActivated,
+            this, [this](const QString &filePath) {
+                activeMultiEditor()->openFile(filePath);
+            });
+    connect(m_fileExplorerDock, &FileExplorerDock::openInNewWindowRequested,
+            this, &MainWindow::openFileInNewWindow);
 
-    m_pDock->setVisible(false);
+    m_fileExplorerDock->setVisible(false);
     ui->widget_findreplace->setVisible(false);
 
     ui->editorSplitter->setStretchFactor(0, 1);
@@ -147,7 +149,6 @@ MainWindow::MainWindow(QWidget *parent)
 
 MainWindow::~MainWindow()
 {
-    // m_pFileModel is owned by parent, no need to delete
     delete ui;
 }
 
@@ -209,45 +210,6 @@ void MainWindow::changeEvent(QEvent *event)
     }
 }
 
-void MainWindow::createDirView()
-{
-    m_pFileModel = new QFileSystemModel(this);
-    m_pFileModel->setFilter(QDir::AllEntries | QDir::NoDotAndDotDot | QDir::AllDirs);
-
-    m_fileFilterProxy = new FileTypeFilterProxyModel(this);
-    m_fileFilterProxy->setSourceModel(m_pFileModel);
-    m_fileFilterProxy->setDynamicSortFilter(true);
-
-    auto *treeView = new FileTreeView(this);
-    m_pTreeView = treeView;
-    m_pTreeView->setModel(m_fileFilterProxy);
-
-    m_pTreeView->setAnimated(true);
-    m_pTreeView->setIndentation(15);
-    m_pTreeView->setSortingEnabled(true);
-    m_pTreeView->sortByColumn(0, Qt::AscendingOrder);
-    m_pTreeView->setColumnWidth(0, 250);
-    m_pTreeView->header()->setSectionResizeMode(0, QHeaderView::ResizeToContents);
-    m_pTreeView->setHeaderHidden(true);
-
-    m_pTreeView->hideColumn(1);
-    m_pTreeView->hideColumn(2);
-    m_pTreeView->hideColumn(3);
-
-    connect(m_pTreeView, &QTreeView::doubleClicked, this, &MainWindow::onFileClicked);
-    connect(treeView, &FileTreeView::openInNewWindowRequested, this, &MainWindow::openFileInNewWindow);
-    QScroller::grabGesture(m_pTreeView, QScroller::TouchGesture);
-}
-
-void MainWindow::createDockWindows()
-{
-    m_pDock = new QDockWidget(tr("Note Browser"), this);
-    m_pDock->setAllowedAreas(Qt::LeftDockWidgetArea | Qt::RightDockWidgetArea);
-    m_pDock->setWidget(m_pTreeView);
-    addDockWidget(Qt::LeftDockWidgetArea, m_pDock);
-    m_pDock->setTitleBarWidget(new QWidget());
-}
-
 void MainWindow::refreshHighlights()
 {
     if (ui->widget_findreplace->isVisible())
@@ -261,17 +223,7 @@ void MainWindow::refreshHighlights()
 
 void MainWindow::setRootDirectory(const QString &dirPath)
 {
-    if (!dirPath.isEmpty())
-    {
-        const QModelIndex rootIndex = m_pFileModel->setRootPath(dirPath);
-        const QModelIndex proxyRootIndex = m_fileFilterProxy->mapFromSource(rootIndex);
-        m_pTreeView->setRootIndex(proxyRootIndex);
-        m_pTreeView->expand(proxyRootIndex);
-    }
-    else
-    {
-        m_pTreeView->setRootIndex(QModelIndex());
-    }
+    m_fileExplorerDock->setRootDirectory(dirPath);
 }
 
 void MainWindow::openFileAndSetRootDirectory(const QString &fileName)
@@ -281,17 +233,7 @@ void MainWindow::openFileAndSetRootDirectory(const QString &fileName)
     QFileInfo fileInfo(fileName);
     QString dirPath = fileInfo.absolutePath();
     setRootDirectory(dirPath);
-
-    QModelIndex index = m_pFileModel->index(fileName);
-    if (index.isValid())
-    {
-        const QModelIndex proxyIndex = m_fileFilterProxy->mapFromSource(index);
-        if (proxyIndex.isValid())
-        {
-            m_pTreeView->scrollTo(proxyIndex);
-            m_pTreeView->setCurrentIndex(proxyIndex);
-        }
-    }
+    m_fileExplorerDock->selectFile(fileName);
 }
 
 void MainWindow::on_action_new_triggered()
@@ -318,13 +260,9 @@ void MainWindow::on_action_openDirectory_triggered()
         if (!dirPath.isEmpty())
         {
             setRootDirectory(dirPath);
-            m_pDock->setVisible(true);
+            m_fileExplorerDock->setVisible(true);
             ui->action_showSlideBar->setChecked(true);
-            QModelIndex rootIndex = m_pFileModel->index(dirPath);
-            if (rootIndex.isValid())
-            {
-                m_pTreeView->expand(m_fileFilterProxy->mapFromSource(rootIndex));
-            }
+            m_fileExplorerDock->expandDirectory(dirPath);
         }
     }
 }
@@ -355,7 +293,7 @@ void MainWindow::on_action_about_triggered()
 
 void MainWindow::on_action_showSlideBar_triggered(bool checked)
 {
-    m_pDock->setVisible(checked);
+    m_fileExplorerDock->setVisible(checked);
 }
 
 void MainWindow::on_action_undo_triggered()
@@ -445,16 +383,7 @@ void MainWindow::on_action_switchHeaderSource_triggered()
     if (!correspondingFile.isEmpty())
     {
         multiEditor->openFile(correspondingFile);
-
-        QModelIndex index = m_pFileModel->index(correspondingFile);
-        if (index.isValid()) {
-            const QModelIndex proxyIndex = m_fileFilterProxy->mapFromSource(index);
-            if (proxyIndex.isValid())
-            {
-                m_pTreeView->scrollTo(proxyIndex);
-                m_pTreeView->setCurrentIndex(proxyIndex);
-            }
-        }
+        m_fileExplorerDock->selectFile(correspondingFile);
     }
 }
 
@@ -531,15 +460,6 @@ void MainWindow::openFileInNewWindow(const QString &filePath)
 
     QProcess::startDetached(QCoreApplication::applicationFilePath(),
                             { QStringLiteral("--single-file-window"), filePath });
-}
-
-void MainWindow::onFileClicked(const QModelIndex &index)
-{
-    if (!m_fileFilterProxy->isDir(index))
-    {
-        QString filePath = m_fileFilterProxy->filePath(index);
-        activeMultiEditor()->openFile(filePath);
-    }
 }
 
 void MainWindow::updateEditActions(bool available)

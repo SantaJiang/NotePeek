@@ -1,9 +1,9 @@
 ﻿#include "multieditor.h"
 #include "ui_multieditor.h"
-#include "documentio.h"
 #include "documentpage.h"
+#include "documentpersistenceservice.h"
+#include "documentregistry.h"
 #include "filesavedialog.h"
-#include "lexerfactory.h"
 #include "editorswitchpopup.h"
 #include "externalfilewatcher.h"
 #include "../find/findreplacemanager.h"
@@ -14,12 +14,11 @@
 #include <QFontDatabase>
 #include <QApplication>
 #include <QFileInfo>
-#include <QDir>
 #include <QSignalBlocker>
 #include <QMap>
+#include <QSet>
 #include <QMessageBox>
 #include <QCoreApplication>
-#include <QRegularExpression>
 #include <QIcon>
 #include "customeditor.h"
 #include "../decorators/highlightedscrollbardecorator.h"
@@ -40,6 +39,7 @@ bool isMarkdownPath(const QString &filePath)
 
 MultiEditor::MultiEditor(QWidget *parent, bool createDefault) : QWidget(parent),
     ui(new Ui::MultiEditor),
+    m_documentPersistence(new DocumentPersistenceService(this)),
     m_defaultEditor(nullptr),
     m_switchPopup(nullptr),  // 初始化弹出窗口指针
     m_externalFileWatcher(new ExternalFileWatcher(this)),
@@ -183,9 +183,7 @@ bool MultiEditor::maybeSave(CustomEditor *editor)
 
     // 使用新的多文件对话框，但只显示当前文件..
     QMap<CustomEditor*, QString> files;
-    QString filePath = editor->filePath();
-    QString displayName = filePath.isEmpty() ? tr("untitled.txt") : QFileInfo(filePath).fileName();
-    files.insert(editor, displayName);
+    files.insert(editor, m_documentPersistence->displayNameForSavePrompt(editor));
 
     FileSaveDialog dialog(files, this);
     int result = dialog.exec();
@@ -220,7 +218,7 @@ bool MultiEditor::saveEditorForClose(CustomEditor *editor)
     QString filePath = editor->filePath();
     if (filePath.isEmpty())
     {
-        filePath = promptSaveFileName(this->parentWidget());
+        filePath = m_documentPersistence->promptSaveFileName(this->parentWidget());
         if (filePath.isEmpty())
         {
             return false;
@@ -241,7 +239,7 @@ bool MultiEditor::saveFile(CustomEditor *editor, const QString &filePath)
 
     QApplication::setOverrideCursor(Qt::WaitCursor);
     QString errorMessage;
-    const bool saved = DocumentIO::saveTextFile(filePath, editor->text(), &errorMessage);
+    const bool saved = m_documentPersistence->saveEditor(editor, filePath, &errorMessage);
     QApplication::restoreOverrideCursor();
 
     if (!saved)
@@ -307,7 +305,7 @@ void MultiEditor::openFile(const QString &filePath, bool activate)
     QApplication::setOverrideCursor(Qt::WaitCursor);
     QString content;
     QString errorMessage;
-    const bool loaded = DocumentIO::loadTextFile(filePath, &content, &errorMessage);
+    const bool loaded = m_documentPersistence->loadFile(filePath, &content, &errorMessage);
     QApplication::restoreOverrideCursor();
 
     if (!loaded)
@@ -558,43 +556,11 @@ bool MultiEditor::onSaveAs()
     CustomEditor *editor = currentEditor();
     if (!editor) return false;
 
-    QString fileName = promptSaveFileName(this);
+    QString fileName = m_documentPersistence->promptSaveFileName(this);
     if (fileName.isEmpty())
         return false;
 
     return saveFile(editor, fileName);
-}
-
-QString MultiEditor::promptSaveFileName(QWidget *parent)
-{
-    QStringList filters;
-    filters.append(tr("Text Files (*.txt)"));
-    for (const QString &ext : LexerFactory::supportedExtensions())
-        filters.append(QStringLiteral("%1 (*.%2)").arg(LexerFactory::languageName(LexerFactory::languageFromExtension(ext)), ext));
-    for (const QString &fileName : LexerFactory::supportedFileNames())
-        filters.append(QStringLiteral("%1 (%2)").arg(LexerFactory::languageName(LexerFactory::languageFromFileName(fileName)), fileName));
-    filters.append(tr("All Files (*)"));
-    QString selectedFilter;
-
-    QString fileName = QFileDialog::getSaveFileName(parent, tr("Save As"), QStringLiteral("untitled.txt"),
-                                                    filters.join(QStringLiteral(";;")), &selectedFilter);
-    if (fileName.isEmpty())
-        return {};
-
-    if (QFileInfo(fileName).suffix().isEmpty()
-        && !selectedFilter.isEmpty()
-        && selectedFilter != tr("All Files (*)"))
-    {
-        QRegularExpression re(QStringLiteral("\\(\\*\\.([^)]+)\\)"));
-        QRegularExpressionMatch match = re.match(selectedFilter);
-        if (match.hasMatch())
-        {
-            const QString ext = match.captured(1);
-            if (!ext.isEmpty())
-                fileName += u'.' + ext;
-        }
-    }
-    return fileName;
 }
 
 void MultiEditor::addTab(const QString &text, const QString &filePath)
@@ -829,9 +795,7 @@ bool MultiEditor::closeAllEditors()
     {
         if (editor && editor->isModified())
         {
-            QString filePath = editor->filePath();
-            QString displayName = filePath.isEmpty() ? tr("untitled.txt") : QFileInfo(filePath).fileName();
-            modifiedFiles.insert(editor, displayName);
+            modifiedFiles.insert(editor, m_documentPersistence->displayNameForSavePrompt(editor));
         }
     }
 
@@ -1001,39 +965,16 @@ void MultiEditor::hideMarkdownPreview(CustomEditor *editor)
     page->hidePreview();
 }
 
-QString MultiEditor::normalizedFilePath(const QString &filePath) const
-{
-    if (filePath.isEmpty())
-    {
-        return QString();
-    }
-
-    return QDir::cleanPath(QFileInfo(filePath).absoluteFilePath());
-}
-
-QSet<QString> MultiEditor::currentTrackedFilePaths() const
-{
-    QSet<QString> filePaths;
-    for (int i = 0; i < ui->tabWidget->count(); ++i)
-    {
-        const QString filePath = normalizedFilePath(filePathAt(i));
-        if (!filePath.isEmpty())
-        {
-            filePaths.insert(filePath);
-        }
-    }
-    return filePaths;
-}
-
 void MultiEditor::refreshWatchedFiles()
 {
-    m_externalFileWatcher->setTrackedFilePaths(currentTrackedFilePaths());
+    m_externalFileWatcher->setTrackedFilePaths(DocumentRegistry::trackedFilePaths(m_editorManager->getEditors()));
 }
 
 bool MultiEditor::reloadFileFromDiskIfUnmodified(const QString &filePath)
 {
-    const QString normalizedPath = normalizedFilePath(filePath);
-    if (normalizedPath.isEmpty() || !currentTrackedFilePaths().contains(normalizedPath))
+    const QString normalizedPath = DocumentRegistry::normalizedFilePath(filePath);
+    if (normalizedPath.isEmpty()
+        || !DocumentRegistry::trackedFilePaths(m_editorManager->getEditors()).contains(normalizedPath))
     {
         return false;
     }
@@ -1055,7 +996,7 @@ bool MultiEditor::reloadFileFromDiskIfUnmodified(const QString &filePath)
 
     QString content;
     QString errorMessage;
-    if (!DocumentIO::loadTextFile(normalizedPath, &content, &errorMessage))
+    if (!m_documentPersistence->loadFile(normalizedPath, &content, &errorMessage))
     {
         refreshWatchedFiles();
         return false;
@@ -1068,7 +1009,7 @@ bool MultiEditor::reloadFileFromDiskIfUnmodified(const QString &filePath)
     QSet<void *> reloadedDocuments;
     for (CustomEditor *editor : m_editorManager->getEditors())
     {
-        if (!editor || normalizedFilePath(editor->filePath()) != normalizedPath)
+        if (!editor || DocumentRegistry::normalizedFilePath(editor->filePath()) != normalizedPath)
         {
             continue;
         }
@@ -1124,17 +1065,7 @@ bool MultiEditor::reloadFileFromDiskIfUnmodified(const QString &filePath)
 
 bool MultiEditor::hasModifiedEditorForFile(const QString &filePath) const
 {
-    const QString normalizedPath = normalizedFilePath(filePath);
-    for (CustomEditor *editor : m_editorManager->getEditors())
-    {
-        if (editor
-            && normalizedFilePath(editor->filePath()) == normalizedPath
-            && editor->isModified())
-        {
-            return true;
-        }
-    }
-    return false;
+    return DocumentRegistry::hasModifiedEditorForFile(m_editorManager->getEditors(), filePath);
 }
 
 void MultiEditor::recordFileState(const QString &filePath)

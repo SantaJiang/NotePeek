@@ -3,10 +3,10 @@
 
 #include <QWidget>
 #include <QUrl>
-#include <QSet>
 #include "editormanager.h"
 
 class DocumentPage;
+class DocumentPersistenceService;
 class ExternalFileWatcher;
 class EditorSwitchPopup;
 class FindReplaceManager;
@@ -104,20 +104,18 @@ private slots:
 
 private:
     void connectEditorSignals(CustomEditor *editor);
-    QString promptSaveFileName(QWidget *parent = nullptr);
     bool closeDefaultEditorIfUnused();
     DocumentPage *createDocumentPage(CustomEditor *editor, const QString &filePath);
     void refreshDocumentPageForFile(CustomEditor *editor, const QString &filePath);
     DocumentPage *currentPage() const;
     DocumentPage *pageForWidget(QWidget *widget) const;
     DocumentPage *pageForEditor(CustomEditor *editor) const;
-    QString normalizedFilePath(const QString &filePath) const;
-    QSet<QString> currentTrackedFilePaths() const;
     void refreshWatchedFiles();
     void recordFileState(const QString &filePath);
 
     Ui::MultiEditor *ui;
     EditorManager *m_editorManager;
+    DocumentPersistenceService *m_documentPersistence;
     CustomEditor *m_defaultEditor; // 指向默认空白编辑器的指针..
     EditorSwitchPopup *m_switchPopup;
     ExternalFileWatcher *m_externalFileWatcher;

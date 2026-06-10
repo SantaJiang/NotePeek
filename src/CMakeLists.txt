@@ -1,4 +1,5 @@
 add_subdirectory(QScintilla)
+add_subdirectory(third_party/md4c)
 set(QLITEHTML_LIBRARY_TYPE STATIC)
 add_subdirectory(third_party/qlitehtml)
 add_subdirectory(MainPage)
