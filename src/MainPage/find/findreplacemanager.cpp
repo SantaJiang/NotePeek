@@ -317,13 +317,13 @@ void FindReplaceManager::setBackwards(bool backwards)
 
 void FindReplaceManager::addToFindHistory(const QString &text)
 {
-    // 历史记录管理实现
+    // History tracking not implemented yet
     Q_UNUSED(text);
 }
 
 void FindReplaceManager::addToReplaceHistory(const QString &text)
 {
-    // 历史记录管理实现
+    // History tracking not implemented yet
     Q_UNUSED(text);
 }
 

@@ -21,17 +21,18 @@ NotePeek/
 main.cpp
   -> MainWindow
       -> FileExplorerDock
-      -> SplitEditorCoordinator
-          -> MultiEditor (left pane)
-          -> MultiEditor (right pane)
-              -> EditorManager
-              -> DocumentPage
-              -> DocumentPersistenceService
-              -> DocumentRegistry
-              -> ExternalFileWatcher
+      -> DocumentController (left)  ──┐
+      -> DocumentController (right) ──┤ each drives one EditorPane
+      -> SplitEditorCoordinator     ──┘ and owns:
+          (synchronizes the two        -> EditorManager
+           controllers/panes)          -> DocumentPersistenceService
+                                       -> ExternalFileWatcher
       -> FindReplaceManager
       -> HeaderSourceManager
       -> MarkdownPreviewer
+
+EditorPane (view)
+  -> DocumentPage (one per tab, plain or Markdown-capable)
 ```
 
 ## Module Responsibilities
@@ -44,9 +45,13 @@ Owns the application shell: menus, dock placement, the find/replace widget, acti
 
 Owns the file-system browser dock, including the `QFileSystemModel`, file-type filter proxy, tree view behavior, root directory changes, and file selection.
 
-### `editor/MultiEditor`
+### `editor/EditorPane`
 
-Owns one editor pane: tab UI, combo-box selection, current document page, and pane-level signals. It coordinates services but should avoid containing reusable file IO or document-state policy.
+Pure view of one editor pane: the tab stack of document pages, the file combo box, close/split-view buttons, and the Ctrl+Tab switch popup. It exposes a small page-container API and view-level signals (`pageCloseRequested`, `currentPageChanged`, `splitViewToggled`) and contains no file IO or document-state policy.
+
+### `editor/DocumentController`
+
+Drives the document lifecycle of one pane: open/save/save-as/close workflows with save prompts, the default blank document policy, shared documents for split view, reloading externally changed files, and file-watcher bookkeeping. It owns `EditorManager`, `DocumentPersistenceService`, and `ExternalFileWatcher`, and emits all document-level signals (`fileOpened`, `currentFileChanged`, `modificationChanged`, ...).
 
 ### `editor/EditorManager`
 
@@ -66,7 +71,11 @@ Adapts a `CustomEditor` into either a plain editor page or a Markdown-capable pa
 
 ### `editor/SplitEditorCoordinator`
 
-Synchronizes the two editor panes and keeps split-view behavior out of `MainWindow`.
+Synchronizes the two `DocumentController`s (active pane tracking, mirroring opened/closed/renamed files, external reloads) and keeps split-view behavior out of `MainWindow`.
+
+### `editor/LexerFactory` and `editor/lexers/`
+
+`LexerFactory` maps languages, extensions, and file names to QScintilla lexers through two declarative tables; adding a language is a one-line table entry. Custom lexers (Dockerfile, qmake, Starlark, ...) live one-per-file under `editor/lexers/`.
 
 ## Dependency Direction
 
@@ -76,7 +85,7 @@ Application dependencies should flow inward:
 MainWindow/widgets -> editor UI -> editor services -> pure Qt/core helpers
 ```
 
-Avoid making low-level editor services depend on `MainWindow` or application menus. When new features need cross-widget coordination, prefer a small coordinator object over adding more responsibilities to `MainWindow` or `MultiEditor`.
+Avoid making low-level editor services depend on `MainWindow` or application menus. When new features need cross-widget coordination, prefer a small coordinator object over adding more responsibilities to `MainWindow`, `DocumentController`, or `EditorPane`.
 
 ## Third-Party Code
 

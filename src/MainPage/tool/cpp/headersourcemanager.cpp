@@ -46,7 +46,7 @@ QString HeaderSourceManager::getCorrespondingFile(const QString &filePath) const
     
     QStringList possibleExtensions = getPossibleExtensions(filePath);
     
-    // 在相同目录下查找对应文件
+    // Look for the counterpart in the same directory
     for (const QString &ext : possibleExtensions) {
         QString testPath = QDir(dirPath).filePath(baseName + "." + ext);
         if (fileExists(testPath)) {
@@ -74,7 +74,6 @@ QString HeaderSourceManager::getBaseName(const QString &filePath) const
     QFileInfo fileInfo(filePath);
     QString fileName = fileInfo.fileName();
     
-    // 移除扩展名
     int dotIndex = fileName.lastIndexOf('.');
     if (dotIndex != -1) {
         return fileName.left(dotIndex);
@@ -86,13 +85,13 @@ QString HeaderSourceManager::getBaseName(const QString &filePath) const
 QStringList HeaderSourceManager::getPossibleExtensions(const QString &filePath) const
 {
     if (isHeaderFile(filePath)) {
-        // 如果是头文件，找对应的源文件
+        // A header maps to source extensions
         return QStringList{
             "cpp", "cc", "cxx", "c++", "c",
             "mm"  // Objective-C++
         };
     } else if (isSourceFile(filePath)) {
-        // 如果是源文件，找对应的头文件
+        // A source file maps to header extensions
         return QStringList{
             "h", "hh", "hpp", "hxx", "h++", "inl"
         };

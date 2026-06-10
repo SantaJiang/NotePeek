@@ -7,11 +7,11 @@ HighlightedScrollBar::HighlightedScrollBar(QsciScintilla *editor, Qt::Orientatio
     : QScrollBar(orientation, parent),
     editor(editor)
 {
-    // 连接滚动条和编辑器的同步
+    // Keep the scrollbar and editor in sync
     connect(this, &QScrollBar::valueChanged, this, &HighlightedScrollBar::onValueChanged);
     connect(this, &QScrollBar::rangeChanged, this, &HighlightedScrollBar::onRangeChanged);
 
-    // 初始同步
+    // Defer initial sync until the editor is fully set up
     QTimer::singleShot(0, this, &HighlightedScrollBar::updateScrollBarFromEditor);
 }
 
@@ -21,13 +21,12 @@ HighlightedScrollBar::~HighlightedScrollBar()
 
 void HighlightedScrollBar::paintEvent(QPaintEvent *event)
 {
-    // 先绘制默认滚动条
+    // Draw the default scrollbar first, then overlay the markers
     QScrollBar::paintEvent(event);
 
     QPainter p(this);
     p.setRenderHint(QPainter::Antialiasing, false);
 
-    // 绘制各种标记
     drawSearchResults(p);
     drawBookmarks(p);
     drawCurrentLine(p);
@@ -37,7 +36,7 @@ void HighlightedScrollBar::onValueChanged(int value)
 {
     if (!editor || m_blockSignals) return;
 
-    // 使用 QScintilla 的原始 API 设置滚动位置
+    // Scroll the editor through the raw Scintilla API
     editor->SendScintilla(QsciScintillaBase::SCI_SETFIRSTVISIBLELINE, value);
 }
 
@@ -54,12 +53,10 @@ void HighlightedScrollBar::updateScrollBarFromEditor()
 
     m_blockSignals = true;
 
-    // 获取编辑器的滚动信息
     int firstVisibleLine = editor->SendScintilla(QsciScintillaBase::SCI_GETFIRSTVISIBLELINE);
     int linesOnScreen = editor->SendScintilla(QsciScintillaBase::SCI_LINESONSCREEN);
     int lineCount = editor->lines();
 
-    // 更新滚动条范围
     setMinimum(0);
     setMaximum(qMax(0, lineCount - linesOnScreen));
     setPageStep(linesOnScreen);
@@ -67,7 +64,7 @@ void HighlightedScrollBar::updateScrollBarFromEditor()
 
     m_blockSignals = false;
 
-    // 触发重绘以更新标记
+    // Repaint to refresh the markers
     update();
 }
 
@@ -75,7 +72,7 @@ void HighlightedScrollBar::drawSearchResults(QPainter &p)
 {
     if (searchIndicator == -1) return;
 
-    // 查找所有使用搜索指示器的位置
+    // Walk every range marked with the search indicator
     int length = editor->length();
     int currentPos = 0;
 
@@ -94,7 +91,6 @@ void HighlightedScrollBar::drawBookmarks(QPainter &p)
 {
     if (bookmarkMarker == -1) return;
 
-    // 查找所有书签
     int line = 0;
     while ((line = editor->markerFindNext(line, 1 << bookmarkMarker)) != -1) {
         drawTickMark(p, lineToScrollBarY(line), DEFAULT_TICK_HEIGHT, ThemeColors::ScrollBar::bookmark());
@@ -114,7 +110,7 @@ void HighlightedScrollBar::drawTickMark(QPainter &p, int y, int height, const QC
     int arrowHeight = scrollbarArrowHeight();
     int availableHeight = rect().height() - arrowHeight * 2;
 
-    // 确保y在有效范围内
+    // Clamp y to the drawable area
     if (y < 0) y = 0;
     if (y > availableHeight) y = availableHeight;
 
@@ -126,7 +122,7 @@ void HighlightedScrollBar::drawTickMark(QPainter &p, int y, int height, const QC
 
 int HighlightedScrollBar::posToScrollBarY(int pos) const
 {
-    // 在 QScintilla 中，我们需要使用 SendScintilla 来获取位置对应的行号
+    // QScintilla only exposes position-to-line mapping via SendScintilla
     int line = editor->SendScintilla(QsciScintillaBase::SCI_LINEFROMPOSITION, pos);
     return lineToScrollBarY(line);
 }
@@ -145,6 +141,6 @@ int HighlightedScrollBar::lineToScrollBarY(int line) const
 
 int HighlightedScrollBar::scrollbarArrowHeight() const
 {
-    // 假设箭头是正方形，高度等于滚动条宽度
+    // Assume square arrow buttons: height equals the scrollbar width
     return rect().width();
 }

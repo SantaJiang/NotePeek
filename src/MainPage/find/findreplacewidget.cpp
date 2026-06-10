@@ -19,17 +19,14 @@ FindReplaceWidget::FindReplaceWidget(QWidget *parent)
     }
     ui->buttonClose->setText(QChar(0xf00d));
 
-    // 连接 UI 信号到槽函数
     connect(ui->buttonFind, &QPushButton::clicked, this, &FindReplaceWidget::onFindClicked);
     connect(ui->buttonReplace, &QPushButton::clicked, this, &FindReplaceWidget::onReplaceClicked);
     connect(ui->buttonReplaceAll, &QPushButton::clicked, this, &FindReplaceWidget::onReplaceAllClicked);
     connect(ui->buttonClose, &QPushButton::clicked, this, &FindReplaceWidget::onCloseClicked);
 
-    // 连接输入控件信号
     connect(ui->comboFind->lineEdit(), &QLineEdit::textChanged, this, &FindReplaceWidget::onFindTextChanged);
     connect(ui->comboReplace->lineEdit(), &QLineEdit::textChanged, this, &FindReplaceWidget::onReplaceTextChanged);
 
-    // 连接选项控件信号
     connect(ui->checkBoxMatchCase, &QCheckBox::toggled, this, &FindReplaceWidget::onCaseSensitiveToggled);
     connect(ui->checkBoxMatchWholeWord, &QCheckBox::toggled, this, &FindReplaceWidget::onWholeWordToggled);
     connect(ui->checkBoxWrapAround, &QCheckBox::toggled, this, &FindReplaceWidget::onWrapAroundToggled);
