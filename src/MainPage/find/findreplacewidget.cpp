@@ -1,7 +1,6 @@
 ﻿#include "find/findreplacewidget.h"
 #include "ui_findreplacewidget.h"
 #include "find/findreplacemanager.h"
-#include "editor/multieditor.h"
 #include <QKeyEvent>
 #include <QLineEdit>
 #include <QFontDatabase>
@@ -10,7 +9,6 @@ FindReplaceWidget::FindReplaceWidget(QWidget *parent)
     : QWidget(parent)
     , ui(new Ui::FindReplaceWidget)
     , m_manager(nullptr)
-    , m_multiEditor(nullptr)
 {
     ui->setupUi(this);
 
@@ -45,11 +43,6 @@ FindReplaceWidget::FindReplaceWidget(QWidget *parent)
 FindReplaceWidget::~FindReplaceWidget()
 {
     delete ui;
-}
-
-void FindReplaceWidget::setMultiEditor(MultiEditor *multiEditor)
-{
-    m_multiEditor = multiEditor;
 }
 
 void FindReplaceWidget::setFindReplaceManager(FindReplaceManager *manager)

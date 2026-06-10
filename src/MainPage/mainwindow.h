@@ -1,8 +1,7 @@
-﻿#ifndef MAINWINDOW_H
+#ifndef MAINWINDOW_H
 #define MAINWINDOW_H
 
 #include <QMainWindow>
-#include "editor/multieditor.h"
 #include "find/findreplacemanager.h"
 #include "tool/cpp/headersourcemanager.h"
 #include "tool/markdown/markdownpreviewer.h"
@@ -12,6 +11,7 @@ namespace Ui
 class MainWindow;
 }
 
+class DocumentController;
 class FileExplorerDock;
 class SplitEditorCoordinator;
 
@@ -24,7 +24,6 @@ public:
     ~MainWindow();
 
     void openFileByArg(const QString &fileName);
-    MultiEditor *multiEditor();
 
 protected:
     void closeEvent(QCloseEvent *event) override;
@@ -60,11 +59,13 @@ private:
     void refreshHighlights();
     void openFileAndSetRootDirectory(const QString &fileName);
     void updateToolActions();
-    MultiEditor *activeMultiEditor() const;
-    void applyActiveMultiEditor(MultiEditor *multiEditor);
+    DocumentController *activeController() const;
+    void applyActiveController(DocumentController *controller);
 
     Ui::MainWindow *ui;
     FileExplorerDock *m_fileExplorerDock;
+    DocumentController *m_leftController;
+    DocumentController *m_rightController;
     SplitEditorCoordinator *m_editorCoordinator;
     bool m_singleFileWindow;
     FindReplaceManager *m_findReplaceManager;

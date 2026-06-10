@@ -7,24 +7,27 @@
 #include <QUrl>
 
 class CustomEditor;
-class MultiEditor;
+class DocumentController;
 class QSplitter;
 class QWidget;
 
+// Keeps the two editor panes of the split view in sync: which pane is
+// active, mirroring opened/closed/renamed files and routing pane-level
+// signals to the main window.
 class SplitEditorCoordinator : public QObject
 {
     Q_OBJECT
 
 public:
-    SplitEditorCoordinator(MultiEditor *leftEditor,
-                           MultiEditor *rightEditor,
+    SplitEditorCoordinator(DocumentController *leftController,
+                           DocumentController *rightController,
                            QSplitter *splitter,
                            bool singleFileWindow,
                            QObject *parent = nullptr);
 
-    MultiEditor *activeMultiEditor() const;
-    QList<MultiEditor *> editorPanes() const;
-    void setActiveMultiEditor(MultiEditor *multiEditor);
+    DocumentController *activeController() const;
+    QList<DocumentController *> controllers() const;
+    void setActiveController(DocumentController *controller);
     void setSplitViewEnabled(bool enabled);
     bool closeAllEditors();
     void reapplyThemeToEditorPanes();
@@ -32,26 +35,26 @@ public:
     void updateActivePaneForFocus(QWidget *widget);
 
 signals:
-    void activeMultiEditorChanged(MultiEditor *multiEditor);
-    void paneModificationChanged(MultiEditor *multiEditor, bool modified);
-    void paneCopyAvailableChanged(MultiEditor *multiEditor, bool available);
-    void filesDropped(MultiEditor *multiEditor, const QList<QUrl> &urls);
+    void activeControllerChanged(DocumentController *controller);
+    void paneModificationChanged(DocumentController *controller, bool modified);
+    void paneCopyAvailableChanged(DocumentController *controller, bool available);
+    void filesDropped(DocumentController *controller, const QList<QUrl> &urls);
 
 private:
-    void connectMultiEditor(MultiEditor *multiEditor);
-    void syncOpenedFileToOtherPanes(MultiEditor *source, const QString &filePath);
-    void syncClosedFileToOtherPanes(MultiEditor *source, const QString &filePath);
-    void syncRenamedFileToOtherPanes(MultiEditor *source,
+    void connectController(DocumentController *controller);
+    void syncOpenedFileToOtherPanes(DocumentController *source, const QString &filePath);
+    void syncClosedFileToOtherPanes(DocumentController *source, const QString &filePath);
+    void syncRenamedFileToOtherPanes(DocumentController *source,
                                      CustomEditor *sourceEditor,
                                      const QString &oldFilePath,
                                      const QString &newFilePath);
-    void reloadExternallyChangedFile(MultiEditor *source, const QString &filePath);
+    void reloadExternallyChangedFile(DocumentController *source, const QString &filePath);
     void showSameFileInRightPane();
 
-    MultiEditor *m_leftEditor;
-    MultiEditor *m_rightEditor;
+    DocumentController *m_leftController;
+    DocumentController *m_rightController;
     QSplitter *m_splitter;
-    MultiEditor *m_activeMultiEditor;
+    DocumentController *m_activeController;
     bool m_syncingEditorPanes;
     bool m_singleFileWindow;
 };

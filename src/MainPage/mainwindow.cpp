@@ -1,4 +1,4 @@
-﻿#include "mainwindow.h"
+#include "mainwindow.h"
 #include "ui_mainwindow.h"
 #include "themecolors.h"
 #include <QFileDialog>
@@ -14,16 +14,18 @@
 #include <QApplication>
 #include <QProcess>
 #include <QDockWidget>
-#include "editor/filesavedialog.h"
 #include "editor/customeditor.h"
+#include "editor/documentcontroller.h"
+#include "editor/multieditor.h"
 #include "editor/spliteditorcoordinator.h"
-#include "decorators/highlightedscrollbardecorator.h"
 #include "widgets/fileexplorerdock.h"
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
     , ui(new Ui::MainWindow)
     , m_fileExplorerDock(nullptr)
+    , m_leftController(nullptr)
+    , m_rightController(nullptr)
     , m_editorCoordinator(nullptr)
     , m_singleFileWindow(false)
     , m_findReplaceManager(new FindReplaceManager(this))
@@ -31,18 +33,17 @@ MainWindow::MainWindow(QWidget *parent)
     , m_markdownPreviewer(new MarkdownPreviewer(this))
 {
     ui->setupUi(this);
-    setAcceptDrops(false);  // 主窗口不处理拖拽
+    setAcceptDrops(false); // Drag and drop is handled by the editors.
 
-    // 检查命令行参数..
-    QStringList args = QCoreApplication::arguments();
+    // Command line: any argument not starting with '-' is a file to open.
+    const QStringList args = QCoreApplication::arguments();
     bool hasFileArg = false;
     QString filePath;
     m_singleFileWindow = args.contains(QStringLiteral("--single-file-window"));
 
-    // 跳过第一个参数（程序自身）..
     for (int i = 1; i < args.size(); ++i)
     {
-        if (!args[i].startsWith("-"))   // 假设不以"-"开头的参数是文件路径..
+        if (!args[i].startsWith("-"))
         {
             filePath = args[i];
             hasFileArg = true;
@@ -50,18 +51,17 @@ MainWindow::MainWindow(QWidget *parent)
         }
     }
 
-    // 根据是否有文件参数决定是否创建默认编辑器..
-    ui->multieditor->setCreateDefault(!hasFileArg);
-    ui->multieditorRight->setCreateDefault(false);
+    // A default blank document only makes sense when no file was requested.
+    m_leftController = new DocumentController(ui->multieditor, !hasFileArg, this);
+    m_rightController = new DocumentController(ui->multieditorRight, false, this);
 
-    // 设置查找替换部件和管理器的关联
     ui->widget_findreplace->setFindReplaceManager(m_findReplaceManager);
 
     m_fileExplorerDock = new FileExplorerDock(this);
     addDockWidget(Qt::LeftDockWidgetArea, m_fileExplorerDock->dockWidget());
     connect(m_fileExplorerDock, &FileExplorerDock::fileActivated,
             this, [this](const QString &filePath) {
-                activeMultiEditor()->openFile(filePath);
+                activeController()->openFile(filePath);
             });
     connect(m_fileExplorerDock, &FileExplorerDock::openInNewWindowRequested,
             this, &MainWindow::openFileInNewWindow);
@@ -71,32 +71,32 @@ MainWindow::MainWindow(QWidget *parent)
 
     ui->editorSplitter->setStretchFactor(0, 1);
     ui->editorSplitter->setStretchFactor(1, 1);
-    m_editorCoordinator = new SplitEditorCoordinator(ui->multieditor,
-                                                     ui->multieditorRight,
+    m_editorCoordinator = new SplitEditorCoordinator(m_leftController,
+                                                     m_rightController,
                                                      ui->editorSplitter,
                                                      m_singleFileWindow,
                                                      this);
-    connect(m_editorCoordinator, &SplitEditorCoordinator::activeMultiEditorChanged,
-            this, &MainWindow::applyActiveMultiEditor);
+    connect(m_editorCoordinator, &SplitEditorCoordinator::activeControllerChanged,
+            this, &MainWindow::applyActiveController);
     connect(m_editorCoordinator, &SplitEditorCoordinator::paneModificationChanged,
-            this, [this](MultiEditor *multiEditor, bool modified) {
-                if (multiEditor == activeMultiEditor())
+            this, [this](DocumentController *controller, bool modified) {
+                if (controller == activeController())
                 {
                     updateWindowTitle(modified);
                 }
             });
     connect(m_editorCoordinator, &SplitEditorCoordinator::paneCopyAvailableChanged,
-            this, [this](MultiEditor *multiEditor, bool available) {
-                if (multiEditor == activeMultiEditor())
+            this, [this](DocumentController *controller, bool available) {
+                if (controller == activeController())
                 {
                     updateEditActions(available);
                 }
             });
     connect(m_editorCoordinator, &SplitEditorCoordinator::filesDropped,
-            this, [this](MultiEditor *, const QList<QUrl> &urls) {
+            this, [this](DocumentController *, const QList<QUrl> &urls) {
                 onFileDraged(urls);
             });
-    applyActiveMultiEditor(ui->multieditor);
+    applyActiveController(m_leftController);
     if (m_singleFileWindow)
     {
         ui->multieditor->setTopbarVisible(false);
@@ -110,7 +110,6 @@ MainWindow::MainWindow(QWidget *parent)
         m_editorCoordinator->updateActivePaneForFocus(now);
     });
 
-    // 连接查找替换部件的可见性变化
     connect(ui->widget_findreplace, &FindReplaceWidget::visibilityChanged, this, [this](bool visible) {
         if (!visible)
         {
@@ -118,16 +117,13 @@ MainWindow::MainWindow(QWidget *parent)
         }
     });
 
-    // 连接编辑动作..
     connect(ui->action_cut, &QAction::triggered, this, &MainWindow::on_action_cut_triggered);
     connect(ui->action_copy, &QAction::triggered, this, &MainWindow::on_action_copy_triggered);
     connect(ui->action_paste, &QAction::triggered, this, &MainWindow::on_action_paste_triggered);
 
-    // 初始化编辑动作状态..
     updateEditActions(false);
     updateToolActions();
 
-    // 如果有文件参数，打开文件..
     if (hasFileArg && !filePath.isEmpty())
     {
         openFileByArg(filePath);
@@ -157,27 +153,20 @@ void MainWindow::openFileByArg(const QString &fileName)
     openFileAndSetRootDirectory(fileName);
 }
 
-MultiEditor *MainWindow::multiEditor()
+DocumentController *MainWindow::activeController() const
 {
-    return activeMultiEditor();
+    return m_editorCoordinator ? m_editorCoordinator->activeController() : m_leftController;
 }
 
-MultiEditor *MainWindow::activeMultiEditor() const
+void MainWindow::applyActiveController(DocumentController *controller)
 {
-    return m_editorCoordinator ? m_editorCoordinator->activeMultiEditor() : ui->multieditor;
-}
-
-void MainWindow::applyActiveMultiEditor(MultiEditor *multiEditor)
-{
-    if (!multiEditor)
+    if (!controller)
         return;
 
-    ui->widget_findreplace->setMultiEditor(multiEditor);
-
-    CustomEditor *editor = multiEditor->currentEditor();
+    CustomEditor *editor = controller->currentEditor();
     ui->statusbar->connectToEditor(editor);
     m_findReplaceManager->setCurrentEditor(editor);
-    multiEditor->setFindReplaceManagerForCurrentEditor(m_findReplaceManager);
+    controller->attachFindReplaceManager(m_findReplaceManager);
 
     updateToolActions();
     updateEditActions(editor && editor->hasSelectedText());
@@ -228,23 +217,22 @@ void MainWindow::setRootDirectory(const QString &dirPath)
 
 void MainWindow::openFileAndSetRootDirectory(const QString &fileName)
 {
-    activeMultiEditor()->openFile(fileName);
+    activeController()->openFile(fileName);
 
-    QFileInfo fileInfo(fileName);
-    QString dirPath = fileInfo.absolutePath();
-    setRootDirectory(dirPath);
+    const QFileInfo fileInfo(fileName);
+    setRootDirectory(fileInfo.absolutePath());
     m_fileExplorerDock->selectFile(fileName);
 }
 
 void MainWindow::on_action_new_triggered()
 {
-    activeMultiEditor()->onNewFile();
+    activeController()->newDocument();
     setRootDirectory(QString());
 }
 
 void MainWindow::on_action_openFile_triggered()
 {
-    QString fileName = QFileDialog::getOpenFileName(this, tr("Open File"));
+    const QString fileName = QFileDialog::getOpenFileName(this, tr("Open File"));
     if (!fileName.isEmpty())
     {
         openFileAndSetRootDirectory(fileName);
@@ -253,10 +241,10 @@ void MainWindow::on_action_openFile_triggered()
 
 void MainWindow::on_action_openDirectory_triggered()
 {
-    MultiEditor *multiEditor = activeMultiEditor();
-    if (multiEditor->maybeSave(multiEditor->currentEditor()))
+    DocumentController *controller = activeController();
+    if (controller->maybeSave(controller->currentEditor()))
     {
-        QString dirPath = QFileDialog::getExistingDirectory(this, tr("Open Directory..."), ".");
+        const QString dirPath = QFileDialog::getExistingDirectory(this, tr("Open Directory..."), ".");
         if (!dirPath.isEmpty())
         {
             setRootDirectory(dirPath);
@@ -269,12 +257,12 @@ void MainWindow::on_action_openDirectory_triggered()
 
 bool MainWindow::on_action_save_triggered()
 {
-    return activeMultiEditor()->onSave();
+    return activeController()->save();
 }
 
 bool MainWindow::on_action_saveAs_triggered()
 {
-    return activeMultiEditor()->onSaveAs();
+    return activeController()->saveAs();
 }
 
 void MainWindow::on_action_exit_triggered()
@@ -298,11 +286,11 @@ void MainWindow::on_action_showSlideBar_triggered(bool checked)
 
 void MainWindow::on_action_undo_triggered()
 {
-    MultiEditor *multiEditor = activeMultiEditor();
-    if (multiEditor->isCurrentEditorPreviewVisible()) return;
+    DocumentController *controller = activeController();
+    if (controller->pane()->isCurrentEditorPreviewVisible())
+        return;
 
-    CustomEditor *editor = multiEditor->currentEditor();
-    if (editor)
+    if (CustomEditor *editor = controller->currentEditor())
     {
         editor->undo();
     }
@@ -310,11 +298,11 @@ void MainWindow::on_action_undo_triggered()
 
 void MainWindow::on_action_redo_triggered()
 {
-    MultiEditor *multiEditor = activeMultiEditor();
-    if (multiEditor->isCurrentEditorPreviewVisible()) return;
+    DocumentController *controller = activeController();
+    if (controller->pane()->isCurrentEditorPreviewVisible())
+        return;
 
-    CustomEditor *editor = multiEditor->currentEditor();
-    if (editor)
+    if (CustomEditor *editor = controller->currentEditor())
     {
         editor->redo();
     }
@@ -322,11 +310,11 @@ void MainWindow::on_action_redo_triggered()
 
 void MainWindow::on_action_cut_triggered()
 {
-    MultiEditor *multiEditor = activeMultiEditor();
-    if (multiEditor->isCurrentEditorPreviewVisible()) return;
+    DocumentController *controller = activeController();
+    if (controller->pane()->isCurrentEditorPreviewVisible())
+        return;
 
-    CustomEditor *editor = multiEditor->currentEditor();
-    if (editor)
+    if (CustomEditor *editor = controller->currentEditor())
     {
         editor->cut();
     }
@@ -334,16 +322,16 @@ void MainWindow::on_action_cut_triggered()
 
 void MainWindow::on_action_copy_triggered()
 {
-    activeMultiEditor()->copyCurrentSelection();
+    activeController()->pane()->copyCurrentSelection();
 }
 
 void MainWindow::on_action_paste_triggered()
 {
-    MultiEditor *multiEditor = activeMultiEditor();
-    if (multiEditor->isCurrentEditorPreviewVisible()) return;
+    DocumentController *controller = activeController();
+    if (controller->pane()->isCurrentEditorPreviewVisible())
+        return;
 
-    CustomEditor *editor = multiEditor->currentEditor();
-    if (editor)
+    if (CustomEditor *editor = controller->currentEditor())
     {
         editor->paste();
     }
@@ -351,13 +339,15 @@ void MainWindow::on_action_paste_triggered()
 
 void MainWindow::on_action_find_triggered()
 {
-    MultiEditor *multiEditor = activeMultiEditor();
-    if (multiEditor->isCurrentEditorPreviewVisible()) return;
+    DocumentController *controller = activeController();
+    if (controller->pane()->isCurrentEditorPreviewVisible())
+        return;
 
-    CustomEditor *editor = multiEditor->currentEditor();
-    if (!editor) return;
+    CustomEditor *editor = controller->currentEditor();
+    if (!editor)
+        return;
 
-    QString selectedText = editor->selectedText();
+    const QString selectedText = editor->selectedText();
     if (ui->widget_findreplace->isVisible())
     {
         ui->widget_findreplace->setFocus();
@@ -370,33 +360,35 @@ void MainWindow::on_action_find_triggered()
 
 void MainWindow::on_action_switchHeaderSource_triggered()
 {
-    MultiEditor *multiEditor = activeMultiEditor();
-    CustomEditor *editor = multiEditor->currentEditor();
-    if (!editor) return;
+    DocumentController *controller = activeController();
+    CustomEditor *editor = controller->currentEditor();
+    if (!editor)
+        return;
 
-    QString currentFilePath = editor->filePath();
-    if (currentFilePath.isEmpty()) return;
+    const QString currentFilePath = editor->filePath();
+    if (currentFilePath.isEmpty())
+        return;
 
-    // 获取对应的头文件/源文件路径
-    QString correspondingFile = m_headerSourceManager->getCorrespondingFile(currentFilePath);
-
+    const QString correspondingFile = m_headerSourceManager->getCorrespondingFile(currentFilePath);
     if (!correspondingFile.isEmpty())
     {
-        multiEditor->openFile(correspondingFile);
+        controller->openFile(correspondingFile);
         m_fileExplorerDock->selectFile(correspondingFile);
     }
 }
 
 void MainWindow::on_action_markdownPreview_triggered()
 {
-    MultiEditor *multiEditor = activeMultiEditor();
-    CustomEditor *editor = multiEditor->currentEditor();
-    if (!editor) return;
+    DocumentController *controller = activeController();
+    CustomEditor *editor = controller->currentEditor();
+    if (!editor)
+        return;
 
     const QString currentFilePath = editor->filePath();
-    if (!m_markdownPreviewer->isMarkdownFile(currentFilePath)) return;
+    if (!m_markdownPreviewer->isMarkdownFile(currentFilePath))
+        return;
 
-    const bool previewVisible = multiEditor->toggleMarkdownPreview(m_markdownPreviewer);
+    const bool previewVisible = controller->pane()->toggleMarkdownPreview(m_markdownPreviewer);
     if (previewVisible)
     {
         ui->widget_findreplace->setVisible(false);
@@ -408,11 +400,13 @@ void MainWindow::on_action_markdownPreview_triggered()
 
 void MainWindow::on_action_markdownExportPdf_triggered()
 {
-    CustomEditor *editor = activeMultiEditor()->currentEditor();
-    if (!editor) return;
+    CustomEditor *editor = activeController()->currentEditor();
+    if (!editor)
+        return;
 
     const QString currentFilePath = editor->filePath();
-    if (!m_markdownPreviewer->isMarkdownFile(currentFilePath)) return;
+    if (!m_markdownPreviewer->isMarkdownFile(currentFilePath))
+        return;
 
     const QFileInfo fileInfo(currentFilePath);
     const QString defaultPath = fileInfo.absolutePath()
@@ -447,8 +441,7 @@ void MainWindow::onFileDraged(const QList<QUrl> &urls)
     {
         if (url.isLocalFile())
         {
-            QString filePath = url.toLocalFile();
-            openFileByArg(filePath);
+            openFileByArg(url.toLocalFile());
         }
     }
 }
@@ -464,7 +457,7 @@ void MainWindow::openFileInNewWindow(const QString &filePath)
 
 void MainWindow::updateEditActions(bool available)
 {
-    const bool editingAvailable = !activeMultiEditor()->isCurrentEditorPreviewVisible();
+    const bool editingAvailable = !activeController()->pane()->isCurrentEditorPreviewVisible();
     ui->action_cut->setEnabled(editingAvailable && available);
     ui->action_copy->setEnabled(available);
     ui->action_paste->setEnabled(editingAvailable);
@@ -475,20 +468,12 @@ void MainWindow::updateEditActions(bool available)
 
 void MainWindow::updateWindowTitle(bool modified)
 {
-    CustomEditor *editor = activeMultiEditor()->currentEditor();
-    if (!editor) return;
+    CustomEditor *editor = activeController()->currentEditor();
+    if (!editor)
+        return;
 
-    QString title;
-    QString filePath = editor->filePath();
-
-    if (filePath.isEmpty())
-    {
-        title = tr("Untitled");
-    }
-    else
-    {
-        title = QFileInfo(filePath).fileName();
-    }
+    const QString filePath = editor->filePath();
+    const QString title = filePath.isEmpty() ? tr("Untitled") : QFileInfo(filePath).fileName();
 
     const QString appName = tr("NotePeek");
     if (modified)
@@ -505,10 +490,10 @@ void MainWindow::updateWindowTitle(bool modified)
 
 void MainWindow::updateToolActions()
 {
-    MultiEditor *multiEditor = activeMultiEditor();
-    CustomEditor *editor = multiEditor->currentEditor();
+    DocumentController *controller = activeController();
+    CustomEditor *editor = controller->currentEditor();
     const QString filePath = editor ? editor->filePath() : QString();
-    const bool previewVisible = multiEditor->isCurrentEditorPreviewVisible();
+    const bool previewVisible = controller->pane()->isCurrentEditorPreviewVisible();
 
     const bool cppSupported = !filePath.isEmpty() && m_headerSourceManager->isCppFile(filePath);
     const bool markdownSupported = !filePath.isEmpty() && m_markdownPreviewer->isMarkdownFile(filePath);
@@ -525,7 +510,7 @@ void MainWindow::updateToolActions()
 
 void MainWindow::onSearchResultsChanged()
 {
-    CustomEditor *editor = activeMultiEditor()->currentEditor();
+    CustomEditor *editor = activeController()->currentEditor();
     if (editor)
     {
         editor->verticalScrollBar()->update();
