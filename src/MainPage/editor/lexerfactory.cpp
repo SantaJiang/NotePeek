@@ -5,34 +5,26 @@
 #include "editor/lexers/mesonlexer.h"
 #include "editor/lexers/qmakelexer.h"
 #include "editor/lexers/starlarklexer.h"
-#include <Qsci/qscilexerpython.h>
-#include <Qsci/qscilexercpp.h>
-#include <Qsci/qscilexerjava.h>
-#include <Qsci/qscilexerjavascript.h>
-#include <Qsci/qscilexerhtml.h>
-#include <Qsci/qscilexerxml.h>
-#include <Qsci/qscilexerqml.h>
-#include <Qsci/qscilexeridl.h>
-#include <Qsci/qscilexerjson.h>
-#include <Qsci/qscilexersql.h>
-#include <Qsci/qscilexercmake.h>
-#include <Qsci/qscilexercss.h>
-#include <Qsci/qscilexermakefile.h>
-#include <Qsci/qscilexermarkdown.h>
-#include <Qsci/qscilexertex.h>
-#include <Qsci/qscilexerbash.h>
-#include <Qsci/qscilexeryaml.h>
-#include <Qsci/qscilexerrust.h>
-#include <Qsci/qscilexerruby.h>
 #include <Qsci/qscilexeravs.h>
+#include <Qsci/qscilexerbash.h>
 #include <Qsci/qscilexerbatch.h>
+#include <Qsci/qscilexercmake.h>
 #include <Qsci/qscilexercoffeescript.h>
+#include <Qsci/qscilexercpp.h>
 #include <Qsci/qscilexercsharp.h>
+#include <Qsci/qscilexercss.h>
 #include <Qsci/qscilexerd.h>
 #include <Qsci/qscilexerdiff.h>
 #include <Qsci/qscilexerfortran.h>
 #include <Qsci/qscilexerfortran77.h>
+#include <Qsci/qscilexerhtml.h>
+#include <Qsci/qscilexeridl.h>
+#include <Qsci/qscilexerjava.h>
+#include <Qsci/qscilexerjavascript.h>
+#include <Qsci/qscilexerjson.h>
 #include <Qsci/qscilexerlua.h>
+#include <Qsci/qscilexermakefile.h>
+#include <Qsci/qscilexermarkdown.h>
 #include <Qsci/qscilexermatlab.h>
 #include <Qsci/qscilexeroctave.h>
 #include <Qsci/qscilexerpascal.h>
@@ -41,405 +33,264 @@
 #include <Qsci/qscilexerpostscript.h>
 #include <Qsci/qscilexerpov.h>
 #include <Qsci/qscilexerproperties.h>
+#include <Qsci/qscilexerpython.h>
+#include <Qsci/qscilexerqml.h>
+#include <Qsci/qscilexerruby.h>
+#include <Qsci/qscilexerrust.h>
 #include <Qsci/qscilexerspice.h>
+#include <Qsci/qscilexersql.h>
 #include <Qsci/qscilexertcl.h>
+#include <Qsci/qscilexertex.h>
 #include <Qsci/qscilexerverilog.h>
 #include <Qsci/qscilexervhdl.h>
-#include <algorithm>
+#include <Qsci/qscilexerxml.h>
+#include <Qsci/qscilexeryaml.h>
+
 #include <QFileInfo>
-#include <vector>
+
+#include <algorithm>
 
 namespace {
 
-struct LexerRule
+using LexerCtor = QsciLexer *(*)();
+
+template <typename T>
+QsciLexer *make()
 {
-    const char *pattern;
+    return new T;
+}
+
+// One row per language: display name, lexer constructor and the
+// space-separated, lowercase extension list (compound suffixes such as
+// "cmake.in" are allowed). Adding a language means adding a row here and,
+// if it is recognized by file name, a row in kFileNameRules below.
+struct LanguageSpec
+{
     LexerFactory::Language language;
+    const char *displayName;
+    LexerCtor create;
+    const char *extensions;
+};
+
+const LanguageSpec kLanguages[] = {
+    {LexerFactory::Python, "Python", make<QsciLexerPython>, "py"},
+    {LexerFactory::CPP, "C++", make<QsciLexerCPP>, "c cpp cc cxx h hpp hxx hh ipp inl"},
+    {LexerFactory::Java, "Java", make<QsciLexerJava>, "java"},
+    {LexerFactory::JavaScript, "JavaScript", make<QsciLexerJavaScript>, "js mjs cjs jsx"},
+    {LexerFactory::HTML, "HTML", make<QsciLexerHTML>, "html htm xhtml"},
+    {LexerFactory::XML, "XML", make<QsciLexerXML>, "xml ui qrc svg ts xsd xsl xslt plist"},
+    {LexerFactory::QML, "QML", make<QsciLexerQML>, "qml qmltypes"},
+    {LexerFactory::JSON, "JSON", make<QsciLexerJSON>, "json"},
+    {LexerFactory::JSONL, "JSON Lines", make<QsciLexerJSON>, "jsonl"},
+    {LexerFactory::SQL, "SQL", make<QsciLexerSQL>, "sql"},
+    {LexerFactory::CMAKE, "CMake", make<QsciLexerCMake>, "cmake cmake.in"},
+    {LexerFactory::CSS, "CSS", make<QsciLexerCSS>, "css"},
+    {LexerFactory::MAKEFILE, "Makefile", make<QsciLexerMakefile>, "makefile mk"},
+    {LexerFactory::MARKDOWN, "Markdown", make<QsciLexerMarkdown>, "md markdown mdown mkd mkdn"},
+    {LexerFactory::TEX, "TeX", make<QsciLexerTeX>, "tex"},
+    {LexerFactory::SHELL, "Shell", make<QsciLexerBash>, "sh bash zsh ksh"},
+    {LexerFactory::YAML, "YAML", make<QsciLexerYAML>, "yaml yml"},
+    {LexerFactory::Rust, "Rust", make<QsciLexerRust>, "rs"},
+    {LexerFactory::RUBY, "Ruby", make<QsciLexerRuby>, "rb"},
+    {LexerFactory::AVS, "AVS", make<QsciLexerAVS>, "avs"},
+    {LexerFactory::BATCH, "Batch", make<QsciLexerBatch>, "bat cmd"},
+    {LexerFactory::COFFEESCRIPT, "CoffeeScript", make<QsciLexerCoffeeScript>, "coffee"},
+    {LexerFactory::CSHARP, "C#", make<QsciLexerCSharp>, "cs"},
+    {LexerFactory::D, "D", make<QsciLexerD>, "d"},
+    {LexerFactory::DIFF, "Diff", make<QsciLexerDiff>, "diff patch"},
+    {LexerFactory::FORTRAN, "Fortran", make<QsciLexerFortran>, "f for f90 f95 f03 f08"},
+    {LexerFactory::FORTRAN77, "Fortran 77", make<QsciLexerFortran77>, "f77"},
+    {LexerFactory::LUA, "Lua", make<QsciLexerLua>, "lua"},
+    {LexerFactory::MATLAB, "Matlab", make<QsciLexerMatlab>, "m"},
+    {LexerFactory::PASCAL, "Pascal", make<QsciLexerPascal>, "pas p"},
+    {LexerFactory::PERL, "Perl", make<QsciLexerPerl>, "pl pm"},
+    {LexerFactory::PO, "PO", make<QsciLexerPO>, "po pot"},
+    {LexerFactory::POSTSCRIPT, "PostScript", make<QsciLexerPostScript>, "ps eps"},
+    {LexerFactory::POV, "POV", make<QsciLexerPOV>, "pov inc"},
+    {LexerFactory::PROPERTIES, "Properties", make<QsciLexerProperties>,
+     "properties prop ini cfg conf desktop service timer socket mount path target env"},
+    {LexerFactory::TOML, "TOML", make<QsciLexerProperties>, "toml"},
+    {LexerFactory::SPICE, "Spice", make<QsciLexerSpice>, "spice cir"},
+    {LexerFactory::TCL, "TCL", make<QsciLexerTCL>, "tcl tk"},
+    {LexerFactory::VERILOG, "Verilog", make<QsciLexerVerilog>, "v"},
+    {LexerFactory::VHDL, "VHDL", make<QsciLexerVHDL>, "vhdl vhd"},
+    {LexerFactory::IDL, "IDL", make<QsciLexerIDL>, "idl"},
+    {LexerFactory::OCTAVE, "Octave", make<QsciLexerOctave>, "octave oct"},
+    {LexerFactory::DOCKERFILE, "Dockerfile", make<DockerfileLexer>, "dockerfile containerfile"},
+    {LexerFactory::GROOVY, "Groovy", make<GroovyLexer>, "groovy gvy gradle"},
+    {LexerFactory::STARLARK, "Starlark", make<StarlarkLexer>, "bzl star"},
+    {LexerFactory::MESON, "Meson", make<MesonLexer>, "meson"},
+    {LexerFactory::QMAKE, "qmake", make<QMakeLexer>, "pro pri prf"},
+    {LexerFactory::IGNORE, "Ignore file", make<IgnoreFileLexer>, ""},
+};
+
+// File name based recognition. Exact matches the name as-is; Prefix matches
+// the name itself plus any "name.suffix" variant (e.g. "Dockerfile.dev").
+enum class NameMatch
+{
+    Exact,
+    Prefix
+};
+
+struct FileNameRule
+{
+    const char *name;
+    LexerFactory::Language language;
+    NameMatch match = NameMatch::Exact;
     Qt::CaseSensitivity caseSensitivity = Qt::CaseInsensitive;
 };
 
-const std::vector<LexerRule>& fileNameRules()
+const FileNameRule kFileNameRules[] = {
+    {"CMakeLists.txt", LexerFactory::CMAKE},
+    {"CMakeLists.txt.in", LexerFactory::CMAKE},
+
+    {"Makefile", LexerFactory::MAKEFILE},
+    {"GNUmakefile", LexerFactory::MAKEFILE},
+    {"BSDmakefile", LexerFactory::MAKEFILE},
+    {"Makefile.am", LexerFactory::MAKEFILE},
+    {"Makefile.in", LexerFactory::MAKEFILE},
+
+    {".bashrc", LexerFactory::SHELL},
+    {".bash_profile", LexerFactory::SHELL},
+    {".bash_login", LexerFactory::SHELL},
+    {".profile", LexerFactory::SHELL},
+    {".zshrc", LexerFactory::SHELL},
+    {".zprofile", LexerFactory::SHELL},
+    {".zlogin", LexerFactory::SHELL},
+    {".zshenv", LexerFactory::SHELL},
+    {".kshrc", LexerFactory::SHELL},
+    {"configure", LexerFactory::SHELL},
+    {"PKGBUILD", LexerFactory::SHELL},
+    {"APKBUILD", LexerFactory::SHELL},
+
+    {"Gemfile", LexerFactory::RUBY},
+    {"Rakefile", LexerFactory::RUBY},
+    {"Guardfile", LexerFactory::RUBY},
+    {"Capfile", LexerFactory::RUBY},
+    {"Podfile", LexerFactory::RUBY},
+    {"Vagrantfile", LexerFactory::RUBY},
+
+    {"SConstruct", LexerFactory::Python},
+    {"SConscript", LexerFactory::Python},
+
+    {".editorconfig", LexerFactory::PROPERTIES},
+    {".env", LexerFactory::PROPERTIES, NameMatch::Prefix},
+    {".gitconfig", LexerFactory::PROPERTIES},
+    {".gitmodules", LexerFactory::PROPERTIES},
+
+    {".clang-format", LexerFactory::YAML},
+    {".clang-tidy", LexerFactory::YAML},
+
+    {"Jenkinsfile", LexerFactory::GROOVY, NameMatch::Prefix},
+    {"Dockerfile", LexerFactory::DOCKERFILE, NameMatch::Prefix},
+    {"Containerfile", LexerFactory::DOCKERFILE, NameMatch::Prefix},
+
+    {"BUILD", LexerFactory::STARLARK, NameMatch::Exact, Qt::CaseSensitive},
+    {"BUILD.bazel", LexerFactory::STARLARK},
+    {"WORKSPACE", LexerFactory::STARLARK, NameMatch::Exact, Qt::CaseSensitive},
+    {"WORKSPACE.bazel", LexerFactory::STARLARK},
+    {"MODULE.bazel", LexerFactory::STARLARK},
+
+    {"meson.build", LexerFactory::MESON},
+    {"meson_options.txt", LexerFactory::MESON},
+
+    {".gitignore", LexerFactory::IGNORE},
+    {".dockerignore", LexerFactory::IGNORE},
+    {".npmignore", LexerFactory::IGNORE},
+    {".eslintignore", LexerFactory::IGNORE},
+    {".prettierignore", LexerFactory::IGNORE},
+    {".stylelintignore", LexerFactory::IGNORE},
+    {".hgignore", LexerFactory::IGNORE},
+    {".ignore", LexerFactory::IGNORE},
+    {".fdignore", LexerFactory::IGNORE},
+    {".rgignore", LexerFactory::IGNORE},
+};
+
+const LanguageSpec *specForLanguage(LexerFactory::Language lang)
 {
-    static const std::vector<LexerRule> rules = {
-        {"CMakeLists.txt", LexerFactory::CMAKE},
-        {"CMakeLists.txt.in", LexerFactory::CMAKE},
-
-        {"Makefile", LexerFactory::MAKEFILE},
-        {"GNUmakefile", LexerFactory::MAKEFILE},
-        {"BSDmakefile", LexerFactory::MAKEFILE},
-        {"Makefile.am", LexerFactory::MAKEFILE},
-        {"Makefile.in", LexerFactory::MAKEFILE},
-
-        {".bashrc", LexerFactory::SHELL},
-        {".bash_profile", LexerFactory::SHELL},
-        {".bash_login", LexerFactory::SHELL},
-        {".profile", LexerFactory::SHELL},
-        {".zshrc", LexerFactory::SHELL},
-        {".zprofile", LexerFactory::SHELL},
-        {".zlogin", LexerFactory::SHELL},
-        {".zshenv", LexerFactory::SHELL},
-        {".kshrc", LexerFactory::SHELL},
-        {"configure", LexerFactory::SHELL},
-        {"PKGBUILD", LexerFactory::SHELL},
-        {"APKBUILD", LexerFactory::SHELL},
-
-        {"Gemfile", LexerFactory::RUBY},
-        {"Rakefile", LexerFactory::RUBY},
-        {"Guardfile", LexerFactory::RUBY},
-        {"Capfile", LexerFactory::RUBY},
-        {"Podfile", LexerFactory::RUBY},
-        {"Vagrantfile", LexerFactory::RUBY},
-
-        {"SConstruct", LexerFactory::Python},
-        {"SConscript", LexerFactory::Python},
-
-        {".editorconfig", LexerFactory::PROPERTIES},
-        {".env", LexerFactory::PROPERTIES},
-        {".gitconfig", LexerFactory::PROPERTIES},
-        {".gitmodules", LexerFactory::PROPERTIES},
-
-        {".clang-format", LexerFactory::YAML},
-        {".clang-tidy", LexerFactory::YAML},
-
-        {"Jenkinsfile", LexerFactory::GROOVY},
-        {"Dockerfile", LexerFactory::DOCKERFILE},
-        {"Containerfile", LexerFactory::DOCKERFILE},
-
-        {"BUILD", LexerFactory::STARLARK, Qt::CaseSensitive},
-        {"BUILD.bazel", LexerFactory::STARLARK},
-        {"WORKSPACE", LexerFactory::STARLARK, Qt::CaseSensitive},
-        {"WORKSPACE.bazel", LexerFactory::STARLARK},
-        {"MODULE.bazel", LexerFactory::STARLARK},
-
-        {"meson.build", LexerFactory::MESON},
-        {"meson_options.txt", LexerFactory::MESON},
-
-        {".gitignore", LexerFactory::IGNORE},
-        {".dockerignore", LexerFactory::IGNORE},
-        {".npmignore", LexerFactory::IGNORE},
-        {".eslintignore", LexerFactory::IGNORE},
-        {".prettierignore", LexerFactory::IGNORE},
-        {".stylelintignore", LexerFactory::IGNORE},
-        {".hgignore", LexerFactory::IGNORE},
-        {".ignore", LexerFactory::IGNORE},
-        {".fdignore", LexerFactory::IGNORE},
-        {".rgignore", LexerFactory::IGNORE},
-    };
-    return rules;
+    static const QHash<int, const LanguageSpec *> index = [] {
+        QHash<int, const LanguageSpec *> map;
+        for (const LanguageSpec &spec : kLanguages)
+            map.insert(spec.language, &spec);
+        return map;
+    }();
+    return index.value(lang, nullptr);
 }
 
-static LexerFactory::Language languageFromRules(const QString &value, const std::vector<LexerRule> &rules)
+const QHash<QString, LexerFactory::Language> &extensionIndex()
 {
-    for (const LexerRule &rule : rules)
-    {
-        if (value.compare(QLatin1String(rule.pattern), rule.caseSensitivity) == 0)
+    static const QHash<QString, LexerFactory::Language> index = [] {
+        QHash<QString, LexerFactory::Language> map;
+        for (const LanguageSpec &spec : kLanguages)
         {
-            return rule.language;
+            const QStringList extensions = QString::fromLatin1(spec.extensions)
+                                               .split(QLatin1Char(' '), Qt::SkipEmptyParts);
+            for (const QString &extension : extensions)
+                map.insert(extension, spec.language);
         }
-    }
+        return map;
+    }();
+    return index;
+}
 
-    return LexerFactory::Unknown;
+bool matchesRule(const QString &baseName, const FileNameRule &rule)
+{
+    const QLatin1String name(rule.name);
+    if (baseName.compare(name, rule.caseSensitivity) == 0)
+        return true;
+
+    return rule.match == NameMatch::Prefix
+           && baseName.startsWith(QString(name) + QLatin1Char('.'), rule.caseSensitivity);
 }
 
 } // namespace
 
-
-QsciLexer* LexerFactory::createLexer(Language lang)
+QsciLexer *LexerFactory::createLexer(Language lang)
 {
-    switch(lang)
-    {
-    case Python:
-        return new QsciLexerPython();
-    case CPP:
-        return new QsciLexerCPP();
-    case Java:
-        return new QsciLexerJava();
-    case JavaScript:
-        return new QsciLexerJavaScript();
-    case HTML:
-        return new QsciLexerHTML();
-    case XML:
-        return new QsciLexerXML();
-    case QML:
-        return new QsciLexerQML();
-    case JSON:
-    case JSONL:
-        return new QsciLexerJSON();
-    case SQL:
-        return new QsciLexerSQL();
-    case CMAKE:
-        return new QsciLexerCMake();
-    case CSS:
-        return new QsciLexerCSS();
-    case MAKEFILE:
-        return new QsciLexerMakefile();
-    case MARKDOWN:
-        return new QsciLexerMarkdown();
-    case TEX:
-        return new QsciLexerTeX();
-    case SHELL:
-        return new QsciLexerBash();
-    case YAML:
-        return new QsciLexerYAML();
-    case Rust:
-        return new QsciLexerRust();
-    case RUBY:
-        return new QsciLexerRuby();
-    case AVS:
-        return new QsciLexerAVS();
-    case BATCH:
-        return new QsciLexerBatch();
-    case COFFEESCRIPT:
-        return new QsciLexerCoffeeScript();
-    case CSHARP:
-        return new QsciLexerCSharp();
-    case D:
-        return new QsciLexerD();
-    case DIFF:
-        return new QsciLexerDiff();
-    case FORTRAN:
-        return new QsciLexerFortran();
-    case FORTRAN77:
-        return new QsciLexerFortran77();
-    case LUA:
-        return new QsciLexerLua();
-    case MATLAB:
-        return new QsciLexerMatlab();
-    case PASCAL:
-        return new QsciLexerPascal();
-    case PERL:
-        return new QsciLexerPerl();
-    case PO:
-        return new QsciLexerPO();
-    case POSTSCRIPT:
-        return new QsciLexerPostScript();
-    case POV:
-        return new QsciLexerPOV();
-    case PROPERTIES:
-    case TOML:
-        return new QsciLexerProperties();
-    case SPICE:
-        return new QsciLexerSpice();
-    case TCL:
-        return new QsciLexerTCL();
-    case VERILOG:
-        return new QsciLexerVerilog();
-    case VHDL:
-        return new QsciLexerVHDL();
-    case IDL:
-        return new QsciLexerIDL();
-    case OCTAVE:
-        return new QsciLexerOctave();
-    case DOCKERFILE:
-        return new DockerfileLexer();
-    case GROOVY:
-        return new GroovyLexer();
-    case STARLARK:
-        return new StarlarkLexer();
-    case MESON:
-        return new MesonLexer();
-    case QMAKE:
-        return new QMakeLexer();
-    case IGNORE:
-        return new IgnoreFileLexer();
-    default:
-        return nullptr;
-    }
+    const LanguageSpec *spec = specForLanguage(lang);
+    return spec ? spec->create() : nullptr;
 }
 
-static const QHash<QString, LexerFactory::Language>& extensionMap()
+LexerFactory::Language LexerFactory::languageFromExtension(const QString &ext)
 {
-    static const QHash<QString, LexerFactory::Language> map = {
-        {"py", LexerFactory::Python},
-        {"c", LexerFactory::CPP}, {"cpp", LexerFactory::CPP}, {"cc", LexerFactory::CPP}, {"cxx", LexerFactory::CPP},
-        {"h", LexerFactory::CPP}, {"hpp", LexerFactory::CPP}, {"hxx", LexerFactory::CPP},
-        {"hh", LexerFactory::CPP}, {"ipp", LexerFactory::CPP}, {"inl", LexerFactory::CPP},
-        {"java", LexerFactory::Java},
-        {"js", LexerFactory::JavaScript}, {"mjs", LexerFactory::JavaScript},
-        {"cjs", LexerFactory::JavaScript}, {"jsx", LexerFactory::JavaScript},
-        {"html", LexerFactory::HTML}, {"htm", LexerFactory::HTML}, {"xhtml", LexerFactory::HTML},
-        {"xml", LexerFactory::XML}, {"ui", LexerFactory::XML}, {"qrc", LexerFactory::XML},
-        {"svg", LexerFactory::XML}, {"ts", LexerFactory::XML}, {"xsd", LexerFactory::XML},
-        {"xsl", LexerFactory::XML}, {"xslt", LexerFactory::XML}, {"plist", LexerFactory::XML},
-        {"qml", LexerFactory::QML}, {"qmltypes", LexerFactory::QML},
-        {"json", LexerFactory::JSON}, {"jsonl", LexerFactory::JSONL},
-        {"sql", LexerFactory::SQL},
-        {"cmake", LexerFactory::CMAKE},
-        {"css", LexerFactory::CSS},
-        {"makefile", LexerFactory::MAKEFILE}, {"mk", LexerFactory::MAKEFILE},
-        {"md", LexerFactory::MARKDOWN}, {"markdown", LexerFactory::MARKDOWN},
-        {"mdown", LexerFactory::MARKDOWN}, {"mkd", LexerFactory::MARKDOWN}, {"mkdn", LexerFactory::MARKDOWN},
-        {"tex", LexerFactory::TEX},
-        {"sh", LexerFactory::SHELL}, {"bash", LexerFactory::SHELL},
-        {"zsh", LexerFactory::SHELL}, {"ksh", LexerFactory::SHELL},
-        {"yaml", LexerFactory::YAML}, {"yml", LexerFactory::YAML},
-        {"rs", LexerFactory::Rust},
-        {"rb", LexerFactory::RUBY},
-        {"avs", LexerFactory::AVS},
-        {"bat", LexerFactory::BATCH}, {"cmd", LexerFactory::BATCH},
-        {"coffee", LexerFactory::COFFEESCRIPT},
-        {"cs", LexerFactory::CSHARP},
-        {"d", LexerFactory::D},
-        {"diff", LexerFactory::DIFF}, {"patch", LexerFactory::DIFF},
-        {"f", LexerFactory::FORTRAN}, {"for", LexerFactory::FORTRAN},
-        {"f90", LexerFactory::FORTRAN}, {"f95", LexerFactory::FORTRAN},
-        {"f03", LexerFactory::FORTRAN}, {"f08", LexerFactory::FORTRAN},
-        {"f77", LexerFactory::FORTRAN77},
-        {"lua", LexerFactory::LUA},
-        {"m", LexerFactory::MATLAB},
-        {"pas", LexerFactory::PASCAL}, {"p", LexerFactory::PASCAL},
-        {"pl", LexerFactory::PERL}, {"pm", LexerFactory::PERL},
-        {"po", LexerFactory::PO}, {"pot", LexerFactory::PO},
-        {"ps", LexerFactory::POSTSCRIPT}, {"eps", LexerFactory::POSTSCRIPT},
-        {"pov", LexerFactory::POV}, {"inc", LexerFactory::POV},
-        {"properties", LexerFactory::PROPERTIES}, {"prop", LexerFactory::PROPERTIES},
-        {"ini", LexerFactory::PROPERTIES}, {"cfg", LexerFactory::PROPERTIES},
-        {"conf", LexerFactory::PROPERTIES}, {"desktop", LexerFactory::PROPERTIES},
-        {"service", LexerFactory::PROPERTIES}, {"timer", LexerFactory::PROPERTIES},
-        {"socket", LexerFactory::PROPERTIES}, {"mount", LexerFactory::PROPERTIES},
-        {"path", LexerFactory::PROPERTIES}, {"target", LexerFactory::PROPERTIES},
-        {"env", LexerFactory::PROPERTIES},
-        {"toml", LexerFactory::TOML},
-        {"spice", LexerFactory::SPICE}, {"cir", LexerFactory::SPICE},
-        {"tcl", LexerFactory::TCL}, {"tk", LexerFactory::TCL},
-        {"v", LexerFactory::VERILOG},
-        {"vhdl", LexerFactory::VHDL}, {"vhd", LexerFactory::VHDL},
-        {"idl", LexerFactory::IDL},
-        {"octave", LexerFactory::OCTAVE}, {"oct", LexerFactory::OCTAVE},
-        {"dockerfile", LexerFactory::DOCKERFILE}, {"containerfile", LexerFactory::DOCKERFILE},
-        {"groovy", LexerFactory::GROOVY}, {"gvy", LexerFactory::GROOVY}, {"gradle", LexerFactory::GROOVY},
-        {"bzl", LexerFactory::STARLARK}, {"star", LexerFactory::STARLARK},
-        {"meson", LexerFactory::MESON},
-        {"pro", LexerFactory::QMAKE}, {"pri", LexerFactory::QMAKE}, {"prf", LexerFactory::QMAKE},
-    };
-    return map;
+    return extensionIndex().value(ext.toLower(), Unknown);
 }
 
-static const QHash<QString, LexerFactory::Language>& compoundExtensionMap()
-{
-    static const QHash<QString, LexerFactory::Language> map = {
-        {"cmake.in", LexerFactory::CMAKE},
-    };
-    return map;
-}
-
-LexerFactory::Language LexerFactory::languageFromExtension(const QString& ext)
-{
-    const QString normalized = ext.toLower();
-    const Language lang = extensionMap().value(normalized, Unknown);
-    if (lang != Unknown)
-    {
-        return lang;
-    }
-
-    return compoundExtensionMap().value(normalized, Unknown);
-}
-
-LexerFactory::Language LexerFactory::languageFromFileName(const QString& fileName)
+LexerFactory::Language LexerFactory::languageFromFileName(const QString &fileName)
 {
     const QString baseName = QFileInfo(fileName).fileName();
-    if (baseName.compare(QStringLiteral(".env"), Qt::CaseInsensitive) == 0
-        || baseName.startsWith(QStringLiteral(".env."), Qt::CaseInsensitive))
+    for (const FileNameRule &rule : kFileNameRules)
     {
-        return PROPERTIES;
+        if (matchesRule(baseName, rule))
+            return rule.language;
     }
-
-    if (baseName.compare(QStringLiteral("Dockerfile"), Qt::CaseInsensitive) == 0
-        || baseName.startsWith(QStringLiteral("Dockerfile."), Qt::CaseInsensitive)
-        || baseName.compare(QStringLiteral("Containerfile"), Qt::CaseInsensitive) == 0
-        || baseName.startsWith(QStringLiteral("Containerfile."), Qt::CaseInsensitive))
-    {
-        return DOCKERFILE;
-    }
-
-    if (baseName.compare(QStringLiteral("Jenkinsfile"), Qt::CaseInsensitive) == 0
-        || baseName.startsWith(QStringLiteral("Jenkinsfile."), Qt::CaseInsensitive))
-    {
-        return GROOVY;
-    }
-
-    return languageFromRules(baseName, fileNameRules());
+    return Unknown;
 }
 
-LexerFactory::Language LexerFactory::languageFromFilePath(const QString& filePath)
+LexerFactory::Language LexerFactory::languageFromFilePath(const QString &filePath)
 {
     const QFileInfo fileInfo(filePath);
 
     Language lang = languageFromFileName(fileInfo.fileName());
     if (lang != Unknown)
-    {
         return lang;
-    }
 
     lang = languageFromExtension(fileInfo.completeSuffix());
     if (lang != Unknown)
-    {
         return lang;
-    }
 
     return languageFromExtension(fileInfo.suffix());
 }
 
 QString LexerFactory::languageName(Language lang)
 {
-    switch(lang)
-    {
-    case Python: return "Python";
-    case CPP: return "C++";
-    case Java: return "Java";
-    case JavaScript: return "JavaScript";
-    case HTML: return "HTML";
-    case XML: return "XML";
-    case QML: return "QML";
-    case JSON: return "JSON";
-    case JSONL: return "JSON Lines";
-    case SQL: return "SQL";
-    case CMAKE: return "CMake";
-    case CSS: return "CSS";
-    case MAKEFILE: return "Makefile";
-    case MARKDOWN: return "Markdown";
-    case TEX: return "TeX";
-    case SHELL: return "Shell";
-    case YAML: return "YAML";
-    case Rust: return "Rust";
-    case RUBY: return "Ruby";
-    case AVS: return "AVS";
-    case BATCH: return "Batch";
-    case COFFEESCRIPT: return "CoffeeScript";
-    case CSHARP: return "C#";
-    case D: return "D";
-    case DIFF: return "Diff";
-    case FORTRAN: return "Fortran";
-    case FORTRAN77: return "Fortran 77";
-    case LUA: return "Lua";
-    case MATLAB: return "Matlab";
-    case PASCAL: return "Pascal";
-    case PERL: return "Perl";
-    case PO: return "PO";
-    case POSTSCRIPT: return "PostScript";
-    case POV: return "POV";
-    case PROPERTIES: return "Properties";
-    case TOML: return "TOML";
-    case SPICE: return "Spice";
-    case TCL: return "TCL";
-    case VERILOG: return "Verilog";
-    case VHDL: return "VHDL";
-    case IDL: return "IDL";
-    case OCTAVE: return "Octave";
-    case DOCKERFILE: return "Dockerfile";
-    case GROOVY: return "Groovy";
-    case STARLARK: return "Starlark";
-    case MESON: return "Meson";
-    case QMAKE: return "qmake";
-    case IGNORE: return "Ignore file";
-    default: return "Unknown";
-    }
+    const LanguageSpec *spec = specForLanguage(lang);
+    return spec ? QString::fromLatin1(spec->displayName) : QStringLiteral("Unknown");
 }
 
 QStringList LexerFactory::supportedExtensions()
 {
-    QStringList extensions = extensionMap().keys();
-    extensions.append(compoundExtensionMap().keys());
+    QStringList extensions = extensionIndex().keys();
     std::sort(extensions.begin(), extensions.end());
     return extensions;
 }
@@ -447,10 +298,8 @@ QStringList LexerFactory::supportedExtensions()
 QStringList LexerFactory::supportedFileNames()
 {
     QStringList fileNames;
-    for (const LexerRule &rule : fileNameRules())
-    {
-        fileNames.append(QString::fromLatin1(rule.pattern));
-    }
+    for (const FileNameRule &rule : kFileNameRules)
+        fileNames.append(QString::fromLatin1(rule.name));
 
     std::sort(fileNames.begin(), fileNames.end(), [](const QString &left, const QString &right) {
         return QString::compare(left, right, Qt::CaseInsensitive) < 0;
