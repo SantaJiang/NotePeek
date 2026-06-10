@@ -2,9 +2,6 @@
 #define MAINWINDOW_H
 
 #include <QMainWindow>
-#include <QFileSystemModel>
-#include <QTreeView>
-#include <QDockWidget>
 #include "./editor/multieditor.h"
 #include "./find/findreplacemanager.h"
 #include "./tool/cpp/headersourcemanager.h"
@@ -15,7 +12,7 @@ namespace Ui
 class MainWindow;
 }
 
-class FileTypeFilterProxyModel;
+class FileExplorerDock;
 class SplitEditorCoordinator;
 
 class MainWindow : public QMainWindow
@@ -54,14 +51,11 @@ private slots:
 
     void onFileDraged(const QList<QUrl> &urls);
     void openFileInNewWindow(const QString &filePath);
-    void onFileClicked(const QModelIndex &index);
     void updateEditActions(bool available);
     void updateWindowTitle(bool modified);
     void onSearchResultsChanged();
 
 private:
-    void createDirView();
-    void createDockWindows();
     void setRootDirectory(const QString &dirPath);
     void refreshHighlights();
     void openFileAndSetRootDirectory(const QString &fileName);
@@ -70,10 +64,7 @@ private:
     void applyActiveMultiEditor(MultiEditor *multiEditor);
 
     Ui::MainWindow *ui;
-    QFileSystemModel *m_pFileModel;
-    FileTypeFilterProxyModel *m_fileFilterProxy;
-    QTreeView *m_pTreeView;
-    QDockWidget *m_pDock;
+    FileExplorerDock *m_fileExplorerDock;
     SplitEditorCoordinator *m_editorCoordinator;
     bool m_singleFileWindow;
     FindReplaceManager *m_findReplaceManager;

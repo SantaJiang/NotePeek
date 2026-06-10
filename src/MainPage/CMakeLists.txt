@@ -1,94 +1,93 @@
-set(MAINPAGE_SOURCES
-    main.cpp
-    mainwindow.cpp
-    editor/customeditor.cpp
+set(NOTEPEEK_QT_LIBS
+    Qt${NOTEPEEK_QT_MAJOR}::Widgets
+    Qt${NOTEPEEK_QT_MAJOR}::PrintSupport
+    Qt${NOTEPEEK_QT_MAJOR}::Svg
+)
+
+add_library(notepeek_core STATIC
     editor/customsyntaxlexers.cpp
-    editor/documentio.cpp
-    editor/documentpage.cpp
-    editor/editormanager.cpp
-    editor/editorswitchpopup.cpp
-    editor/externalfilewatcher.cpp
-    editor/filesavedialog.cpp
-    editor/lexerfactory.cpp
-    editor/multieditor.cpp
-    editor/spliteditorcoordinator.cpp
-    editor/supportedfilepolicy.cpp
-    decorators/highlightedscrollbar.cpp
-    decorators/highlightedscrollbardecorator.cpp
-    find/findreplacemanager.cpp
-    find/findreplacewidget.cpp
-    widgets/filetypefilterproxymodel.cpp
-    widgets/filetreeview.cpp
-    widgets/qscieditorinfostatusbar.cpp
-    tool/cpp/headersourcemanager.cpp
-    tool/markdown/markdownpreviewer.cpp
-    ../third_party/md4c/entity.c
-    ../third_party/md4c/md4c.c
-    ../third_party/md4c/md4c-html.c
-)
-
-set(MAINPAGE_HEADERS
-    mainwindow.h
-    themecolors.h
-    editor/customeditor.h
     editor/customsyntaxlexers.h
+    editor/documentio.cpp
     editor/documentio.h
-    editor/documentpage.h
-    editor/editormanager.h
-    editor/editorswitchpopup.h
-    editor/externalfilewatcher.h
-    editor/filesavedialog.h
+    editor/documentpersistenceservice.cpp
+    editor/documentpersistenceservice.h
+    editor/documentregistry.cpp
+    editor/documentregistry.h
+    editor/lexerfactory.cpp
     editor/lexerfactory.h
-    editor/multieditor.h
-    editor/spliteditorcoordinator.h
+    editor/supportedfilepolicy.cpp
     editor/supportedfilepolicy.h
-    decorators/highlightedscrollbar.h
-    decorators/highlightedscrollbardecorator.h
-    find/findreplacemanager.h
-    find/findreplacewidget.h
-    widgets/filetypefilterproxymodel.h
-    widgets/filetreeview.h
-    widgets/qscieditorinfostatusbar.h
+    tool/cpp/headersourcemanager.cpp
     tool/cpp/headersourcemanager.h
+    tool/markdown/markdownpreviewer.cpp
     tool/markdown/markdownpreviewer.h
+    themecolors.h
 )
 
-set(MAINPAGE_FORMS
+target_link_libraries(notepeek_core PUBLIC
+    qscintilla2
+    qlitehtml
+    md4c
+    ${NOTEPEEK_QT_LIBS}
+)
+
+target_include_directories(notepeek_core PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/../QScintilla
+    ${CMAKE_CURRENT_SOURCE_DIR}/../QScintilla/scintilla/include
+)
+
+add_library(notepeek_widgets STATIC
+    mainwindow.cpp
+    mainwindow.h
     mainwindow.ui
+    editor/customeditor.cpp
+    editor/customeditor.h
+    editor/documentpage.cpp
+    editor/documentpage.h
+    editor/editormanager.cpp
+    editor/editormanager.h
+    editor/editorswitchpopup.cpp
+    editor/editorswitchpopup.h
+    editor/externalfilewatcher.cpp
+    editor/externalfilewatcher.h
+    editor/filesavedialog.cpp
+    editor/filesavedialog.h
+    editor/multieditor.cpp
+    editor/multieditor.h
     editor/multieditor.ui
+    editor/spliteditorcoordinator.cpp
+    editor/spliteditorcoordinator.h
+    decorators/highlightedscrollbar.cpp
+    decorators/highlightedscrollbar.h
+    decorators/highlightedscrollbardecorator.cpp
+    decorators/highlightedscrollbardecorator.h
+    find/findreplacemanager.cpp
+    find/findreplacemanager.h
+    find/findreplacewidget.cpp
+    find/findreplacewidget.h
     find/findreplacewidget.ui
+    widgets/fileexplorerdock.cpp
+    widgets/fileexplorerdock.h
+    widgets/filetreeview.cpp
+    widgets/filetreeview.h
+    widgets/filetypefilterproxymodel.cpp
+    widgets/filetypefilterproxymodel.h
+    widgets/qscieditorinfostatusbar.cpp
+    widgets/qscieditorinfostatusbar.h
+)
+
+target_link_libraries(notepeek_widgets PUBLIC
+    notepeek_core
 )
 
 add_executable(notepeek
-    ${MAINPAGE_SOURCES}
-    ${MAINPAGE_HEADERS}
-    ${MAINPAGE_FORMS}
+    main.cpp
     rec.qrc
 )
 
-if(Qt6_FOUND)
-    target_link_libraries(notepeek PRIVATE
-        qscintilla2
-        qlitehtml
-        Qt6::Widgets
-        Qt6::PrintSupport
-        Qt6::Svg
-    )
-else()
-    target_link_libraries(notepeek PRIVATE
-        qscintilla2
-        qlitehtml
-        Qt5::Widgets
-        Qt5::PrintSupport
-        Qt5::Svg
-    )
-endif()
-
-target_include_directories(notepeek PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}
-    ${CMAKE_CURRENT_SOURCE_DIR}/../third_party/md4c
-    ${CMAKE_CURRENT_SOURCE_DIR}/../QScintilla
-    ${CMAKE_CURRENT_SOURCE_DIR}/../QScintilla/scintilla/include
+target_link_libraries(notepeek PRIVATE
+    notepeek_widgets
 )
 
 target_compile_definitions(notepeek PRIVATE
@@ -96,7 +95,7 @@ target_compile_definitions(notepeek PRIVATE
 )
 
 if(WIN32)
-    target_compile_definitions(notepeek PRIVATE QSCINTILLA_DLL)
+    target_compile_definitions(notepeek_core PUBLIC QSCINTILLA_DLL)
 endif()
 
 # ---- Translations ----

@@ -4,11 +4,11 @@
 #include <QFontDatabase>
 #include <QApplication>
 #include <QScreen>
-#include <QDir>
 #include <QTimer>
 #include "../QScintilla/Qsci/qscilexer.h"
 #include "../decorators/highlightedscrollbardecorator.h"
 #include "customeditor.h"
+#include "documentregistry.h"
 #include "lexerfactory.h"
 
 namespace {
@@ -112,29 +112,8 @@ CustomEditor *EditorManager::createEditorForFile(const QString &filePath, bool t
 
 CustomEditor *EditorManager::getEditorByFilePath(const QString &filePath)
 {
-    QFileInfo targetInfo(filePath);
-    targetInfo.makeAbsolute();
-
-    // 规范化路径，统一分隔符和格式..
-    QString canonicalTargetPath = QDir::cleanPath(targetInfo.absoluteFilePath());
-
     purgeOldEditorPointers();
-
-    for (CustomEditor *editor : m_editors)
-    {
-        if (editor)
-        {
-            QString editorPath = editor->filePath();
-            // 同样规范化编辑器中的路径..
-            QString canonicalEditorPath = QDir::cleanPath(QFileInfo(editorPath).absoluteFilePath());
-
-            if (canonicalEditorPath == canonicalTargetPath)
-            {
-                return editor;
-            }
-        }
-    }
-    return nullptr;
+    return DocumentRegistry::findEditorByFilePath(getEditors(), filePath);
 }
 
 QList<CustomEditor *> EditorManager::getEditors() const
