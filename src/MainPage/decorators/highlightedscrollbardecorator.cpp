@@ -1,5 +1,5 @@
-#include "highlightedscrollbardecorator.h"
-#include "highlightedscrollbar.h"
+#include "decorators/highlightedscrollbardecorator.h"
+#include "decorators/highlightedscrollbar.h"
 #include "themecolors.h"
 #include <Qsci/qsciscintilla.h>
 

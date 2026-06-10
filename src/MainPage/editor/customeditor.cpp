@@ -1,4 +1,4 @@
-#include "customeditor.h"
+#include "editor/customeditor.h"
 #include <QMimeData>
 
 CustomEditor::CustomEditor(QWidget *parent)

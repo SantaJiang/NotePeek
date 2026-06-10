@@ -1,6 +1,6 @@
-#include "filetypefilterproxymodel.h"
+#include "widgets/filetypefilterproxymodel.h"
 
-#include "../editor/supportedfilepolicy.h"
+#include "editor/supportedfilepolicy.h"
 
 #include <QFileInfo>
 #include <QFileSystemModel>

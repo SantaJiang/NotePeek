@@ -3,7 +3,7 @@
 
 #include <QWidget>
 #include <QUrl>
-#include "editormanager.h"
+#include "editor/editormanager.h"
 
 class DocumentPage;
 class DocumentPersistenceService;

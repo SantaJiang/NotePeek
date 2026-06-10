@@ -1,8 +1,8 @@
-#include "spliteditorcoordinator.h"
+#include "editor/spliteditorcoordinator.h"
 
-#include "customeditor.h"
-#include "filesavedialog.h"
-#include "multieditor.h"
+#include "editor/customeditor.h"
+#include "editor/filesavedialog.h"
+#include "editor/multieditor.h"
 
 #include <QFileInfo>
 #include <QHash>

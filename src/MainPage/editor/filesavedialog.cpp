@@ -1,5 +1,5 @@
-#include "filesavedialog.h"
-#include "customeditor.h"
+#include "editor/filesavedialog.h"
+#include "editor/customeditor.h"
 
 #include <QCheckBox>
 #include <QHBoxLayout>

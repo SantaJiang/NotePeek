@@ -1,8 +1,8 @@
-#include "documentpersistenceservice.h"
+#include "editor/documentpersistenceservice.h"
 
-#include "customeditor.h"
-#include "documentio.h"
-#include "lexerfactory.h"
+#include "editor/customeditor.h"
+#include "editor/documentio.h"
+#include "editor/lexerfactory.h"
 
 #include <QFileDialog>
 #include <QFileInfo>

@@ -14,11 +14,11 @@
 #include <QApplication>
 #include <QProcess>
 #include <QDockWidget>
-#include "./editor/filesavedialog.h"
-#include "./editor/customeditor.h"
-#include "./editor/spliteditorcoordinator.h"
-#include "./decorators/highlightedscrollbardecorator.h"
-#include "./widgets/fileexplorerdock.h"
+#include "editor/filesavedialog.h"
+#include "editor/customeditor.h"
+#include "editor/spliteditorcoordinator.h"
+#include "decorators/highlightedscrollbardecorator.h"
+#include "widgets/fileexplorerdock.h"
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)

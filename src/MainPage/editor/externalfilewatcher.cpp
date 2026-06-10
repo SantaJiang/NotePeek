@@ -1,4 +1,4 @@
-#include "externalfilewatcher.h"
+#include "editor/externalfilewatcher.h"
 
 #include <QCryptographicHash>
 #include <QDir>

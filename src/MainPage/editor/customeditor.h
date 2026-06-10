@@ -4,7 +4,7 @@
 #include <QObject>
 #include <QDragEnterEvent>
 #include <QDropEvent>
-#include "../../QScintilla/Qsci/qsciscintilla.h"
+#include <Qsci/qsciscintilla.h>
 
 class CustomEditor : public QsciScintilla
 {

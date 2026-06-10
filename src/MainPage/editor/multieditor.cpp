@@ -1,13 +1,13 @@
-﻿#include "multieditor.h"
+﻿#include "editor/multieditor.h"
 #include "ui_multieditor.h"
-#include "documentpage.h"
-#include "documentpersistenceservice.h"
-#include "documentregistry.h"
-#include "filesavedialog.h"
-#include "editorswitchpopup.h"
-#include "externalfilewatcher.h"
-#include "../find/findreplacemanager.h"
-#include "../tool/markdown/markdownpreviewer.h"
+#include "editor/documentpage.h"
+#include "editor/documentpersistenceservice.h"
+#include "editor/documentregistry.h"
+#include "editor/filesavedialog.h"
+#include "editor/editorswitchpopup.h"
+#include "editor/externalfilewatcher.h"
+#include "find/findreplacemanager.h"
+#include "tool/markdown/markdownpreviewer.h"
 #include <QTabBar>
 #include <QShortcut>
 #include <QFileDialog>
@@ -20,8 +20,8 @@
 #include <QMessageBox>
 #include <QCoreApplication>
 #include <QIcon>
-#include "customeditor.h"
-#include "../decorators/highlightedscrollbardecorator.h"
+#include "editor/customeditor.h"
+#include "decorators/highlightedscrollbardecorator.h"
 
 namespace {
 

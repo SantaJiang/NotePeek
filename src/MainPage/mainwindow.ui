@@ -298,18 +298,18 @@
   <customwidget>
    <class>QsciEditorInfoStatusBar</class>
    <extends>QStatusBar</extends>
-   <header>./widgets/qscieditorinfostatusbar.h</header>
+   <header>widgets/qscieditorinfostatusbar.h</header>
   </customwidget>
   <customwidget>
    <class>FindReplaceWidget</class>
    <extends>QWidget</extends>
-   <header>./find/findreplacewidget.h</header>
+   <header>find/findreplacewidget.h</header>
    <container>1</container>
   </customwidget>
   <customwidget>
    <class>MultiEditor</class>
    <extends>QWidget</extends>
-   <header>./editor/multieditor.h</header>
+   <header>editor/multieditor.h</header>
    <container>1</container>
   </customwidget>
  </customwidgets>

@@ -1,7 +1,7 @@
-#include "customsyntaxlexers.h"
+#include "editor/customsyntaxlexers.h"
 
-#include "../QScintilla/Qsci/qsciscintillabase.h"
-#include "../QScintilla/Qsci/qsciscintilla.h"
+#include <Qsci/qsciscintillabase.h>
+#include <Qsci/qsciscintilla.h>
 
 #include <algorithm>
 

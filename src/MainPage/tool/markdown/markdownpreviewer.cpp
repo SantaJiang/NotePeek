@@ -1,4 +1,4 @@
-#include "markdownpreviewer.h"
+#include "tool/markdown/markdownpreviewer.h"
 #include "themecolors.h"
 
 #include <QByteArray>
@@ -12,10 +12,10 @@
 #include <QUuid>
 #include <QUrl>
 
-#include "qlitehtmlwidget.h"
+#include <qlitehtmlwidget.h>
 
 extern "C" {
-#include "../../../third_party/md4c/md4c-html.h"
+#include <md4c-html.h>
 }
 
 namespace {

@@ -1,4 +1,4 @@
-#include "headersourcemanager.h"
+#include "tool/cpp/headersourcemanager.h"
 
 HeaderSourceManager::HeaderSourceManager(QObject *parent)
     : QObject(parent)
