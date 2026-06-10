@@ -1,4 +1,4 @@
-﻿#ifndef FINDREPLACEWIDGET_H
+#ifndef FINDREPLACEWIDGET_H
 #define FINDREPLACEWIDGET_H
 
 #include <QWidget>

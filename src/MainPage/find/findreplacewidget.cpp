@@ -1,4 +1,4 @@
-﻿#include "find/findreplacewidget.h"
+#include "find/findreplacewidget.h"
 #include "ui_findreplacewidget.h"
 #include "find/findreplacemanager.h"
 #include <QKeyEvent>
