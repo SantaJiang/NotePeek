@@ -55,6 +55,8 @@ add_library(notepeek_widgets STATIC
     mainwindow.ui
     editor/customeditor.cpp
     editor/customeditor.h
+    editor/documentcontroller.cpp
+    editor/documentcontroller.h
     editor/documentpage.cpp
     editor/documentpage.h
     editor/editormanager.cpp

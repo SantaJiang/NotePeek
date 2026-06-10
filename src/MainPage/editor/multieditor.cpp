@@ -1,49 +1,19 @@
-﻿#include "editor/multieditor.h"
+#include "editor/multieditor.h"
 #include "ui_multieditor.h"
-#include "editor/documentpage.h"
-#include "editor/documentpersistenceservice.h"
-#include "editor/documentregistry.h"
-#include "editor/filesavedialog.h"
-#include "editor/editorswitchpopup.h"
-#include "editor/externalfilewatcher.h"
-#include "find/findreplacemanager.h"
-#include "tool/markdown/markdownpreviewer.h"
-#include <QTabBar>
-#include <QShortcut>
-#include <QFileDialog>
-#include <QFontDatabase>
-#include <QApplication>
-#include <QFileInfo>
-#include <QSignalBlocker>
-#include <QMap>
-#include <QSet>
-#include <QMessageBox>
-#include <QCoreApplication>
-#include <QIcon>
+
 #include "editor/customeditor.h"
-#include "decorators/highlightedscrollbardecorator.h"
+#include "editor/documentpage.h"
+#include "editor/editorswitchpopup.h"
 
-namespace {
+#include <QFontDatabase>
+#include <QShortcut>
+#include <QSignalBlocker>
+#include <QTabBar>
 
-bool isMarkdownPath(const QString &filePath)
-{
-    const QString suffix = QFileInfo(filePath).suffix().toLower();
-    return suffix == QStringLiteral("md")
-           || suffix == QStringLiteral("markdown")
-           || suffix == QStringLiteral("mdown")
-           || suffix == QStringLiteral("mkd")
-           || suffix == QStringLiteral("mkdn");
-}
-
-} // namespace
-
-MultiEditor::MultiEditor(QWidget *parent, bool createDefault) : QWidget(parent),
-    ui(new Ui::MultiEditor),
-    m_documentPersistence(new DocumentPersistenceService(this)),
-    m_defaultEditor(nullptr),
-    m_switchPopup(nullptr),  // 初始化弹出窗口指针
-    m_externalFileWatcher(new ExternalFileWatcher(this)),
-    m_createDefaultWhenEmpty(createDefault)
+MultiEditor::MultiEditor(QWidget *parent)
+    : QWidget(parent)
+    , ui(new Ui::MultiEditor)
+    , m_switchPopup(nullptr)
 {
     ui->setupUi(this);
     setAcceptDrops(false);
@@ -59,42 +29,29 @@ MultiEditor::MultiEditor(QWidget *parent, bool createDefault) : QWidget(parent),
     ui->pushButton_splitView->setText(QChar(0xf0db));
     ui->pushButton_splitView->setToolTip(tr("Split editor"));
 
-    // 初始化编辑器管理器..
-    m_editorManager = new EditorManager(this);
-    connect(m_editorManager, &EditorManager::filesDropped, this, &MultiEditor::filesDropped);
-    connect(m_externalFileWatcher, &ExternalFileWatcher::externalFileChanged,
-            this, &MultiEditor::externalFileChanged);
-
-    // 设置标签页..
     ui->tabWidget->setTabsClosable(true);
     ui->tabWidget->setDocumentMode(true);
     ui->tabWidget->tabBar()->setVisible(false);
 
-    // 连接信号槽..
-    connect(ui->tabWidget, &QTabWidget::tabCloseRequested, this, &MultiEditor::tabCloseRequested);
-    connect(ui->tabWidget, &QTabWidget::currentChanged, this, &MultiEditor::currentTabChanged);
+    connect(ui->tabWidget, &QTabWidget::tabCloseRequested, this, &MultiEditor::pageCloseRequested);
+    connect(ui->tabWidget, &QTabWidget::currentChanged, this, &MultiEditor::onTabCurrentChanged);
 
-    // 连接标签页变化到下拉框更新..
-    connect(ui->tabWidget, &QTabWidget::currentChanged, this, &MultiEditor::setCurrentTabIndex);
-
-    // 只有在需要时才创建默认编辑器..
-    if (createDefault)
-    {
-        createDefaultDoc();
-    }
-
-    // 创建切换弹出窗口
     m_switchPopup = new EditorSwitchPopup(this);
-    connect(m_switchPopup, &EditorSwitchPopup::itemSelected, this, &MultiEditor::switchToEditorByIndex);
-    connect(m_switchPopup, &EditorSwitchPopup::popupClosed, this, &MultiEditor::onSwitchPopupClosed);
+    connect(m_switchPopup, &EditorSwitchPopup::itemSelected, this, [this](int index) {
+        setCurrentIndex(index);
+        if (QWidget *widget = ui->tabWidget->widget(index))
+        {
+            widget->setFocus();
+        }
+    });
 
-    // Ctrl+Tab 切换编辑器（仅在本控件及子控件获得焦点时生效）
+    // Ctrl+Tab cycles through pages while this pane has focus.
     auto *tabShortcut = new QShortcut(QKeySequence(Qt::CTRL | Qt::Key_Tab), this);
     tabShortcut->setContext(Qt::WidgetWithChildrenShortcut);
     connect(tabShortcut, &QShortcut::activated, this, &MultiEditor::showEditorSwitchPopup);
 
 #ifdef Q_OS_MAC
-    // macOS 上 Cmd+Tab 被系统占用，改用 Option+Tab
+    // Cmd+Tab is taken by the system on macOS; offer Option+Tab as well.
     auto *tabShortcutMac = new QShortcut(QKeySequence(Qt::ALT | Qt::Key_Tab), this);
     tabShortcutMac->setContext(Qt::WidgetWithChildrenShortcut);
     connect(tabShortcutMac, &QShortcut::activated, this, &MultiEditor::showEditorSwitchPopup);
@@ -106,24 +63,100 @@ MultiEditor::~MultiEditor()
     delete ui;
 }
 
-CustomEditor *MultiEditor::currentEditor() const
+int MultiEditor::addPage(DocumentPage *page, const QString &title, const QString &toolTip)
 {
-    if(ui->tabWidget == nullptr)
+    const int index = ui->tabWidget->addTab(page, title);
+    ui->tabWidget->setTabToolTip(index, toolTip);
+
+    ui->comboBox_files->addItem(title);
+    ui->comboBox_files->setItemData(index, toolTip, Qt::ToolTipRole);
+    return index;
+}
+
+void MultiEditor::removePage(int index)
+{
+    ui->tabWidget->removeTab(index);
+    if (index >= 0 && index < ui->comboBox_files->count())
+    {
+        ui->comboBox_files->removeItem(index);
+    }
+}
+
+void MultiEditor::replacePage(int index, DocumentPage *page)
+{
+    const QString tabText = ui->tabWidget->tabText(index);
+    const QString tabToolTip = ui->tabWidget->tabToolTip(index);
+    const QIcon tabIcon = ui->tabWidget->tabIcon(index);
+
+    const bool tabsWereBlocked = ui->tabWidget->blockSignals(true);
+    ui->tabWidget->removeTab(index);
+    ui->tabWidget->insertTab(index, page, tabIcon, tabText);
+    ui->tabWidget->setTabToolTip(index, tabToolTip);
+    ui->tabWidget->setCurrentIndex(index);
+    ui->tabWidget->blockSignals(tabsWereBlocked);
+}
+
+int MultiEditor::count() const
+{
+    return ui->tabWidget->count();
+}
+
+int MultiEditor::currentIndex() const
+{
+    return ui->tabWidget->currentIndex();
+}
+
+void MultiEditor::setCurrentIndex(int index)
+{
+    if (index < 0 || index >= ui->tabWidget->count())
+        return;
+
+    ui->tabWidget->setCurrentIndex(index);
+    syncComboBoxIndex(index);
+}
+
+DocumentPage *MultiEditor::currentPage() const
+{
+    return pageForWidget(ui->tabWidget->currentWidget());
+}
+
+DocumentPage *MultiEditor::pageAt(int index) const
+{
+    return pageForWidget(ui->tabWidget->widget(index));
+}
+
+DocumentPage *MultiEditor::pageForEditor(CustomEditor *editor) const
+{
+    if (!editor)
     {
         return nullptr;
     }
 
+    for (int i = 0; i < ui->tabWidget->count(); ++i)
+    {
+        DocumentPage *page = pageForWidget(ui->tabWidget->widget(i));
+        if (page && page->editor() == editor)
+        {
+            return page;
+        }
+    }
+
+    return nullptr;
+}
+
+CustomEditor *MultiEditor::currentEditor() const
+{
     DocumentPage *page = currentPage();
     return page ? page->editor() : nullptr;
 }
 
-bool MultiEditor::isCurrentEditorPreviewVisible() const
+CustomEditor *MultiEditor::editorAt(int index) const
 {
-    DocumentPage *page = currentPage();
-    return page && page->isPreviewVisible();
+    DocumentPage *page = pageAt(index);
+    return page ? page->editor() : nullptr;
 }
 
-int MultiEditor::findEditorIndex(CustomEditor *editor) const
+int MultiEditor::indexOfEditor(CustomEditor *editor) const
 {
     for (int i = 0; i < ui->tabWidget->count(); ++i)
     {
@@ -136,633 +169,109 @@ int MultiEditor::findEditorIndex(CustomEditor *editor) const
     return -1;
 }
 
-int MultiEditor::findFileIndex(const QString &filePath) const
-{
-    CustomEditor *editor = m_editorManager->getEditorByFilePath(filePath);
-    return editor ? findEditorIndex(editor) : -1;
-}
-
-CustomEditor *MultiEditor::editorAt(int index) const
-{
-    DocumentPage *page = pageForWidget(ui->tabWidget->widget(index));
-    return page ? page->editor() : nullptr;
-}
-
-int MultiEditor::currentIndex() const
-{
-    return ui->tabWidget->currentIndex();
-}
-
 QString MultiEditor::filePathAt(int index) const
 {
-    DocumentPage *page = pageForWidget(ui->tabWidget->widget(index));
-    CustomEditor *editor = page ? page->editor() : nullptr;
+    CustomEditor *editor = editorAt(index);
     return editor ? editor->filePath() : QString();
 }
 
-void MultiEditor::switchToEditor(CustomEditor *editor)
+QString MultiEditor::pageTitle(int index) const
 {
-    if (!editor) return;
-
-    // 查找编辑器在tabWidget中的索引..
-    int index = findEditorIndex(editor);
-    if (index != -1)
-    {
-        // 切换到对应的标签页..
-        ui->tabWidget->setCurrentIndex(index);
-        // 确保编辑器获得焦点..
-        ui->tabWidget->currentWidget()->setFocus();
-    }
+    return ui->tabWidget->tabText(index);
 }
 
-bool MultiEditor::maybeSave(CustomEditor *editor)
+void MultiEditor::setPageTitle(int index, const QString &title)
 {
-    if (!editor || !editor->isModified()) return true;
-
-    switchToEditor(editor);
-
-    // 使用新的多文件对话框，但只显示当前文件..
-    QMap<CustomEditor*, QString> files;
-    files.insert(editor, m_documentPersistence->displayNameForSavePrompt(editor));
-
-    FileSaveDialog dialog(files, this);
-    int result = dialog.exec();
-
-    if (result == QDialog::Accepted)
-    {
-        QString filePath = editor->filePath();
-        if (filePath.isEmpty())
-        {
-            return onSaveAs();
-        }
-        else
-        {
-            return saveFile(editor, filePath);
-        }
-    }
-    else if (result == FileSaveDialog::DontSave)
-    {
-        return true;
-    }
-
-    return false;
-}
-
-bool MultiEditor::saveEditorForClose(CustomEditor *editor)
-{
-    if (!editor)
-    {
-        return false;
-    }
-
-    QString filePath = editor->filePath();
-    if (filePath.isEmpty())
-    {
-        filePath = m_documentPersistence->promptSaveFileName(this->parentWidget());
-        if (filePath.isEmpty())
-        {
-            return false;
-        }
-    }
-
-    return saveFile(editor, filePath);
-}
-
-bool MultiEditor::saveFile(CustomEditor *editor, const QString &filePath)
-{
-    if (!editor) return false;
-
-    const QString oldFilePath = editor->filePath().isEmpty()
-                                    ? QString()
-                                    : QFileInfo(editor->filePath()).absoluteFilePath();
-    const QString newFilePath = QFileInfo(filePath).absoluteFilePath();
-
-    QApplication::setOverrideCursor(Qt::WaitCursor);
-    QString errorMessage;
-    const bool saved = m_documentPersistence->saveEditor(editor, filePath, &errorMessage);
-    QApplication::restoreOverrideCursor();
-
-    if (!saved)
-    {
-        QMessageBox::warning(this, tr("NotePeek"),
-                             tr("Cannot write file %1:\n%2.")
-                             .arg(filePath)
-                             .arg(errorMessage));
-        return false;
-    }
-
-    recordFileState(newFilePath);
-    setCurrentFile(editor, filePath);
-    m_editorManager->updateEditorSyntax(editor, filePath);
-    if (newFilePath != oldFilePath)
-    {
-        refreshDocumentPageForFile(editor, filePath);
-        emit filePathChanged(editor, oldFilePath, newFilePath);
-    }
-    return true;
-}
-
-void MultiEditor::openFile(const QString &filePath, bool activate)
-{
-    const int previousIndex = ui->tabWidget->currentIndex();
-
-    // Check if file is already open
-    CustomEditor *existingEditor = m_editorManager->getEditorByFilePath(filePath);
-    if (existingEditor)
-    {
-        closeDefaultEditorIfUnused();
-        int index = findEditorIndex(existingEditor);
-        if (index != -1)
-        {
-            if (activate)
-            {
-                ui->tabWidget->setCurrentIndex(index);
-                setCurrentTabIndex(index); // 确保下拉框也同步..
-            }
-        }
-        return;
-    }
-
-    // Create new editor
-    CustomEditor *editor = m_editorManager->createEditorForFile(filePath, false);
-    if (!editor)
-    {
-        return;
-    }
-
-    // Add to tab widget
-    QFileInfo fileInfo(filePath);
-    DocumentPage *page = createDocumentPage(editor, filePath);
-    int tabIndex = ui->tabWidget->addTab(page, fileInfo.fileName());
-    ui->tabWidget->setCurrentIndex(tabIndex);
-
-    // 添加到下拉框..
-    addTab(fileInfo.fileName(), filePath);
-
-    // 确保下拉框当前项同步..
-    setCurrentTabIndex(tabIndex);
-
-    QApplication::setOverrideCursor(Qt::WaitCursor);
-    QString content;
-    QString errorMessage;
-    const bool loaded = m_documentPersistence->loadFile(filePath, &content, &errorMessage);
-    QApplication::restoreOverrideCursor();
-
-    if (!loaded)
-    {
-        ui->tabWidget->removeTab(tabIndex);
-        removeTab(tabIndex);
-        emit editorClosed(editor);
-        m_editorManager->forgetEditor(editor);
-        page->deleteLater();
-
-        if (m_createDefaultWhenEmpty && ui->tabWidget->count() == 0)
-        {
-            createDefaultDoc();
-        }
-
-        QMessageBox::warning(this, tr("NotePeek"),
-                             tr("Cannot read file %1:\n%2.")
-                             .arg(filePath)
-                             .arg(errorMessage));
-        return;
-    }
-
-    editor->setText(content);
-
-    setCurrentFile(editor, filePath);
-    m_editorManager->updateLineNumberMarginWidth(editor);
-    closeDefaultEditorIfUnused();
-    if (activate)
-    {
-        switchToEditor(editor);
-    }
-    else if (previousIndex >= 0 && previousIndex < ui->tabWidget->count())
-    {
-        ui->tabWidget->setCurrentIndex(previousIndex);
-        setCurrentTabIndex(previousIndex);
-    }
-
-    // 发出文件打开信号..
-    emit fileOpened(editor, filePath);
-
-    // 连接编辑器信号..
-    connectEditorSignals(editor);
-}
-
-void MultiEditor::setCurrentFile(CustomEditor *editor, const QString &filePath)
-{
-    if (!editor)
-        return;
-
-    editor->setFilePath(filePath);
-    editor->setModified(false);
-
-    QString shownName;
-    if (filePath.isEmpty())
-        shownName = "untitled.txt";
-    else
-        shownName = QFileInfo(filePath).fileName();
-
-    int index = findEditorIndex(editor);
-    if (index != -1)
-    {
-        ui->tabWidget->setTabText(index, shownName);
-        ui->tabWidget->setTabToolTip(index, filePath);
-
-        // 更新下拉框中的显示..
-        setTabText(index, shownName);
-        setTabToolTip(index, filePath);
-    }
-
-    emit editorModificationChanged(editor, false);
-    if (editor == currentEditor())
-    {
-        emit modificationChanged(false);
-        emit currentFileChanged(editor, filePath);
-    }
-
-    recordFileState(filePath);
-    refreshWatchedFiles();
-}
-
-void MultiEditor::createDefaultDoc()
-{
-    CustomEditor *editor = m_editorManager->createEditor(tr("Untitled"));
-    DocumentPage *page = createDocumentPage(editor, QString());
-    int tabIndex = ui->tabWidget->addTab(page, tr("Untitled"));
-    ui->tabWidget->setCurrentIndex(tabIndex);
-
-    // 设置为默认编辑器..
-    m_defaultEditor = editor;
-
-    // 添加到下拉框..
-    addTab(tr("Untitled"));
-    setCurrentTabIndex(tabIndex);
-
-    // 连接编辑器信号..
-    connectEditorSignals(editor);
-
-    // 发出编辑器创建信号..
-    emit editorCreated(editor);
-}
-
-int MultiEditor::findSharedDocumentIndex(CustomEditor *sourceEditor) const
-{
-    if (!sourceEditor)
-    {
-        return -1;
-    }
-
-    void *sourceDocument = sourceEditor->SendScintillaPtrResult(QsciScintillaBase::SCI_GETDOCPOINTER);
-    if (!sourceDocument)
-    {
-        return -1;
-    }
-
-    for (int i = 0; i < ui->tabWidget->count(); ++i)
-    {
-        DocumentPage *page = pageForWidget(ui->tabWidget->widget(i));
-        CustomEditor *editor = page ? page->editor() : nullptr;
-        if (editor && editor->SendScintillaPtrResult(QsciScintillaBase::SCI_GETDOCPOINTER) == sourceDocument)
-        {
-            return i;
-        }
-    }
-
-    return -1;
-}
-
-void MultiEditor::openSharedDocument(CustomEditor *sourceEditor, bool activate)
-{
-    if (!sourceEditor)
-    {
-        return;
-    }
-
-    const int existingIndex = findSharedDocumentIndex(sourceEditor);
-    if (existingIndex != -1)
-    {
-        if (activate)
-        {
-            ui->tabWidget->setCurrentIndex(existingIndex);
-            setCurrentTabIndex(existingIndex);
-        }
-        return;
-    }
-
-    const QString filePath = sourceEditor->filePath();
-    QString displayName = filePath.isEmpty() ? tr("Untitled") : QFileInfo(filePath).fileName();
-    if (sourceEditor->isModified())
-    {
-        displayName += '*';
-    }
-
-    CustomEditor *editor = m_editorManager->createEditorSharingDocument(sourceEditor, displayName);
-    if (!editor)
-    {
-        return;
-    }
-
-    DocumentPage *page = createDocumentPage(editor, filePath);
-    connectEditorSignals(editor);
-    const int tabIndex = ui->tabWidget->addTab(page, displayName);
-    ui->tabWidget->setTabToolTip(tabIndex, filePath);
-    addTab(displayName, filePath);
-
-    if (filePath.isEmpty() && !sourceEditor->isModified() && sourceEditor->text().isEmpty())
-    {
-        m_defaultEditor = editor;
-    }
-
-    if (activate)
-    {
-        ui->tabWidget->setCurrentIndex(tabIndex);
-        setCurrentTabIndex(tabIndex);
-    }
-
-    emit editorCreated(editor);
-    emit currentEditorChanged(editor);
-    emit modificationChanged(editor->isModified());
-    recordFileState(filePath);
-    refreshWatchedFiles();
-}
-
-bool MultiEditor::adoptSharedDocumentPath(CustomEditor *sourceEditor, const QString &newFilePath)
-{
-    if (!sourceEditor || newFilePath.isEmpty())
-    {
-        return false;
-    }
-
-    const int index = findSharedDocumentIndex(sourceEditor);
-    if (index == -1)
-    {
-        return false;
-    }
-
-    CustomEditor *editor = editorAt(index);
-    if (!editor)
-    {
-        return false;
-    }
-
-    setCurrentFile(editor, newFilePath);
-    m_editorManager->updateEditorSyntax(editor, newFilePath);
-    refreshDocumentPageForFile(editor, newFilePath);
-    return true;
-}
-
-void MultiEditor::onNewFile()
-{
-    if (maybeSave(currentEditor()))
-    {
-        createDefaultDoc();
-    }
-}
-
-void MultiEditor::onOpenFile(const QString &fileName)
-{
-    QString filePath = fileName;
-    if (filePath.isEmpty())
-    {
-        filePath = QFileDialog::getOpenFileName(this, tr("Open File"));
-    }
-
-    if (!filePath.isEmpty())
-    {
-        openFile(filePath);
-    }
-}
-
-bool MultiEditor::onSave()
-{
-    CustomEditor *editor = currentEditor();
-    if (!editor) return false;
-
-    QString filePath = editor->filePath();
-    if (filePath.isEmpty())
-    {
-        return onSaveAs();
-    }
-    else
-    {
-        return saveFile(editor, filePath);
-    }
-}
-
-bool MultiEditor::onSaveAs()
-{
-    CustomEditor *editor = currentEditor();
-    if (!editor) return false;
-
-    QString fileName = m_documentPersistence->promptSaveFileName(this);
-    if (fileName.isEmpty())
-        return false;
-
-    return saveFile(editor, fileName);
-}
-
-void MultiEditor::addTab(const QString &text, const QString &filePath)
-{
-    ui->comboBox_files->addItem(text);
-    int index = ui->comboBox_files->count() - 1;
-    ui->comboBox_files->setItemData(index, filePath, Qt::ToolTipRole);
-}
-
-void MultiEditor::removeTab(int index)
-{
+    ui->tabWidget->setTabText(index, title);
     if (index >= 0 && index < ui->comboBox_files->count())
     {
-        ui->comboBox_files->removeItem(index);
+        ui->comboBox_files->setItemText(index, title);
     }
 }
 
-void MultiEditor::setTabText(int index, const QString &text)
+void MultiEditor::setPageToolTip(int index, const QString &toolTip)
 {
-    if (index >= 0 && index < ui->comboBox_files->count())
-    {
-        ui->comboBox_files->setItemText(index, text);
-    }
-}
-
-void MultiEditor::setTabToolTip(int index, const QString &toolTip)
-{
+    ui->tabWidget->setTabToolTip(index, toolTip);
     if (index >= 0 && index < ui->comboBox_files->count())
     {
         ui->comboBox_files->setItemData(index, toolTip, Qt::ToolTipRole);
     }
 }
 
-void MultiEditor::setCurrentTabIndex(int index)
+void MultiEditor::focusEditor(CustomEditor *editor)
 {
-    if (index >= 0 && index < ui->comboBox_files->count())
-    {
-        // 阻塞信号，避免触发currentIndexChanged信号..
-        ui->comboBox_files->blockSignals(true);
-        ui->comboBox_files->setCurrentIndex(index);
-        ui->comboBox_files->blockSignals(false);
-    }
-}
-
-int MultiEditor::count() const
-{
-    return ui->comboBox_files->count();
-}
-
-void MultiEditor::clear()
-{
-    ui->comboBox_files->clear();
-}
-
-void MultiEditor::tabCloseRequested(int index)
-{
-    DocumentPage *page = pageForWidget(ui->tabWidget->widget(index));
-    CustomEditor *editor = page ? page->editor() : nullptr;
-    if (!editor) return;
-
-    // 如果关闭的是默认编辑器，清除指针..
-    if (editor == m_defaultEditor)
-    {
-        m_defaultEditor = nullptr;
-    }
-
-    if (maybeSave(editor))
-    {
-        ui->tabWidget->removeTab(index);
-        // 从下拉框中移除对应项..
-        removeTab(index);
-
-        // 发出编辑器关闭信号..
-        emit editorClosed(editor);
-
-        m_editorManager->forgetEditor(editor);
-        page->deleteLater();
-        refreshWatchedFiles();
-
-        // If no tabs left, create a new empty editor
-        if (m_createDefaultWhenEmpty && ui->tabWidget->count() == 0)
-        {
-            createDefaultDoc();
-        }
-    }
-}
-
-void MultiEditor::currentTabChanged(int index)
-{
-    if (index == -1) return;
-
-    DocumentPage *page = pageForWidget(ui->tabWidget->widget(index));
-    CustomEditor *editor = page ? page->editor() : nullptr;
-    if (!editor) return;
-
-    // 发出当前编辑器改变信号..
-    emit currentEditorChanged(editor);
-
-    // 更新下拉框当前项..
-    setCurrentTabIndex(index);
-
-    // Update window title
-    QString title = ui->tabWidget->tabText(index);
-    if (title.endsWith('*'))
-    {
-        title = title.left(title.length() - 1);
-        emit modificationChanged(true);
-    }
-    else
-    {
-        emit modificationChanged(false);
-    }
-
-    // Update edit actions
-    emit copyAvailable(page->hasCopySelection());
-}
-
-void MultiEditor::documentWasModified()
-{
-    CustomEditor *editor = qobject_cast<CustomEditor *>(sender());
-    if (!editor) return;
-
-    // 如果默认编辑器被修改，取消其默认状态
-    if (editor == m_defaultEditor && editor->isModified())
-    {
-        m_defaultEditor = nullptr;
-    }
-
-    int index = findEditorIndex(editor);
-    if (index == -1) return;
-
-    QString title = ui->tabWidget->tabText(index);
-    if (title.endsWith('*'))
-    {
-        title = title.left(title.length() - 1);
-    }
-
-    if (editor->isModified())
-    {
-        ui->tabWidget->setTabText(index, title + '*');
-        setTabText(index, title + '*');
-        emit modificationChanged(true);
-    }
-    else
-    {
-        ui->tabWidget->setTabText(index, title);
-        setTabText(index, title);
-        emit modificationChanged(false);
-    }
-
-    // 发出编辑器修改状态改变信号..
-    emit editorModificationChanged(editor, editor->isModified());
-
-    refreshWatchedFiles();
-    if (!editor->isModified() && !editor->filePath().isEmpty())
-    {
-        m_externalFileWatcher->requestExternalChangeCheck(editor->filePath());
-    }
-}
-
-void MultiEditor::on_pushButton_closeDoc_clicked()
-{
-    int currentIndex = ui->comboBox_files->currentIndex();
-    if (currentIndex >= 0)
-    {
-        tabCloseRequested(currentIndex);
-    }
-}
-
-bool MultiEditor::closeFileIfUnmodified(const QString &filePath)
-{
-    const int index = findFileIndex(filePath);
+    const int index = indexOfEditor(editor);
     if (index == -1)
-    {
-        return true;
-    }
+        return;
 
-    DocumentPage *page = pageForWidget(ui->tabWidget->widget(index));
-    CustomEditor *editor = page ? page->editor() : nullptr;
-    if (!editor || editor->isModified())
+    setCurrentIndex(index);
+    ui->tabWidget->currentWidget()->setFocus();
+}
+
+bool MultiEditor::isCurrentEditorPreviewVisible() const
+{
+    DocumentPage *page = currentPage();
+    return page && page->isPreviewVisible();
+}
+
+bool MultiEditor::toggleMarkdownPreview(MarkdownPreviewer *previewer)
+{
+    DocumentPage *page = currentPage();
+    if (!page || !previewer)
     {
         return false;
     }
 
-    if (editor == m_defaultEditor)
+    return page->togglePreview(previewer);
+}
+
+void MultiEditor::hideMarkdownPreview(CustomEditor *editor)
+{
+    if (DocumentPage *page = pageForEditor(editor))
     {
-        m_defaultEditor = nullptr;
+        page->hidePreview();
     }
+}
 
-    ui->tabWidget->removeTab(index);
-    removeTab(index);
-    emit editorClosed(editor);
-    m_editorManager->forgetEditor(editor);
-    page->deleteLater();
-    refreshWatchedFiles();
-
-    if (m_createDefaultWhenEmpty && ui->tabWidget->count() == 0)
+void MultiEditor::refreshVisibleMarkdownPreview()
+{
+    if (DocumentPage *page = currentPage())
     {
-        createDefaultDoc();
+        page->refreshPreview();
     }
+}
 
-    return true;
+void MultiEditor::copyCurrentSelection()
+{
+    if (DocumentPage *page = currentPage())
+    {
+        page->copyCurrentSelection();
+    }
+}
+
+void MultiEditor::setSplitViewButtonChecked(bool checked)
+{
+    const QSignalBlocker blocker(ui->pushButton_splitView);
+    ui->pushButton_splitView->setChecked(checked);
+}
+
+void MultiEditor::setSplitViewButtonVisible(bool visible)
+{
+    ui->pushButton_splitView->setVisible(visible);
+}
+
+void MultiEditor::setTopbarVisible(bool visible)
+{
+    ui->topbar->setVisible(visible);
+}
+
+void MultiEditor::on_pushButton_closeDoc_clicked()
+{
+    const int index = ui->comboBox_files->currentIndex();
+    if (index >= 0)
+    {
+        emit pageCloseRequested(index);
+    }
 }
 
 void MultiEditor::on_pushButton_splitView_clicked(bool checked)
@@ -772,96 +281,16 @@ void MultiEditor::on_pushButton_splitView_clicked(bool checked)
 
 void MultiEditor::on_comboBox_files_currentIndexChanged(int index)
 {
-    if(index >= 0 && index < ui->tabWidget->count())
+    if (index >= 0 && index < ui->tabWidget->count())
     {
         ui->tabWidget->setCurrentIndex(index);
     }
 }
 
-void MultiEditor::connectEditorSignals(CustomEditor *editor)
+void MultiEditor::onTabCurrentChanged(int index)
 {
-    if (!editor) return;
-
-    connect(editor, SIGNAL(modificationChanged(bool)), this, SLOT(documentWasModified()));
-    connect(editor, SIGNAL(copyAvailable(bool)), this, SIGNAL(copyAvailable(bool)));
-}
-
-bool MultiEditor::closeAllEditors()
-{
-    // 收集所有未保存的文件..
-    QMap<CustomEditor*, QString> modifiedFiles;
-    QList<CustomEditor *> listEditors = m_editorManager->getEditors();
-    for(CustomEditor *editor : listEditors)
-    {
-        if (editor && editor->isModified())
-        {
-            modifiedFiles.insert(editor, m_documentPersistence->displayNameForSavePrompt(editor));
-        }
-    }
-
-    if (modifiedFiles.isEmpty())
-    {
-        return true;
-    }
-
-    // 显示自定义保存对话框..
-    FileSaveDialog dialog(modifiedFiles, this->parentWidget());
-    int result = dialog.exec();
-
-    if (result == QDialog::Accepted)
-    {
-        // 保存选中的文件..
-        QList<CustomEditor*> editorsToSave = dialog.selectedEditors();
-        bool allSaved = true;
-
-        for(CustomEditor *editor : editorsToSave)
-        {
-            if (!saveEditorForClose(editor))
-            {
-                allSaved = false;
-                break;
-            }
-        }
-
-        return allSaved;
-    }
-    else if (result == FileSaveDialog::DontSave)
-    {
-        return true;
-    }
-
-    return false;
-}
-
-void MultiEditor::setCreateDefault(bool createDefault)
-{
-    m_createDefaultWhenEmpty = createDefault;
-
-    if (!createDefault && m_defaultEditor)
-    {
-        closeDefaultEditorIfUnused();
-    }
-    else if (createDefault && !m_defaultEditor && ui->tabWidget->count() == 0)
-    {
-        // 如果需要创建默认编辑器且当前没有编辑器，则创建..
-        createDefaultDoc();
-    }
-}
-
-void MultiEditor::setFindReplaceManagerForCurrentEditor(FindReplaceManager *manager)
-{
-    CustomEditor *editor = currentEditor();
-    if (!editor || !manager) return;
-
-    manager->setCurrentEditor(editor);
-
-    HighlightedScrollBarDecorator *decorator = editor->findChild<HighlightedScrollBarDecorator*>();
-    if (decorator)
-    {
-        connect(manager, &FindReplaceManager::searchResultsChanged,
-                decorator, &HighlightedScrollBarDecorator::updateScrollBar,
-                Qt::UniqueConnection);
-    }
+    syncComboBoxIndex(index);
+    emit currentPageChanged(index);
 }
 
 void MultiEditor::showEditorSwitchPopup()
@@ -886,306 +315,16 @@ void MultiEditor::showEditorSwitchPopup()
     m_switchPopup->showPopup();
 }
 
-void MultiEditor::switchToEditorByIndex(int index)
-{
-    if (index >= 0 && index < ui->tabWidget->count())
-    {
-        ui->tabWidget->setCurrentIndex(index);
-        // 确保编辑器获得焦点
-        QWidget *widget = ui->tabWidget->widget(index);
-        if (widget)
-        {
-            widget->setFocus();
-        }
-    }
-}
-
-void MultiEditor::onSwitchPopupClosed()
-{
-    // 弹出窗口关闭后的清理工作（如果需要）
-}
-
-bool MultiEditor::toggleMarkdownPreview(MarkdownPreviewer *previewer)
-{
-    DocumentPage *page = currentPage();
-    if (!page || !previewer)
-    {
-        return false;
-    }
-
-    return page->togglePreview(previewer);
-}
-
-void MultiEditor::refreshVisibleMarkdownPreview()
-{
-    if (DocumentPage *page = currentPage())
-    {
-        page->refreshPreview();
-    }
-}
-
-void MultiEditor::copyCurrentSelection()
-{
-    if (DocumentPage *page = currentPage())
-    {
-        page->copyCurrentSelection();
-    }
-}
-
-void MultiEditor::setSplitViewButtonChecked(bool checked)
-{
-    ui->pushButton_splitView->blockSignals(true);
-    ui->pushButton_splitView->setChecked(checked);
-    ui->pushButton_splitView->blockSignals(false);
-}
-
-void MultiEditor::setSplitViewButtonVisible(bool visible)
-{
-    ui->pushButton_splitView->setVisible(visible);
-}
-
-void MultiEditor::setTopbarVisible(bool visible)
-{
-    ui->topbar->setVisible(visible);
-}
-
-void MultiEditor::hideMarkdownPreview(CustomEditor *editor)
-{
-    if (!editor)
-    {
-        return;
-    }
-
-    DocumentPage *page = pageForEditor(editor);
-    if (!page)
-    {
-        return;
-    }
-
-    page->hidePreview();
-}
-
-void MultiEditor::refreshWatchedFiles()
-{
-    m_externalFileWatcher->setTrackedFilePaths(DocumentRegistry::trackedFilePaths(m_editorManager->getEditors()));
-}
-
-bool MultiEditor::reloadFileFromDiskIfUnmodified(const QString &filePath)
-{
-    const QString normalizedPath = DocumentRegistry::normalizedFilePath(filePath);
-    if (normalizedPath.isEmpty()
-        || !DocumentRegistry::trackedFilePaths(m_editorManager->getEditors()).contains(normalizedPath))
-    {
-        return false;
-    }
-
-    const QFileInfo fileInfo(normalizedPath);
-    const bool exists = fileInfo.exists() && fileInfo.isFile();
-
-    if (!exists)
-    {
-        recordFileState(normalizedPath);
-        refreshWatchedFiles();
-        return false;
-    }
-
-    if (hasModifiedEditorForFile(normalizedPath))
-    {
-        return false;
-    }
-
-    QString content;
-    QString errorMessage;
-    if (!m_documentPersistence->loadFile(normalizedPath, &content, &errorMessage))
-    {
-        refreshWatchedFiles();
-        return false;
-    }
-
-    recordFileState(normalizedPath);
-
-    bool reloaded = false;
-    bool reloadedCurrentEditor = false;
-    QSet<void *> reloadedDocuments;
-    for (CustomEditor *editor : m_editorManager->getEditors())
-    {
-        if (!editor || DocumentRegistry::normalizedFilePath(editor->filePath()) != normalizedPath)
-        {
-            continue;
-        }
-
-        void *document = editor->SendScintillaPtrResult(QsciScintillaBase::SCI_GETDOCPOINTER);
-        if (document && reloadedDocuments.contains(document))
-        {
-            continue;
-        }
-        if (document)
-        {
-            reloadedDocuments.insert(document);
-        }
-
-        int line = 0;
-        int index = 0;
-        editor->getCursorPosition(&line, &index);
-        const int firstVisibleLine = editor->SendScintilla(QsciScintillaBase::SCI_GETFIRSTVISIBLELINE);
-        const int xOffset = editor->SendScintilla(QsciScintillaBase::SCI_GETXOFFSET);
-
-        const QSignalBlocker blocker(editor);
-        editor->setText(content);
-        editor->setModified(false);
-
-        const int targetLine = qBound(0, line, qMax(0, editor->lines() - 1));
-        const int targetIndex = qBound(0, index, editor->lineLength(targetLine));
-        editor->setCursorPosition(targetLine, targetIndex);
-        editor->SendScintilla(QsciScintillaBase::SCI_SETFIRSTVISIBLELINE, firstVisibleLine);
-        editor->SendScintilla(QsciScintillaBase::SCI_SETXOFFSET, xOffset);
-        m_editorManager->updateLineNumberMarginWidth(editor);
-
-        if (DocumentPage *page = pageForEditor(editor))
-        {
-            page->refreshPreview();
-        }
-
-        emit editorModificationChanged(editor, false);
-        if (editor == currentEditor())
-        {
-            reloadedCurrentEditor = true;
-        }
-        reloaded = true;
-    }
-
-    if (reloadedCurrentEditor)
-    {
-        emit modificationChanged(false);
-    }
-
-    refreshWatchedFiles();
-    return reloaded;
-}
-
-bool MultiEditor::hasModifiedEditorForFile(const QString &filePath) const
-{
-    return DocumentRegistry::hasModifiedEditorForFile(m_editorManager->getEditors(), filePath);
-}
-
-void MultiEditor::recordFileState(const QString &filePath)
-{
-    m_externalFileWatcher->recordFileState(filePath);
-}
-
-bool MultiEditor::closeDefaultEditorIfUnused()
-{
-    if (!m_defaultEditor || m_defaultEditor->isModified() || !m_defaultEditor->text().isEmpty())
-    {
-        return false;
-    }
-
-    const int index = findEditorIndex(m_defaultEditor);
-    if (index == -1)
-    {
-        m_defaultEditor = nullptr;
-        return false;
-    }
-
-    CustomEditor *editor = m_defaultEditor;
-    DocumentPage *page = pageForEditor(editor);
-    ui->tabWidget->removeTab(index);
-    removeTab(index);
-    emit editorClosed(editor);
-    m_editorManager->forgetEditor(editor);
-
-    if (page)
-    {
-        page->deleteLater();
-    }
-    else
-    {
-        editor->deleteLater();
-    }
-
-    m_defaultEditor = nullptr;
-    refreshWatchedFiles();
-    return true;
-}
-
-DocumentPage *MultiEditor::createDocumentPage(CustomEditor *editor, const QString &filePath)
-{
-    DocumentPage *page = isMarkdownPath(filePath)
-                             ? static_cast<DocumentPage *>(new MarkdownDocumentPage(editor, ui->tabWidget))
-                             : static_cast<DocumentPage *>(new PlainDocumentPage(editor, ui->tabWidget));
-    connect(page, &DocumentPage::copyAvailableChanged, this, &MultiEditor::copyAvailable);
-    return page;
-}
-
-void MultiEditor::refreshDocumentPageForFile(CustomEditor *editor, const QString &filePath)
-{
-    DocumentPage *oldPage = pageForEditor(editor);
-    if (!oldPage)
-    {
-        return;
-    }
-
-    const bool needsMarkdownPage = isMarkdownPath(filePath);
-    const bool hasMarkdownPage = qobject_cast<MarkdownDocumentPage *>(oldPage) != nullptr;
-    if (needsMarkdownPage == hasMarkdownPage)
-    {
-        oldPage->hidePreview();
-        return;
-    }
-
-    const int index = ui->tabWidget->indexOf(oldPage);
-    if (index == -1)
-    {
-        return;
-    }
-
-    const QString tabText = ui->tabWidget->tabText(index);
-    const QString tabToolTip = ui->tabWidget->tabToolTip(index);
-    const QIcon tabIcon = ui->tabWidget->tabIcon(index);
-    CustomEditor *ownedEditor = oldPage->takeEditor();
-    if (!ownedEditor)
-    {
-        return;
-    }
-
-    DocumentPage *newPage = createDocumentPage(ownedEditor, filePath);
-    const bool tabsWereBlocked = ui->tabWidget->blockSignals(true);
-    ui->tabWidget->removeTab(index);
-    ui->tabWidget->insertTab(index, newPage, tabIcon, tabText);
-    ui->tabWidget->setTabToolTip(index, tabToolTip);
-    ui->tabWidget->setCurrentIndex(index);
-    ui->tabWidget->blockSignals(tabsWereBlocked);
-    oldPage->deleteLater();
-
-    emit currentEditorChanged(ownedEditor);
-    emit copyAvailable(newPage->hasCopySelection());
-}
-
-DocumentPage *MultiEditor::currentPage() const
-{
-    return pageForWidget(ui->tabWidget->currentWidget());
-}
-
 DocumentPage *MultiEditor::pageForWidget(QWidget *widget) const
 {
     return qobject_cast<DocumentPage *>(widget);
 }
 
-DocumentPage *MultiEditor::pageForEditor(CustomEditor *editor) const
+void MultiEditor::syncComboBoxIndex(int index)
 {
-    if (!editor)
+    if (index >= 0 && index < ui->comboBox_files->count())
     {
-        return nullptr;
+        const QSignalBlocker blocker(ui->comboBox_files);
+        ui->comboBox_files->setCurrentIndex(index);
     }
-
-    for (int i = 0; i < ui->tabWidget->count(); ++i)
-    {
-        DocumentPage *page = pageForWidget(ui->tabWidget->widget(i));
-        if (page && page->editor() == editor)
-        {
-            return page;
-        }
-    }
-
-    return nullptr;
 }

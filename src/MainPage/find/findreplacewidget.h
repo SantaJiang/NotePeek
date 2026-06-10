@@ -11,7 +11,6 @@ class FindReplaceWidget;
 }
 
 class FindReplaceManager;
-class MultiEditor;
 
 class FindReplaceWidget : public QWidget
 {
@@ -21,7 +20,6 @@ public:
     explicit FindReplaceWidget(QWidget *parent = nullptr);
     ~FindReplaceWidget();
 
-    void setMultiEditor(MultiEditor *multiEditor);
     void setFindReplaceManager(FindReplaceManager *manager);
     void showWithInitialText(const QString &initialText = QString());
 
@@ -55,7 +53,6 @@ private slots:
 private:
     Ui::FindReplaceWidget *ui;
     FindReplaceManager *m_manager;
-    MultiEditor *m_multiEditor;
 };
 
 #endif // FINDREPLACEWIDGET_H
