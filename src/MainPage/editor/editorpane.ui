@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <ui version="4.0">
- <class>MultiEditor</class>
- <widget class="QWidget" name="MultiEditor">
+ <class>EditorPane</class>
+ <widget class="QWidget" name="EditorPane">
   <property name="geometry">
    <rect>
     <x>0</x>

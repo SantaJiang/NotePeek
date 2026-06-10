@@ -4,7 +4,7 @@
 #include "editor/documentcontroller.h"
 #include "editor/editormanager.h"
 #include "editor/filesavedialog.h"
-#include "editor/multieditor.h"
+#include "editor/editorpane.h"
 
 #include <QFileInfo>
 #include <QHash>
@@ -170,7 +170,7 @@ void SplitEditorCoordinator::updateActivePaneForFocus(QWidget *widget)
 
     for (DocumentController *controller : controllers())
     {
-        MultiEditor *pane = controller->pane();
+        EditorPane *pane = controller->pane();
         if (pane == widget || pane->isAncestorOf(widget))
         {
             setActiveController(controller);
@@ -219,7 +219,7 @@ void SplitEditorCoordinator::connectController(DocumentController *controller)
         setActiveController(controller);
         emit filesDropped(controller, urls);
     });
-    connect(controller->pane(), &MultiEditor::splitViewToggled, this, [this, controller](bool checked) {
+    connect(controller->pane(), &EditorPane::splitViewToggled, this, [this, controller](bool checked) {
         setActiveController(controller);
         setSplitViewEnabled(checked);
     });

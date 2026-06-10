@@ -16,7 +16,7 @@
 #include <QDockWidget>
 #include "editor/customeditor.h"
 #include "editor/documentcontroller.h"
-#include "editor/multieditor.h"
+#include "editor/editorpane.h"
 #include "editor/spliteditorcoordinator.h"
 #include "widgets/fileexplorerdock.h"
 
@@ -52,8 +52,8 @@ MainWindow::MainWindow(QWidget *parent)
     }
 
     // A default blank document only makes sense when no file was requested.
-    m_leftController = new DocumentController(ui->multieditor, !hasFileArg, this);
-    m_rightController = new DocumentController(ui->multieditorRight, false, this);
+    m_leftController = new DocumentController(ui->editorPane, !hasFileArg, this);
+    m_rightController = new DocumentController(ui->editorPaneRight, false, this);
 
     ui->widget_findreplace->setFindReplaceManager(m_findReplaceManager);
 
@@ -99,8 +99,8 @@ MainWindow::MainWindow(QWidget *parent)
     applyActiveController(m_leftController);
     if (m_singleFileWindow)
     {
-        ui->multieditor->setTopbarVisible(false);
-        ui->multieditorRight->setTopbarVisible(false);
+        ui->editorPane->setTopbarVisible(false);
+        ui->editorPaneRight->setTopbarVisible(false);
     }
 
     connect(qApp, &QApplication::focusChanged, this, [this](QWidget *, QWidget *now) {
