@@ -1,7 +1,7 @@
-﻿#include "findreplacewidget.h"
+﻿#include "find/findreplacewidget.h"
 #include "ui_findreplacewidget.h"
-#include "findreplacemanager.h"
-#include "../editor/multieditor.h"
+#include "find/findreplacemanager.h"
+#include "editor/multieditor.h"
 #include <QKeyEvent>
 #include <QLineEdit>
 #include <QFontDatabase>

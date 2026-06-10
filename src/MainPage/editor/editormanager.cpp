@@ -1,15 +1,15 @@
-#include "editormanager.h"
+#include "editor/editormanager.h"
 #include "themecolors.h"
 #include <QFileInfo>
 #include <QFontDatabase>
 #include <QApplication>
 #include <QScreen>
 #include <QTimer>
-#include "../QScintilla/Qsci/qscilexer.h"
-#include "../decorators/highlightedscrollbardecorator.h"
-#include "customeditor.h"
-#include "documentregistry.h"
-#include "lexerfactory.h"
+#include <Qsci/qscilexer.h>
+#include "decorators/highlightedscrollbardecorator.h"
+#include "editor/customeditor.h"
+#include "editor/documentregistry.h"
+#include "editor/lexerfactory.h"
 
 namespace {
 

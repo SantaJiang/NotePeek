@@ -1,14 +1,14 @@
-#include "documentpage.h"
+#include "editor/documentpage.h"
 
-#include "customeditor.h"
-#include "../tool/markdown/markdownpreviewer.h"
+#include "editor/customeditor.h"
+#include "tool/markdown/markdownpreviewer.h"
 
 #include <QClipboard>
 #include <QGuiApplication>
 #include <QStackedWidget>
 #include <QVBoxLayout>
 
-#include "qlitehtmlwidget.h"
+#include <qlitehtmlwidget.h>
 
 DocumentPage::DocumentPage(CustomEditor *editor, QWidget *parent)
     : QWidget(parent)

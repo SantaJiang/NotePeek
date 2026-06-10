@@ -1,4 +1,4 @@
-#include "highlightedscrollbar.h"
+#include "decorators/highlightedscrollbar.h"
 #include "themecolors.h"
 #include <Qsci/qsciscintilla.h>
 #include <QTimer>

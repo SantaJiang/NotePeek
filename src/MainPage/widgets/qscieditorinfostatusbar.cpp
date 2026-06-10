@@ -16,10 +16,10 @@
  * along with NotePeek.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#include "qscieditorinfostatusbar.h"
+#include "widgets/qscieditorinfostatusbar.h"
 #include <QMainWindow>
-#include "../QScintilla/Qsci/qsciscintilla.h"
-#include "../QScintilla/Qsci/qscilexer.h"
+#include <Qsci/qsciscintilla.h>
+#include <Qsci/qscilexer.h>
 
 QsciEditorInfoStatusBar::QsciEditorInfoStatusBar(QMainWindow *window)
     : QStatusBar(window), currentEditor(nullptr)

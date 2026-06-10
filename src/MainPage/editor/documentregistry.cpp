@@ -1,6 +1,6 @@
-#include "documentregistry.h"
+#include "editor/documentregistry.h"
 
-#include "customeditor.h"
+#include "editor/customeditor.h"
 
 #include <QDir>
 #include <QFileInfo>

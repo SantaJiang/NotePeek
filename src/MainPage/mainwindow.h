@@ -2,10 +2,10 @@
 #define MAINWINDOW_H
 
 #include <QMainWindow>
-#include "./editor/multieditor.h"
-#include "./find/findreplacemanager.h"
-#include "./tool/cpp/headersourcemanager.h"
-#include "./tool/markdown/markdownpreviewer.h"
+#include "editor/multieditor.h"
+#include "find/findreplacemanager.h"
+#include "tool/cpp/headersourcemanager.h"
+#include "tool/markdown/markdownpreviewer.h"
 
 namespace Ui
 {

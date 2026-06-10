@@ -1,6 +1,6 @@
-#include "filetreeview.h"
+#include "widgets/filetreeview.h"
 
-#include "filetypefilterproxymodel.h"
+#include "widgets/filetypefilterproxymodel.h"
 
 #include <QAction>
 #include <QApplication>

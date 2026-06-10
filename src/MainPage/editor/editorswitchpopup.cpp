@@ -1,4 +1,4 @@
-#include "editorswitchpopup.h"
+#include "editor/editorswitchpopup.h"
 #include "themecolors.h"
 
 EditorSwitchPopup::EditorSwitchPopup(QWidget *parent)

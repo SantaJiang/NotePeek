@@ -1,7 +1,7 @@
-#include "fileexplorerdock.h"
+#include "widgets/fileexplorerdock.h"
 
-#include "filetreeview.h"
-#include "filetypefilterproxymodel.h"
+#include "widgets/filetreeview.h"
+#include "widgets/filetypefilterproxymodel.h"
 
 #include <QDir>
 #include <QDockWidget>

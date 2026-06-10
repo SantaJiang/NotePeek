@@ -1,7 +1,7 @@
-#include "findreplacemanager.h"
+#include "find/findreplacemanager.h"
 #include "themecolors.h"
-#include "../editor/customeditor.h"
-#include "../decorators/highlightedscrollbardecorator.h"
+#include "editor/customeditor.h"
+#include "decorators/highlightedscrollbardecorator.h"
 #include <QMessageBox>
 #include <QFileInfo>
 #include <QTimer>
