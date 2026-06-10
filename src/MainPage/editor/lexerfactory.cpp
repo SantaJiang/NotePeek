@@ -1,5 +1,10 @@
 #include "editor/lexerfactory.h"
-#include "editor/customsyntaxlexers.h"
+#include "editor/lexers/dockerfilelexer.h"
+#include "editor/lexers/groovylexer.h"
+#include "editor/lexers/ignorefilelexer.h"
+#include "editor/lexers/mesonlexer.h"
+#include "editor/lexers/qmakelexer.h"
+#include "editor/lexers/starlarklexer.h"
 #include <Qsci/qscilexerpython.h>
 #include <Qsci/qscilexercpp.h>
 #include <Qsci/qscilexerjava.h>

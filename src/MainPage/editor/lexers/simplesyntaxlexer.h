@@ -1,13 +1,13 @@
-#ifndef CUSTOMSYNTAXLEXERS_H
-#define CUSTOMSYNTAXLEXERS_H
+#ifndef SIMPLESYNTAXLEXER_H
+#define SIMPLESYNTAXLEXER_H
 
 #include <Qsci/qscilexercustom.h>
-#include <Qsci/qscilexerjava.h>
-#include <Qsci/qscilexerpython.h>
 
 #include <QByteArray>
 #include <QSet>
 
+// Generic line-oriented lexer for simple configuration-style languages.
+// Concrete lexers configure it with keyword tables and feature flags.
 class SimpleSyntaxLexer : public QsciLexerCustom
 {
 public:
@@ -66,46 +66,4 @@ private:
     bool m_doubleDashFlags;
 };
 
-class DockerfileLexer final : public SimpleSyntaxLexer
-{
-public:
-    explicit DockerfileLexer(QObject *parent = nullptr);
-};
-
-class QMakeLexer final : public SimpleSyntaxLexer
-{
-public:
-    explicit QMakeLexer(QObject *parent = nullptr);
-};
-
-class IgnoreFileLexer final : public SimpleSyntaxLexer
-{
-public:
-    explicit IgnoreFileLexer(QObject *parent = nullptr);
-};
-
-class GroovyLexer final : public QsciLexerJava
-{
-public:
-    explicit GroovyLexer(QObject *parent = nullptr);
-    const char *language() const override;
-    const char *keywords(int set) const override;
-};
-
-class StarlarkLexer final : public QsciLexerPython
-{
-public:
-    explicit StarlarkLexer(QObject *parent = nullptr);
-    const char *language() const override;
-    const char *keywords(int set) const override;
-};
-
-class MesonLexer final : public QsciLexerPython
-{
-public:
-    explicit MesonLexer(QObject *parent = nullptr);
-    const char *language() const override;
-    const char *keywords(int set) const override;
-};
-
-#endif // CUSTOMSYNTAXLEXERS_H
+#endif // SIMPLESYNTAXLEXER_H
