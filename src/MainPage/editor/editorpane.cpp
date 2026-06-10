@@ -1,5 +1,5 @@
-#include "editor/multieditor.h"
-#include "ui_multieditor.h"
+#include "editor/editorpane.h"
+#include "ui_editorpane.h"
 
 #include "editor/customeditor.h"
 #include "editor/documentpage.h"
@@ -10,9 +10,9 @@
 #include <QSignalBlocker>
 #include <QTabBar>
 
-MultiEditor::MultiEditor(QWidget *parent)
+EditorPane::EditorPane(QWidget *parent)
     : QWidget(parent)
-    , ui(new Ui::MultiEditor)
+    , ui(new Ui::EditorPane)
     , m_switchPopup(nullptr)
 {
     ui->setupUi(this);
@@ -33,8 +33,8 @@ MultiEditor::MultiEditor(QWidget *parent)
     ui->tabWidget->setDocumentMode(true);
     ui->tabWidget->tabBar()->setVisible(false);
 
-    connect(ui->tabWidget, &QTabWidget::tabCloseRequested, this, &MultiEditor::pageCloseRequested);
-    connect(ui->tabWidget, &QTabWidget::currentChanged, this, &MultiEditor::onTabCurrentChanged);
+    connect(ui->tabWidget, &QTabWidget::tabCloseRequested, this, &EditorPane::pageCloseRequested);
+    connect(ui->tabWidget, &QTabWidget::currentChanged, this, &EditorPane::onTabCurrentChanged);
 
     m_switchPopup = new EditorSwitchPopup(this);
     connect(m_switchPopup, &EditorSwitchPopup::itemSelected, this, [this](int index) {
@@ -48,22 +48,22 @@ MultiEditor::MultiEditor(QWidget *parent)
     // Ctrl+Tab cycles through pages while this pane has focus.
     auto *tabShortcut = new QShortcut(QKeySequence(Qt::CTRL | Qt::Key_Tab), this);
     tabShortcut->setContext(Qt::WidgetWithChildrenShortcut);
-    connect(tabShortcut, &QShortcut::activated, this, &MultiEditor::showEditorSwitchPopup);
+    connect(tabShortcut, &QShortcut::activated, this, &EditorPane::showEditorSwitchPopup);
 
 #ifdef Q_OS_MAC
     // Cmd+Tab is taken by the system on macOS; offer Option+Tab as well.
     auto *tabShortcutMac = new QShortcut(QKeySequence(Qt::ALT | Qt::Key_Tab), this);
     tabShortcutMac->setContext(Qt::WidgetWithChildrenShortcut);
-    connect(tabShortcutMac, &QShortcut::activated, this, &MultiEditor::showEditorSwitchPopup);
+    connect(tabShortcutMac, &QShortcut::activated, this, &EditorPane::showEditorSwitchPopup);
 #endif
 }
 
-MultiEditor::~MultiEditor()
+EditorPane::~EditorPane()
 {
     delete ui;
 }
 
-int MultiEditor::addPage(DocumentPage *page, const QString &title, const QString &toolTip)
+int EditorPane::addPage(DocumentPage *page, const QString &title, const QString &toolTip)
 {
     const int index = ui->tabWidget->addTab(page, title);
     ui->tabWidget->setTabToolTip(index, toolTip);
@@ -73,7 +73,7 @@ int MultiEditor::addPage(DocumentPage *page, const QString &title, const QString
     return index;
 }
 
-void MultiEditor::removePage(int index)
+void EditorPane::removePage(int index)
 {
     ui->tabWidget->removeTab(index);
     if (index >= 0 && index < ui->comboBox_files->count())
@@ -82,7 +82,7 @@ void MultiEditor::removePage(int index)
     }
 }
 
-void MultiEditor::replacePage(int index, DocumentPage *page)
+void EditorPane::replacePage(int index, DocumentPage *page)
 {
     const QString tabText = ui->tabWidget->tabText(index);
     const QString tabToolTip = ui->tabWidget->tabToolTip(index);
@@ -96,17 +96,17 @@ void MultiEditor::replacePage(int index, DocumentPage *page)
     ui->tabWidget->blockSignals(tabsWereBlocked);
 }
 
-int MultiEditor::count() const
+int EditorPane::count() const
 {
     return ui->tabWidget->count();
 }
 
-int MultiEditor::currentIndex() const
+int EditorPane::currentIndex() const
 {
     return ui->tabWidget->currentIndex();
 }
 
-void MultiEditor::setCurrentIndex(int index)
+void EditorPane::setCurrentIndex(int index)
 {
     if (index < 0 || index >= ui->tabWidget->count())
         return;
@@ -115,17 +115,17 @@ void MultiEditor::setCurrentIndex(int index)
     syncComboBoxIndex(index);
 }
 
-DocumentPage *MultiEditor::currentPage() const
+DocumentPage *EditorPane::currentPage() const
 {
     return pageForWidget(ui->tabWidget->currentWidget());
 }
 
-DocumentPage *MultiEditor::pageAt(int index) const
+DocumentPage *EditorPane::pageAt(int index) const
 {
     return pageForWidget(ui->tabWidget->widget(index));
 }
 
-DocumentPage *MultiEditor::pageForEditor(CustomEditor *editor) const
+DocumentPage *EditorPane::pageForEditor(CustomEditor *editor) const
 {
     if (!editor)
     {
@@ -144,19 +144,19 @@ DocumentPage *MultiEditor::pageForEditor(CustomEditor *editor) const
     return nullptr;
 }
 
-CustomEditor *MultiEditor::currentEditor() const
+CustomEditor *EditorPane::currentEditor() const
 {
     DocumentPage *page = currentPage();
     return page ? page->editor() : nullptr;
 }
 
-CustomEditor *MultiEditor::editorAt(int index) const
+CustomEditor *EditorPane::editorAt(int index) const
 {
     DocumentPage *page = pageAt(index);
     return page ? page->editor() : nullptr;
 }
 
-int MultiEditor::indexOfEditor(CustomEditor *editor) const
+int EditorPane::indexOfEditor(CustomEditor *editor) const
 {
     for (int i = 0; i < ui->tabWidget->count(); ++i)
     {
@@ -169,18 +169,18 @@ int MultiEditor::indexOfEditor(CustomEditor *editor) const
     return -1;
 }
 
-QString MultiEditor::filePathAt(int index) const
+QString EditorPane::filePathAt(int index) const
 {
     CustomEditor *editor = editorAt(index);
     return editor ? editor->filePath() : QString();
 }
 
-QString MultiEditor::pageTitle(int index) const
+QString EditorPane::pageTitle(int index) const
 {
     return ui->tabWidget->tabText(index);
 }
 
-void MultiEditor::setPageTitle(int index, const QString &title)
+void EditorPane::setPageTitle(int index, const QString &title)
 {
     ui->tabWidget->setTabText(index, title);
     if (index >= 0 && index < ui->comboBox_files->count())
@@ -189,7 +189,7 @@ void MultiEditor::setPageTitle(int index, const QString &title)
     }
 }
 
-void MultiEditor::setPageToolTip(int index, const QString &toolTip)
+void EditorPane::setPageToolTip(int index, const QString &toolTip)
 {
     ui->tabWidget->setTabToolTip(index, toolTip);
     if (index >= 0 && index < ui->comboBox_files->count())
@@ -198,7 +198,7 @@ void MultiEditor::setPageToolTip(int index, const QString &toolTip)
     }
 }
 
-void MultiEditor::focusEditor(CustomEditor *editor)
+void EditorPane::focusEditor(CustomEditor *editor)
 {
     const int index = indexOfEditor(editor);
     if (index == -1)
@@ -208,13 +208,13 @@ void MultiEditor::focusEditor(CustomEditor *editor)
     ui->tabWidget->currentWidget()->setFocus();
 }
 
-bool MultiEditor::isCurrentEditorPreviewVisible() const
+bool EditorPane::isCurrentEditorPreviewVisible() const
 {
     DocumentPage *page = currentPage();
     return page && page->isPreviewVisible();
 }
 
-bool MultiEditor::toggleMarkdownPreview(MarkdownPreviewer *previewer)
+bool EditorPane::toggleMarkdownPreview(MarkdownPreviewer *previewer)
 {
     DocumentPage *page = currentPage();
     if (!page || !previewer)
@@ -225,7 +225,7 @@ bool MultiEditor::toggleMarkdownPreview(MarkdownPreviewer *previewer)
     return page->togglePreview(previewer);
 }
 
-void MultiEditor::hideMarkdownPreview(CustomEditor *editor)
+void EditorPane::hideMarkdownPreview(CustomEditor *editor)
 {
     if (DocumentPage *page = pageForEditor(editor))
     {
@@ -233,7 +233,7 @@ void MultiEditor::hideMarkdownPreview(CustomEditor *editor)
     }
 }
 
-void MultiEditor::refreshVisibleMarkdownPreview()
+void EditorPane::refreshVisibleMarkdownPreview()
 {
     if (DocumentPage *page = currentPage())
     {
@@ -241,7 +241,7 @@ void MultiEditor::refreshVisibleMarkdownPreview()
     }
 }
 
-void MultiEditor::copyCurrentSelection()
+void EditorPane::copyCurrentSelection()
 {
     if (DocumentPage *page = currentPage())
     {
@@ -249,23 +249,23 @@ void MultiEditor::copyCurrentSelection()
     }
 }
 
-void MultiEditor::setSplitViewButtonChecked(bool checked)
+void EditorPane::setSplitViewButtonChecked(bool checked)
 {
     const QSignalBlocker blocker(ui->pushButton_splitView);
     ui->pushButton_splitView->setChecked(checked);
 }
 
-void MultiEditor::setSplitViewButtonVisible(bool visible)
+void EditorPane::setSplitViewButtonVisible(bool visible)
 {
     ui->pushButton_splitView->setVisible(visible);
 }
 
-void MultiEditor::setTopbarVisible(bool visible)
+void EditorPane::setTopbarVisible(bool visible)
 {
     ui->topbar->setVisible(visible);
 }
 
-void MultiEditor::on_pushButton_closeDoc_clicked()
+void EditorPane::on_pushButton_closeDoc_clicked()
 {
     const int index = ui->comboBox_files->currentIndex();
     if (index >= 0)
@@ -274,12 +274,12 @@ void MultiEditor::on_pushButton_closeDoc_clicked()
     }
 }
 
-void MultiEditor::on_pushButton_splitView_clicked(bool checked)
+void EditorPane::on_pushButton_splitView_clicked(bool checked)
 {
     emit splitViewToggled(checked);
 }
 
-void MultiEditor::on_comboBox_files_currentIndexChanged(int index)
+void EditorPane::on_comboBox_files_currentIndexChanged(int index)
 {
     if (index >= 0 && index < ui->tabWidget->count())
     {
@@ -287,13 +287,13 @@ void MultiEditor::on_comboBox_files_currentIndexChanged(int index)
     }
 }
 
-void MultiEditor::onTabCurrentChanged(int index)
+void EditorPane::onTabCurrentChanged(int index)
 {
     syncComboBoxIndex(index);
     emit currentPageChanged(index);
 }
 
-void MultiEditor::showEditorSwitchPopup()
+void EditorPane::showEditorSwitchPopup()
 {
     if (m_switchPopup && m_switchPopup->isVisible())
         return;
@@ -315,12 +315,12 @@ void MultiEditor::showEditorSwitchPopup()
     m_switchPopup->showPopup();
 }
 
-DocumentPage *MultiEditor::pageForWidget(QWidget *widget) const
+DocumentPage *EditorPane::pageForWidget(QWidget *widget) const
 {
     return qobject_cast<DocumentPage *>(widget);
 }
 
-void MultiEditor::syncComboBoxIndex(int index)
+void EditorPane::syncComboBoxIndex(int index)
 {
     if (index >= 0 && index < ui->comboBox_files->count())
     {

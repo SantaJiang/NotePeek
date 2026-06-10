@@ -9,7 +9,7 @@
 #include "editor/externalfilewatcher.h"
 #include "editor/filesavedialog.h"
 #include "editor/lexerfactory.h"
-#include "editor/multieditor.h"
+#include "editor/editorpane.h"
 #include "find/findreplacemanager.h"
 
 #include <QApplication>
@@ -28,7 +28,7 @@ bool isMarkdownPath(const QString &filePath)
 
 } // namespace
 
-DocumentController::DocumentController(MultiEditor *pane,
+DocumentController::DocumentController(EditorPane *pane,
                                        bool createDefaultWhenEmpty,
                                        QObject *parent)
     : QObject(parent)
@@ -43,9 +43,9 @@ DocumentController::DocumentController(MultiEditor *pane,
             this, &DocumentController::filesDropped);
     connect(m_externalFileWatcher, &ExternalFileWatcher::externalFileChanged,
             this, &DocumentController::externalFileChanged);
-    connect(m_pane, &MultiEditor::pageCloseRequested,
+    connect(m_pane, &EditorPane::pageCloseRequested,
             this, &DocumentController::requestClose);
-    connect(m_pane, &MultiEditor::currentPageChanged,
+    connect(m_pane, &EditorPane::currentPageChanged,
             this, &DocumentController::onCurrentPageChanged);
 
     if (m_createDefaultWhenEmpty)

@@ -11,22 +11,22 @@ class DocumentPersistenceService;
 class EditorManager;
 class ExternalFileWatcher;
 class FindReplaceManager;
-class MultiEditor;
+class EditorPane;
 
 // Drives the document lifecycle of one editor pane: open/save/close
 // workflows, save prompts, the default blank document policy, shared
 // documents for split view and reloading externally changed files.
-// The pane itself (MultiEditor) stays a pure view.
+// The pane itself (EditorPane) stays a pure view.
 class DocumentController : public QObject
 {
     Q_OBJECT
 
 public:
-    explicit DocumentController(MultiEditor *pane,
+    explicit DocumentController(EditorPane *pane,
                                 bool createDefaultWhenEmpty = true,
                                 QObject *parent = nullptr);
 
-    MultiEditor *pane() const { return m_pane; }
+    EditorPane *pane() const { return m_pane; }
     EditorManager *editorManager() const { return m_editorManager; }
     CustomEditor *currentEditor() const;
     void setCreateDefaultWhenEmpty(bool createDefault);
@@ -80,7 +80,7 @@ private:
     void refreshWatchedFiles();
     void recordFileState(const QString &filePath);
 
-    MultiEditor *m_pane;
+    EditorPane *m_pane;
     EditorManager *m_editorManager;
     DocumentPersistenceService *m_persistence;
     ExternalFileWatcher *m_externalFileWatcher;

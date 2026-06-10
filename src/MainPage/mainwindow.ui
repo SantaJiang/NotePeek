@@ -42,8 +42,8 @@
       <property name="childrenCollapsible">
        <bool>false</bool>
       </property>
-      <widget class="MultiEditor" name="multieditor" native="true"/>
-      <widget class="MultiEditor" name="multieditorRight" native="true"/>
+      <widget class="EditorPane" name="editorPane" native="true"/>
+      <widget class="EditorPane" name="editorPaneRight" native="true"/>
      </widget>
     </item>
     <item>
@@ -307,9 +307,9 @@
    <container>1</container>
   </customwidget>
   <customwidget>
-   <class>MultiEditor</class>
+   <class>EditorPane</class>
    <extends>QWidget</extends>
-   <header>editor/multieditor.h</header>
+   <header>editor/editorpane.h</header>
    <container>1</container>
   </customwidget>
  </customwidgets>

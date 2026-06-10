@@ -1,5 +1,5 @@
-#ifndef MULTIEDITOR_H
-#define MULTIEDITOR_H
+#ifndef EDITORPANE_H
+#define EDITORPANE_H
 
 #include <QWidget>
 
@@ -10,20 +10,20 @@ class MarkdownPreviewer;
 
 namespace Ui
 {
-class MultiEditor;
+class EditorPane;
 }
 
 // Pure view of one editor pane: a tab stack of document pages plus the
 // top bar (file combo box, close and split-view buttons) and the
 // Ctrl+Tab switch popup. All document and file logic lives in
 // DocumentController.
-class MultiEditor : public QWidget
+class EditorPane : public QWidget
 {
     Q_OBJECT
 
 public:
-    explicit MultiEditor(QWidget *parent = nullptr);
-    ~MultiEditor();
+    explicit EditorPane(QWidget *parent = nullptr);
+    ~EditorPane();
 
     // Page container
     int addPage(DocumentPage *page, const QString &title, const QString &toolTip);
@@ -74,8 +74,8 @@ private:
     DocumentPage *pageForWidget(QWidget *widget) const;
     void syncComboBoxIndex(int index);
 
-    Ui::MultiEditor *ui;
+    Ui::EditorPane *ui;
     EditorSwitchPopup *m_switchPopup;
 };
 
-#endif // MULTIEDITOR_H
+#endif // EDITORPANE_H

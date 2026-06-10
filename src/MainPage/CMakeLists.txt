@@ -67,9 +67,9 @@ add_library(notepeek_widgets STATIC
     editor/externalfilewatcher.h
     editor/filesavedialog.cpp
     editor/filesavedialog.h
-    editor/multieditor.cpp
-    editor/multieditor.h
-    editor/multieditor.ui
+    editor/editorpane.cpp
+    editor/editorpane.h
+    editor/editorpane.ui
     editor/spliteditorcoordinator.cpp
     editor/spliteditorcoordinator.h
     decorators/highlightedscrollbar.cpp
