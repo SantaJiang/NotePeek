@@ -173,6 +173,14 @@ void MainWindow::applyActiveController(DocumentController *controller)
     if (editor)
     {
         updateWindowTitle(editor->isModified());
+
+        const QString filePath = editor->filePath();
+        if (!filePath.isEmpty())
+        {
+            const QFileInfo fileInfo(filePath);
+            setRootDirectory(fileInfo.absolutePath());
+            m_fileExplorerDock->selectFile(filePath);
+        }
     }
 }
 
@@ -227,7 +235,6 @@ void MainWindow::openFileAndSetRootDirectory(const QString &fileName)
 void MainWindow::on_action_new_triggered()
 {
     activeController()->newDocument();
-    setRootDirectory(QString());
 }
 
 void MainWindow::on_action_openFile_triggered()
