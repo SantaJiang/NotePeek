@@ -78,6 +78,12 @@ void FileExplorerDock::selectFile(const QString &filePath)
     m_treeView->setCurrentIndex(proxyIndex);
 }
 
+void FileExplorerDock::clearSelection()
+{
+    m_treeView->clearSelection();
+    m_treeView->setCurrentIndex(QModelIndex());
+}
+
 void FileExplorerDock::expandDirectory(const QString &dirPath)
 {
     const QModelIndex proxyIndex = proxyIndexForPath(dirPath);

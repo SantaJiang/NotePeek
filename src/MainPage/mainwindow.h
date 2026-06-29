@@ -2,6 +2,7 @@
 #define MAINWINDOW_H
 
 #include <QMainWindow>
+#include <QString>
 #include "find/findreplacemanager.h"
 #include "tool/cpp/headersourcemanager.h"
 #include "tool/markdown/markdownpreviewer.h"
@@ -55,7 +56,9 @@ private slots:
     void onSearchResultsChanged();
 
 private:
-    void setRootDirectory(const QString &dirPath);
+    void setRootDirectory(const QString &dirPath, bool explicitDirectoryRoot = false);
+    void syncFileExplorerToFile(const QString &filePath, bool allowImplicitRootChange);
+    bool isPathInExplorerRoot(const QString &filePath) const;
     void refreshHighlights();
     void openFileAndSetRootDirectory(const QString &fileName);
     void updateToolActions();
@@ -68,6 +71,8 @@ private:
     DocumentController *m_rightController;
     SplitEditorCoordinator *m_editorCoordinator;
     bool m_singleFileWindow;
+    QString m_fileExplorerRootDirectory;
+    bool m_fileExplorerRootExplicit;
     FindReplaceManager *m_findReplaceManager;
     HeaderSourceManager *m_headerSourceManager;
     MarkdownPreviewer *m_markdownPreviewer;

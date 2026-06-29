@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.16)
 
 project(NotePeek
-    VERSION 1.1.3
+    VERSION 1.1.4
     DESCRIPTION "A modern code/text editor"
     HOMEPAGE_URL "https://github.com/SantaSpeeds/NotePeek"
     LANGUAGES C CXX

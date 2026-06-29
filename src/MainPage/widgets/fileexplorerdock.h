@@ -22,6 +22,7 @@ public:
     void setVisible(bool visible);
     void setRootDirectory(const QString &dirPath);
     void selectFile(const QString &filePath);
+    void clearSelection();
     void expandDirectory(const QString &dirPath);
 
 signals:
