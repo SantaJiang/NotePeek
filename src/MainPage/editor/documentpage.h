@@ -2,11 +2,14 @@
 #define DOCUMENTPAGE_H
 
 #include <QWidget>
+#include <QPair>
+#include <QVector>
 
 class CustomEditor;
 class MarkdownPreviewer;
 class QLiteHtmlWidget;
-class QStackedWidget;
+class QSplitter;
+class QTimer;
 
 class DocumentPage : public QWidget
 {
@@ -55,13 +58,31 @@ public:
     void copyCurrentSelection() override;
     bool hasCopySelection() const override;
 
+protected:
+    bool eventFilter(QObject *watched, QEvent *event) override;
+
 private:
     void ensurePreview(MarkdownPreviewer *previewer);
     void updatePreview();
+    void schedulePreviewUpdate();
+    void syncPreviewScrollFromEditor();
+    void syncEditorScrollFromPreview();
+    void rebuildPreviewScrollMap();
+    void schedulePreviewScrollMapRebuild();
+    int sourceLineAtEditorCenter() const;
+    void scrollEditorToSourceLineCentered(int line);
+    int previewYForSourceLine(int line) const;
+    int sourceLineForPreviewY(int y) const;
+    double editorScrollRatio() const;
+    double previewScrollRatio() const;
+    static void setScrollRatio(QWidget *widget, double ratio);
 
-    QStackedWidget *m_stack;
+    QSplitter *m_splitter;
     QLiteHtmlWidget *m_preview;
     MarkdownPreviewer *m_previewer;
+    QTimer *m_updateTimer;
+    QVector<QPair<int, int>> m_previewLineMap;
+    bool m_syncingScroll;
 };
 
 #endif // DOCUMENTPAGE_H

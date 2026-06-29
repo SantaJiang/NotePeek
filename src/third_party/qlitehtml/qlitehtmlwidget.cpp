@@ -582,6 +582,14 @@ void QLiteHtmlWidget::scrollToAnchor(const QString &name)
         verticalScrollBar()->setValue(std::min(y, verticalScrollBar()->maximum()));
 }
 
+int QLiteHtmlWidget::anchorY(const QString &name) const
+{
+    if (!d->documentContainer.hasDocument())
+        return -1;
+
+    return d->documentContainer.anchorY(name);
+}
+
 void QLiteHtmlWidget::setResourceHandler(const QLiteHtmlWidget::ResourceHandler &handler)
 {
     d->documentContainer.setDataCallback(handler);
