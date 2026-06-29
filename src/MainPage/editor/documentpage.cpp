@@ -6,8 +6,11 @@
 #include <QAbstractScrollArea>
 #include <QApplication>
 #include <QClipboard>
+#include <QEvent>
 #include <QGuiApplication>
+#include <QRegularExpression>
 #include <QScrollBar>
+#include <QSet>
 #include <QSplitter>
 #include <QTimer>
 #include <QVBoxLayout>
@@ -101,6 +104,8 @@ MarkdownDocumentPage::MarkdownDocumentPage(CustomEditor *editor, QWidget *parent
     connect(m_updateTimer, &QTimer::timeout, this, &MarkdownDocumentPage::updatePreview);
     connect(editor->verticalScrollBar(), &QScrollBar::valueChanged,
             this, &MarkdownDocumentPage::syncPreviewScrollFromEditor);
+    connect(m_splitter, &QSplitter::splitterMoved,
+            this, &MarkdownDocumentPage::schedulePreviewScrollMapRebuild);
 }
 
 bool MarkdownDocumentPage::isPreviewVisible() const
@@ -132,7 +137,7 @@ bool MarkdownDocumentPage::togglePreview(MarkdownPreviewer *previewer)
     if (m_splitter->sizes().size() == 2)
     {
         const int width = qMax(1, m_splitter->width());
-        m_splitter->setSizes({width * 2 / 3, width / 3});
+        m_splitter->setSizes({width / 2, width / 2});
     }
     updatePreview();
     m_preview->setFocus();
@@ -214,6 +219,16 @@ bool MarkdownDocumentPage::hasCopySelection() const
     return DocumentPage::hasCopySelection();
 }
 
+bool MarkdownDocumentPage::eventFilter(QObject *watched, QEvent *event)
+{
+    if (watched == m_preview && event->type() == QEvent::Resize)
+    {
+        schedulePreviewScrollMapRebuild();
+    }
+
+    return DocumentPage::eventFilter(watched, event);
+}
+
 void MarkdownDocumentPage::ensurePreview(MarkdownPreviewer *previewer)
 {
     if (m_preview)
@@ -228,6 +243,7 @@ void MarkdownDocumentPage::ensurePreview(MarkdownPreviewer *previewer)
             this, &DocumentPage::copyAvailableChanged);
     connect(m_preview->verticalScrollBar(), &QScrollBar::valueChanged,
             this, &MarkdownDocumentPage::syncEditorScrollFromPreview);
+    m_preview->installEventFilter(this);
     m_splitter->addWidget(m_preview);
     m_preview->hide();
 }
@@ -239,9 +255,45 @@ void MarkdownDocumentPage::updatePreview()
         return;
     }
 
+    const int sourceLine = sourceLineAtEditorCenter();
     const double ratio = previewScrollRatio();
     m_previewer->updatePreview(m_preview, m_editor->text(), m_editor->filePath());
-    restorePreviewScroll(ratio);
+    rebuildPreviewScrollMap();
+
+    QTimer::singleShot(0, this, [this, sourceLine, ratio]() {
+        if (!isPreviewVisible() || !m_preview)
+        {
+            return;
+        }
+
+        m_syncingScroll = true;
+        QScrollBar *editorBar = m_editor->verticalScrollBar();
+        QScrollBar *previewBar = m_preview->verticalScrollBar();
+        if (editorBar->value() <= editorBar->minimum())
+        {
+            previewBar->setValue(previewBar->minimum());
+            m_syncingScroll = false;
+            return;
+        }
+        if (editorBar->value() >= editorBar->maximum())
+        {
+            previewBar->setValue(previewBar->maximum());
+            m_syncingScroll = false;
+            return;
+        }
+
+        const int y = previewYForSourceLine(sourceLine);
+        if (y >= 0)
+        {
+            const int centeredY = y - m_preview->viewport()->height() / 2;
+            previewBar->setValue(qBound(previewBar->minimum(), centeredY, previewBar->maximum()));
+        }
+        else
+        {
+            setScrollRatio(m_preview, ratio);
+        }
+        m_syncingScroll = false;
+    });
 }
 
 void MarkdownDocumentPage::schedulePreviewUpdate()
@@ -254,13 +306,37 @@ void MarkdownDocumentPage::schedulePreviewUpdate()
 
 void MarkdownDocumentPage::syncPreviewScrollFromEditor()
 {
-    if (!isPreviewVisible() || m_syncingScroll)
+    if (!m_editor || !isPreviewVisible() || m_syncingScroll)
     {
         return;
     }
 
     m_syncingScroll = true;
-    setScrollRatio(m_preview, editorScrollRatio());
+    QScrollBar *editorBar = m_editor->verticalScrollBar();
+    QScrollBar *previewBar = m_preview->verticalScrollBar();
+    if (editorBar->value() <= editorBar->minimum())
+    {
+        previewBar->setValue(previewBar->minimum());
+        m_syncingScroll = false;
+        return;
+    }
+    if (editorBar->value() >= editorBar->maximum())
+    {
+        previewBar->setValue(previewBar->maximum());
+        m_syncingScroll = false;
+        return;
+    }
+
+    const int y = previewYForSourceLine(sourceLineAtEditorCenter());
+    if (y >= 0)
+    {
+        const int centeredY = y - m_preview->viewport()->height() / 2;
+        previewBar->setValue(qBound(previewBar->minimum(), centeredY, previewBar->maximum()));
+    }
+    else
+    {
+        setScrollRatio(m_preview, editorScrollRatio());
+    }
     m_syncingScroll = false;
 }
 
@@ -272,22 +348,185 @@ void MarkdownDocumentPage::syncEditorScrollFromPreview()
     }
 
     m_syncingScroll = true;
-    setScrollRatio(m_editor, previewScrollRatio());
+    QScrollBar *editorBar = m_editor->verticalScrollBar();
+    QScrollBar *previewBar = m_preview->verticalScrollBar();
+    if (previewBar->value() <= previewBar->minimum())
+    {
+        editorBar->setValue(editorBar->minimum());
+        m_syncingScroll = false;
+        return;
+    }
+    if (previewBar->value() >= previewBar->maximum())
+    {
+        editorBar->setValue(editorBar->maximum());
+        m_syncingScroll = false;
+        return;
+    }
+
+    const int line = sourceLineForPreviewY(m_preview->verticalScrollBar()->value()
+                                           + m_preview->viewport()->height() / 2);
+    if (line >= 1)
+    {
+        scrollEditorToSourceLineCentered(line);
+    }
+    else
+    {
+        setScrollRatio(m_editor, previewScrollRatio());
+    }
     m_syncingScroll = false;
 }
 
-void MarkdownDocumentPage::restorePreviewScroll(double ratio)
+void MarkdownDocumentPage::rebuildPreviewScrollMap()
 {
-    QTimer::singleShot(0, this, [this, ratio]() {
+    m_previewLineMap.clear();
+    if (!m_preview)
+    {
+        return;
+    }
+
+    static const QRegularExpression anchorPattern(QStringLiteral("id=\"np-src-line-(\\d+)\""));
+    QSet<int> seenLines;
+    QRegularExpressionMatchIterator it = anchorPattern.globalMatch(m_preview->html());
+    while (it.hasNext())
+    {
+        const QRegularExpressionMatch match = it.next();
+        const int line = match.captured(1).toInt();
+        if (seenLines.contains(line))
+        {
+            continue;
+        }
+
+        const int y = m_preview->anchorY(QStringLiteral("np-src-line-%1").arg(line));
+        if (y >= 0)
+        {
+            m_previewLineMap.append(qMakePair(line, y));
+            seenLines.insert(line);
+        }
+    }
+
+    std::sort(m_previewLineMap.begin(), m_previewLineMap.end(),
+              [](const QPair<int, int> &a, const QPair<int, int> &b) {
+                  return a.first < b.first;
+              });
+}
+
+void MarkdownDocumentPage::schedulePreviewScrollMapRebuild()
+{
+    if (!isPreviewVisible())
+    {
+        return;
+    }
+
+    const int sourceLine = sourceLineAtEditorCenter();
+    QTimer::singleShot(0, this, [this, sourceLine]() {
         if (!isPreviewVisible() || !m_preview)
         {
             return;
         }
 
-        m_syncingScroll = true;
-        setScrollRatio(m_preview, ratio);
-        m_syncingScroll = false;
+        rebuildPreviewScrollMap();
+        const int y = previewYForSourceLine(sourceLine);
+        if (y >= 0 && !m_syncingScroll)
+        {
+            m_syncingScroll = true;
+            QScrollBar *bar = m_preview->verticalScrollBar();
+            const int centeredY = y - m_preview->viewport()->height() / 2;
+            bar->setValue(qBound(bar->minimum(), centeredY, bar->maximum()));
+            m_syncingScroll = false;
+        }
     });
+}
+
+int MarkdownDocumentPage::sourceLineAtEditorCenter() const
+{
+    if (!m_editor)
+    {
+        return 1;
+    }
+
+    const int firstVisibleLine = int(m_editor->SendScintilla(QsciScintillaBase::SCI_GETFIRSTVISIBLELINE));
+    const int visibleLines = qMax(1, int(m_editor->SendScintilla(QsciScintillaBase::SCI_LINESONSCREEN)));
+    const int centerVisibleLine = firstVisibleLine + visibleLines / 2;
+    const int documentLine = int(m_editor->SendScintilla(QsciScintillaBase::SCI_DOCLINEFROMVISIBLE,
+                                                         centerVisibleLine));
+    return qMax(0, documentLine) + 1;
+}
+
+void MarkdownDocumentPage::scrollEditorToSourceLineCentered(int line)
+{
+    if (!m_editor)
+    {
+        return;
+    }
+
+    const int visibleLines = qMax(1, int(m_editor->SendScintilla(QsciScintillaBase::SCI_LINESONSCREEN)));
+    const int visibleLine = int(m_editor->SendScintilla(QsciScintillaBase::SCI_VISIBLEFROMDOCLINE,
+                                                        qMax(0, line - 1)));
+    m_editor->setFirstVisibleLine(qMax(0, visibleLine - visibleLines / 2));
+}
+
+int MarkdownDocumentPage::previewYForSourceLine(int line) const
+{
+    if (m_previewLineMap.isEmpty())
+    {
+        return -1;
+    }
+
+    if (line <= m_previewLineMap.first().first)
+    {
+        return m_previewLineMap.first().second;
+    }
+
+    for (int i = 1; i < m_previewLineMap.size(); ++i)
+    {
+        const auto previous = m_previewLineMap.at(i - 1);
+        const auto next = m_previewLineMap.at(i);
+        if (line <= next.first)
+        {
+            const int lineSpan = next.first - previous.first;
+            if (lineSpan <= 0)
+            {
+                return previous.second;
+            }
+
+            const double t = double(line - previous.first) / double(lineSpan);
+            return previous.second + qRound(t * double(next.second - previous.second));
+        }
+    }
+
+    return m_previewLineMap.last().second;
+}
+
+int MarkdownDocumentPage::sourceLineForPreviewY(int y) const
+{
+    if (m_previewLineMap.isEmpty())
+    {
+        return -1;
+    }
+
+    if (y <= m_previewLineMap.first().second)
+    {
+        return m_previewLineMap.first().first;
+    }
+
+    for (int i = 1; i < m_previewLineMap.size(); ++i)
+    {
+        const auto previous = m_previewLineMap.at(i - 1);
+        const auto next = m_previewLineMap.at(i);
+        if (y <= next.second)
+        {
+            const int ySpan = next.second - previous.second;
+            if (ySpan <= 0)
+            {
+                return previous.first;
+            }
+
+            const double t = double(y - previous.second) / double(ySpan);
+            return previous.first + qRound(t * double(next.first - previous.first));
+        }
+    }
+
+    return m_previewLineMap.last().first;
 }
 
 double MarkdownDocumentPage::editorScrollRatio() const

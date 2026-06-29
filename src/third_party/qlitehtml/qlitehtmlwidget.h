@@ -41,6 +41,7 @@ public:
     void setAntialias(bool on);
 
     void scrollToAnchor(const QString &name);
+    int anchorY(const QString &name) const;
 
     using ResourceHandler = std::function<QByteArray(QUrl)>;
     void setResourceHandler(const ResourceHandler &handler);

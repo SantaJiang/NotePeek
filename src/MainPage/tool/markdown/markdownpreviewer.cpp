@@ -9,21 +9,64 @@
 #include <QPageLayout>
 #include <QPageSize>
 #include <QPrinter>
+#include <QRegularExpression>
+#include <QSet>
 #include <QUuid>
 #include <QUrl>
 
 #include <qlitehtmlwidget.h>
 
 extern "C" {
-#include <md4c-html.h>
+#include <cmark-gfm-core-extensions.h>
+#include <cmark-gfm-extension_api.h>
+#include <cmark-gfm.h>
 }
 
 namespace {
 
-void appendHtmlFragment(const MD_CHAR *data, MD_SIZE size, void *userData)
+void attachGfmExtension(cmark_parser *parser, const char *name)
 {
-    auto *html = static_cast<QByteArray *>(userData);
-    html->append(data, static_cast<int>(size));
+    cmark_syntax_extension *extension = cmark_find_syntax_extension(name);
+    if (extension)
+    {
+        cmark_parser_attach_syntax_extension(parser, extension);
+    }
+}
+
+QString addSourceLineAnchors(const QString &html)
+{
+    static const QRegularExpression sourceposPattern(
+        QStringLiteral("<([A-Za-z][A-Za-z0-9]*)\\b([^>]*)\\sdata-sourcepos=\"((\\d+):\\d+-(\\d+):\\d+)\""));
+
+    QString anchored;
+    anchored.reserve(html.size() + 1024);
+
+    QSet<int> anchoredLines;
+    qsizetype lastEnd = 0;
+    QRegularExpressionMatchIterator it = sourceposPattern.globalMatch(html);
+    while (it.hasNext())
+    {
+        const QRegularExpressionMatch match = it.next();
+        const int line = match.captured(4).toInt();
+        anchored += html.mid(lastEnd, match.capturedStart() - lastEnd);
+        if (!anchoredLines.contains(line))
+        {
+            anchored += QStringLiteral("<%1 id=\"np-src-line-%2\"%3 data-sourcepos=\"%4\"")
+                            .arg(match.captured(1))
+                            .arg(line)
+                            .arg(match.captured(2))
+                            .arg(match.captured(3));
+            anchoredLines.insert(line);
+        }
+        else
+        {
+            anchored += match.captured(0);
+        }
+        lastEnd = match.capturedEnd();
+    }
+
+    anchored += html.mid(lastEnd);
+    return anchored;
 }
 
 QByteArray loadDataUrl(const QUrl &url)
@@ -276,20 +319,45 @@ bool MarkdownPreviewer::exportToPdf(const QString &markdown, const QString &file
 QString MarkdownPreviewer::markdownToHtml(const QString &markdown) const
 {
     const QByteArray input = markdown.toUtf8();
-    QByteArray html;
 
-    const int result = md_html(input.constData(),
-                               static_cast<MD_SIZE>(input.size()),
-                               appendHtmlFragment,
-                               &html,
-                               MD_DIALECT_GITHUB,
-                               MD_HTML_FLAG_SKIP_UTF8_BOM);
-    if (result != 0)
+    cmark_gfm_core_extensions_ensure_registered();
+
+    const int options = CMARK_OPT_SOURCEPOS
+                        | CMARK_OPT_UNSAFE
+                        | CMARK_OPT_TABLE_PREFER_STYLE_ATTRIBUTES
+                        | CMARK_OPT_STRIKETHROUGH_DOUBLE_TILDE;
+    cmark_parser *parser = cmark_parser_new(options);
+    if (!parser)
     {
         return QStringLiteral("<p>Failed to render Markdown.</p>");
     }
 
-    return QString::fromUtf8(html);
+    attachGfmExtension(parser, "table");
+    attachGfmExtension(parser, "tasklist");
+    attachGfmExtension(parser, "strikethrough");
+    attachGfmExtension(parser, "autolink");
+    attachGfmExtension(parser, "tagfilter");
+
+    cmark_parser_feed(parser, input.constData(), static_cast<size_t>(input.size()));
+    cmark_node *document = cmark_parser_finish(parser);
+    if (!document)
+    {
+        cmark_parser_free(parser);
+        return QStringLiteral("<p>Failed to render Markdown.</p>");
+    }
+
+    char *html = cmark_render_html(document, options, cmark_parser_get_syntax_extensions(parser));
+    QString rendered;
+    if (html)
+    {
+        rendered = addSourceLineAnchors(QString::fromUtf8(html));
+        cmark_get_default_mem_allocator()->free(html);
+    }
+
+    cmark_node_free(document);
+    cmark_parser_free(parser);
+
+    return rendered.isEmpty() ? QStringLiteral("<p>Failed to render Markdown.</p>") : rendered;
 }
 
 QString MarkdownPreviewer::buildHtmlDocument(const QString &bodyHtml, RenderMode mode) const

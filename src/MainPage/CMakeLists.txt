@@ -39,7 +39,8 @@ add_library(notepeek_core STATIC
 target_link_libraries(notepeek_core PUBLIC
     qscintilla2
     qlitehtml
-    md4c
+    libcmark-gfm-extensions_static
+    libcmark-gfm_static
     ${NOTEPEEK_QT_LIBS}
 )
 
@@ -47,6 +48,10 @@ target_include_directories(notepeek_core PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_CURRENT_SOURCE_DIR}/../QScintilla
     ${CMAKE_CURRENT_SOURCE_DIR}/../QScintilla/scintilla/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../third_party/cmark-gfm/src
+    ${CMAKE_CURRENT_BINARY_DIR}/../third_party/cmark-gfm/src
+    ${CMAKE_CURRENT_SOURCE_DIR}/../third_party/cmark-gfm/extensions
+    ${CMAKE_CURRENT_BINARY_DIR}/../third_party/cmark-gfm/extensions
 )
 
 add_library(notepeek_widgets STATIC
