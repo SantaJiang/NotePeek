@@ -294,9 +294,6 @@ void MainWindow::on_action_showSlideBar_triggered(bool checked)
 void MainWindow::on_action_undo_triggered()
 {
     DocumentController *controller = activeController();
-    if (controller->pane()->isCurrentEditorPreviewVisible())
-        return;
-
     if (CustomEditor *editor = controller->currentEditor())
     {
         editor->undo();
@@ -306,9 +303,6 @@ void MainWindow::on_action_undo_triggered()
 void MainWindow::on_action_redo_triggered()
 {
     DocumentController *controller = activeController();
-    if (controller->pane()->isCurrentEditorPreviewVisible())
-        return;
-
     if (CustomEditor *editor = controller->currentEditor())
     {
         editor->redo();
@@ -318,9 +312,6 @@ void MainWindow::on_action_redo_triggered()
 void MainWindow::on_action_cut_triggered()
 {
     DocumentController *controller = activeController();
-    if (controller->pane()->isCurrentEditorPreviewVisible())
-        return;
-
     if (CustomEditor *editor = controller->currentEditor())
     {
         editor->cut();
@@ -335,9 +326,6 @@ void MainWindow::on_action_copy_triggered()
 void MainWindow::on_action_paste_triggered()
 {
     DocumentController *controller = activeController();
-    if (controller->pane()->isCurrentEditorPreviewVisible())
-        return;
-
     if (CustomEditor *editor = controller->currentEditor())
     {
         editor->paste();
@@ -347,9 +335,6 @@ void MainWindow::on_action_paste_triggered()
 void MainWindow::on_action_find_triggered()
 {
     DocumentController *controller = activeController();
-    if (controller->pane()->isCurrentEditorPreviewVisible())
-        return;
-
     CustomEditor *editor = controller->currentEditor();
     if (!editor)
         return;
@@ -464,7 +449,7 @@ void MainWindow::openFileInNewWindow(const QString &filePath)
 
 void MainWindow::updateEditActions(bool available)
 {
-    const bool editingAvailable = !activeController()->pane()->isCurrentEditorPreviewVisible();
+    const bool editingAvailable = activeController()->currentEditor() != nullptr;
     ui->action_cut->setEnabled(editingAvailable && available);
     ui->action_copy->setEnabled(available);
     ui->action_paste->setEnabled(editingAvailable);
@@ -509,7 +494,7 @@ void MainWindow::updateToolActions()
     ui->menuToolCpp->setEnabled(cppSupported && !previewVisible);
     ui->action_markdownPreview->setEnabled(markdownSupported);
     ui->action_markdownPreview->setChecked(markdownSupported && previewVisible);
-    ui->action_markdownPreview->setText(previewVisible ? tr("Show Markdown Source") : tr("Preview Markdown"));
+    ui->action_markdownPreview->setText(previewVisible ? tr("Hide Markdown Preview") : tr("Preview Markdown"));
     ui->action_markdownExportPdf->setEnabled(markdownSupported);
     ui->menuToolMarkdown->setEnabled(markdownSupported);
     ui->menuTool->setEnabled(true);

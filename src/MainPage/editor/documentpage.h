@@ -6,7 +6,8 @@
 class CustomEditor;
 class MarkdownPreviewer;
 class QLiteHtmlWidget;
-class QStackedWidget;
+class QSplitter;
+class QTimer;
 
 class DocumentPage : public QWidget
 {
@@ -58,10 +59,19 @@ public:
 private:
     void ensurePreview(MarkdownPreviewer *previewer);
     void updatePreview();
+    void schedulePreviewUpdate();
+    void syncPreviewScrollFromEditor();
+    void syncEditorScrollFromPreview();
+    void restorePreviewScroll(double ratio);
+    double editorScrollRatio() const;
+    double previewScrollRatio() const;
+    static void setScrollRatio(QWidget *widget, double ratio);
 
-    QStackedWidget *m_stack;
+    QSplitter *m_splitter;
     QLiteHtmlWidget *m_preview;
     MarkdownPreviewer *m_previewer;
+    QTimer *m_updateTimer;
+    bool m_syncingScroll;
 };
 
 #endif // DOCUMENTPAGE_H
