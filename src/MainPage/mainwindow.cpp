@@ -20,6 +20,39 @@
 #include "editor/spliteditorcoordinator.h"
 #include "widgets/fileexplorerdock.h"
 
+namespace {
+
+QString normalizedAbsolutePath(const QString &path)
+{
+    if (path.isEmpty())
+    {
+        return QString();
+    }
+
+    const QFileInfo info(path);
+    const QString canonicalPath = info.canonicalFilePath();
+    const QString absolutePath = canonicalPath.isEmpty() ? info.absoluteFilePath() : canonicalPath;
+    return QDir::cleanPath(absolutePath);
+}
+
+bool isPathInsideDirectory(const QString &path, const QString &directory)
+{
+    const QString normalizedPath = normalizedAbsolutePath(path);
+    const QString normalizedDirectory = normalizedAbsolutePath(directory);
+    if (normalizedPath.isEmpty() || normalizedDirectory.isEmpty())
+    {
+        return false;
+    }
+
+    const QString relativePath = QDir(normalizedDirectory).relativeFilePath(normalizedPath);
+    return relativePath == "."
+           || (!relativePath.startsWith("../")
+               && relativePath != ".."
+               && !QDir::isAbsolutePath(relativePath));
+}
+
+} // namespace
+
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
     , ui(new Ui::MainWindow)
@@ -28,6 +61,7 @@ MainWindow::MainWindow(QWidget *parent)
     , m_rightController(nullptr)
     , m_editorCoordinator(nullptr)
     , m_singleFileWindow(false)
+    , m_fileExplorerRootExplicit(false)
     , m_findReplaceManager(new FindReplaceManager(this))
     , m_headerSourceManager(new HeaderSourceManager(this))
     , m_markdownPreviewer(new MarkdownPreviewer(this))
@@ -177,9 +211,7 @@ void MainWindow::applyActiveController(DocumentController *controller)
         const QString filePath = editor->filePath();
         if (!filePath.isEmpty())
         {
-            const QFileInfo fileInfo(filePath);
-            setRootDirectory(fileInfo.absolutePath());
-            m_fileExplorerDock->selectFile(filePath);
+            syncFileExplorerToFile(filePath, false);
         }
     }
 }
@@ -218,18 +250,57 @@ void MainWindow::refreshHighlights()
     }
 }
 
-void MainWindow::setRootDirectory(const QString &dirPath)
+void MainWindow::setRootDirectory(const QString &dirPath, bool explicitDirectoryRoot)
 {
+    m_fileExplorerRootDirectory = normalizedAbsolutePath(dirPath);
+    m_fileExplorerRootExplicit = explicitDirectoryRoot && !m_fileExplorerRootDirectory.isEmpty();
     m_fileExplorerDock->setRootDirectory(dirPath);
+}
+
+void MainWindow::syncFileExplorerToFile(const QString &filePath, bool allowImplicitRootChange)
+{
+    if (filePath.isEmpty())
+    {
+        return;
+    }
+
+    if (m_fileExplorerRootDirectory.isEmpty())
+    {
+        if (allowImplicitRootChange)
+        {
+            const QFileInfo fileInfo(filePath);
+            setRootDirectory(fileInfo.absolutePath(), false);
+            m_fileExplorerDock->selectFile(filePath);
+        }
+        return;
+    }
+
+    if (isPathInExplorerRoot(filePath))
+    {
+        m_fileExplorerDock->selectFile(filePath);
+        return;
+    }
+
+    if (!m_fileExplorerRootExplicit && allowImplicitRootChange)
+    {
+        const QFileInfo fileInfo(filePath);
+        setRootDirectory(fileInfo.absolutePath(), false);
+        m_fileExplorerDock->selectFile(filePath);
+        return;
+    }
+
+    m_fileExplorerDock->clearSelection();
+}
+
+bool MainWindow::isPathInExplorerRoot(const QString &filePath) const
+{
+    return isPathInsideDirectory(filePath, m_fileExplorerRootDirectory);
 }
 
 void MainWindow::openFileAndSetRootDirectory(const QString &fileName)
 {
     activeController()->openFile(fileName);
-
-    const QFileInfo fileInfo(fileName);
-    setRootDirectory(fileInfo.absolutePath());
-    m_fileExplorerDock->selectFile(fileName);
+    syncFileExplorerToFile(fileName, true);
 }
 
 void MainWindow::on_action_new_triggered()
@@ -254,7 +325,7 @@ void MainWindow::on_action_openDirectory_triggered()
         const QString dirPath = QFileDialog::getExistingDirectory(this, tr("Open Directory..."), ".");
         if (!dirPath.isEmpty())
         {
-            setRootDirectory(dirPath);
+            setRootDirectory(dirPath, true);
             m_fileExplorerDock->setVisible(true);
             ui->action_showSlideBar->setChecked(true);
             m_fileExplorerDock->expandDirectory(dirPath);
@@ -365,7 +436,7 @@ void MainWindow::on_action_switchHeaderSource_triggered()
     if (!correspondingFile.isEmpty())
     {
         controller->openFile(correspondingFile);
-        m_fileExplorerDock->selectFile(correspondingFile);
+        syncFileExplorerToFile(correspondingFile, false);
     }
 }
 
