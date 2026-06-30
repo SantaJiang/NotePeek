@@ -186,6 +186,7 @@ void EditorManager::forgetEditor(CustomEditor *editor)
 void EditorManager::setupEditor(CustomEditor *editor)
 {
     // Basic editor setup
+    editor->setMargins(1);
     editor->setMarginType(0, CustomEditor::NumberMargin);
     editor->setMarginWidth(0, 30);
     // Start with the minimum scroll width so an empty document shows no horizontal
