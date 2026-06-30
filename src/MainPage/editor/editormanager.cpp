@@ -4,6 +4,7 @@
 #include <QFontDatabase>
 #include <QApplication>
 #include <QScreen>
+#include <QSet>
 #include <QTimer>
 #include <Qsci/qscilexer.h>
 #include "decorators/highlightedscrollbardecorator.h"
@@ -16,6 +17,46 @@ namespace {
 long toScintillaColor(const QColor &color)
 {
     return (color.blue() << 16) | (color.green() << 8) | color.red();
+}
+
+bool shouldUseSoftWrap(const QString &filePath, LexerFactory::Language lang)
+{
+    switch (lang)
+    {
+    case LexerFactory::MARKDOWN:
+    case LexerFactory::TEX:
+    case LexerFactory::PO:
+        return true;
+    default:
+        break;
+    }
+
+    const QFileInfo fileInfo(filePath);
+    const QString suffix = fileInfo.suffix().toLower();
+    static const QSet<QString> proseExtensions = {
+        QStringLiteral("txt"),
+        QStringLiteral("text"),
+        QStringLiteral("rst"),
+        QStringLiteral("adoc"),
+        QStringLiteral("asciidoc"),
+        QStringLiteral("org")
+    };
+    if (proseExtensions.contains(suffix))
+    {
+        return true;
+    }
+
+    const QString fileName = fileInfo.fileName().toLower();
+    static const QSet<QString> proseFileNames = {
+        QStringLiteral("readme"),
+        QStringLiteral("license"),
+        QStringLiteral("copying"),
+        QStringLiteral("notice"),
+        QStringLiteral("changelog"),
+        QStringLiteral("authors"),
+        QStringLiteral("todo")
+    };
+    return proseFileNames.contains(fileName);
 }
 
 } // namespace
@@ -145,6 +186,7 @@ void EditorManager::forgetEditor(CustomEditor *editor)
 void EditorManager::setupEditor(CustomEditor *editor)
 {
     // Basic editor setup
+    editor->setMargins(1);
     editor->setMarginType(0, CustomEditor::NumberMargin);
     editor->setMarginWidth(0, 30);
     // Start with the minimum scroll width so an empty document shows no horizontal
@@ -154,6 +196,7 @@ void EditorManager::setupEditor(CustomEditor *editor)
     editor->setTabWidth(4);
     editor->setCaretLineVisible(true);
     editor->setBraceMatching(CustomEditor::SloppyBraceMatch);
+    editor->setWrapMode(CustomEditor::WrapNone);
 
     // Set UTF-8 encoding
     editor->setUtf8(true);
@@ -194,6 +237,12 @@ void EditorManager::setupScrollBarDecorator(CustomEditor *editor)
 void EditorManager::updateLineNumberMarginWidth(CustomEditor *editor)
 {
     if (!editor) return;
+
+    if (editor->wrapMode() != CustomEditor::WrapNone)
+    {
+        editor->setMarginWidth(0, 0);
+        return;
+    }
 
     int lines = editor->lines();
     int digits = 1;
@@ -286,8 +335,26 @@ void EditorManager::updateEditorSyntax(CustomEditor *editor, const QString &file
         setEditorFont(editor);
     }
     setMarginsFont(editor);
+    applyDisplayPolicy(editor, filePath);
     // Re-apply margin colors after lexer change (lexer can override margin colors)
     applyEditorColors(editor);
+}
+
+void EditorManager::applyDisplayPolicy(CustomEditor *editor, const QString &filePath)
+{
+    if (!editor)
+    {
+        return;
+    }
+
+    const LexerFactory::Language lang = LexerFactory::languageFromFilePath(filePath);
+    const bool softWrap = shouldUseSoftWrap(filePath, lang);
+    editor->setWrapMode(softWrap ? CustomEditor::WrapWord : CustomEditor::WrapNone);
+    editor->setMarginWidth(0, softWrap ? 0 : 30);
+    if (!softWrap)
+    {
+        updateLineNumberMarginWidth(editor);
+    }
 }
 
 void EditorManager::reapplyThemeToAllEditors()

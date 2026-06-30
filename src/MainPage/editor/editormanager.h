@@ -38,6 +38,7 @@ private:
     void setupScrollBarDecorator(CustomEditor *editor);
     void setEditorFont(CustomEditor *editor);
     void setMarginsFont(CustomEditor *editor);
+    void applyDisplayPolicy(CustomEditor *editor, const QString &filePath);
     void purgeOldEditorPointers();
     void applyEditorColors(CustomEditor *editor);
     void applyLexerTheme(class QsciLexer *lexer);

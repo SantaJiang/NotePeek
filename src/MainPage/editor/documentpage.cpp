@@ -257,16 +257,25 @@ void MarkdownDocumentPage::updatePreview()
 
     const int sourceLine = sourceLineAtEditorCenter();
     const double ratio = previewScrollRatio();
+    const int firstVisibleLine = int(m_editor->SendScintilla(QsciScintillaBase::SCI_GETFIRSTVISIBLELINE));
+    const int xOffset = int(m_editor->SendScintilla(QsciScintillaBase::SCI_GETXOFFSET));
+
+    m_syncingScroll = true;
     m_previewer->updatePreview(m_preview, m_editor->text(), m_editor->filePath());
     rebuildPreviewScrollMap();
+    m_editor->SendScintilla(QsciScintillaBase::SCI_SETFIRSTVISIBLELINE, firstVisibleLine);
+    m_editor->SendScintilla(QsciScintillaBase::SCI_SETXOFFSET, xOffset);
 
-    QTimer::singleShot(0, this, [this, sourceLine, ratio]() {
-        if (!isPreviewVisible() || !m_preview)
+    QTimer::singleShot(0, this, [this, sourceLine, ratio, firstVisibleLine, xOffset]() {
+        if (!isPreviewVisible() || !m_preview || !m_editor)
         {
+            m_syncingScroll = false;
             return;
         }
 
-        m_syncingScroll = true;
+        m_editor->SendScintilla(QsciScintillaBase::SCI_SETFIRSTVISIBLELINE, firstVisibleLine);
+        m_editor->SendScintilla(QsciScintillaBase::SCI_SETXOFFSET, xOffset);
+
         QScrollBar *editorBar = m_editor->verticalScrollBar();
         QScrollBar *previewBar = m_preview->verticalScrollBar();
         if (editorBar->value() <= editorBar->minimum())
