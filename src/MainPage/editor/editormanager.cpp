@@ -2,8 +2,6 @@
 #include "themecolors.h"
 #include <QFileInfo>
 #include <QFontDatabase>
-#include <QApplication>
-#include <QScreen>
 #include <QSet>
 #include <QTimer>
 #include <Qsci/qscilexer.h>
@@ -211,6 +209,9 @@ void EditorManager::setupEditor(CustomEditor *editor)
     connect(editor, &CustomEditor::textChanged, this, [editor]() {
         emit editor->modificationChanged(editor->isModified());
     });
+    connect(editor, &CustomEditor::linesChanged, this, [this, editor]() {
+        updateLineNumberMarginWidth(editor);
+    });
 
     setupScrollBarDecorator(editor);
 }
@@ -252,19 +253,11 @@ void EditorManager::updateLineNumberMarginWidth(CustomEditor *editor)
         digits++;
     }
 
-    QScreen *primaryScreen = QApplication::primaryScreen();
-    if(!primaryScreen)
-    {
-        return;
-    }
-    qreal dpr = primaryScreen->devicePixelRatio();
-    QFont font = editor->font();
-    QFontMetrics fm(font);
-
-    int charWidth = fm.horizontalAdvance('0');
-    int width = (charWidth * digits) + (10 * dpr);
-    width = qMax(width, 30);
-
+    const int visibleDigits = qMax(digits, 2);
+    const QString sample = QString(visibleDigits, QLatin1Char('9')) + QLatin1Char(' ');
+    const int width = editor->SendScintilla(QsciScintillaBase::SCI_TEXTWIDTH,
+                                            QsciScintillaBase::STYLE_LINENUMBER,
+                                            sample.toUtf8().constData());
     editor->setMarginWidth(0, width);
 }
 
@@ -420,6 +413,9 @@ void EditorManager::applyEditorColors(CustomEditor *editor)
     // works for SC_MARGIN_COLOUR type margins.
     editor->setMarginsBackgroundColor(marginBg());
     editor->setMarginsForegroundColor(marginFg());
+    editor->setCaretForegroundColor(caretFg());
+    editor->SendScintilla(QsciScintillaBase::SCI_SETADDITIONALCARETFORE,
+                          toScintillaColor(caretFg()));
     editor->setCaretLineBackgroundColor(caretLineBg());
     editor->setMatchedBraceForegroundColor(matchedBraceFg());
     editor->setMatchedBraceBackgroundColor(matchedBraceBg());

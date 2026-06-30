@@ -35,6 +35,7 @@ namespace Editor {
     inline QColor marginBg()           { return isDarkMode() ? QColor(0x2d,0x2d,0x2d) : QColor(0xf0,0xf0,0xf0); }
     inline QColor marginFg()           { return isDarkMode() ? QColor(0x85,0x85,0x85) : QColor(0x66,0x66,0x66); }
     inline QColor caretLineBg()        { return isDarkMode() ? QColor(0x2a,0x2a,0x2a) : QColor(0xe8,0xe8,0xff); }
+    inline QColor caretFg()            { return isDarkMode() ? QColor(0xff,0xff,0xff) : QColor(0x00,0x00,0x00); }
     inline QColor background()         { return isDarkMode() ? QColor(0x1e,0x1e,0x1e) : QColor(0xff,0xff,0xff); }
     inline QColor foreground()         { return isDarkMode() ? QColor(0xd4,0xd4,0xd4) : QColor(0x00,0x00,0x00); }
     inline QColor matchedBraceFg()     { return isDarkMode() ? QColor(0x56,0x9c,0xd6) : Qt::blue; }
