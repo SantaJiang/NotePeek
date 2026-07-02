@@ -64,6 +64,46 @@ static inline bool IsControlCharacter(int ch) {
 	return ch >= 0 && ch < ' ';
 }
 
+static bool IsMarkdownListMarkerPrefixBreak(const LineLayout *ll, Sci::Position p) {
+	if (!ll || p <= 0 || p >= ll->numCharsInLine) {
+		return false;
+	}
+
+	Sci::Position i = 0;
+	while ((i < ll->numCharsInLine) && IsSpaceOrTab(ll->chars[i])) {
+		i++;
+	}
+
+	const Sci::Position markerStart = i;
+	if (i >= ll->numCharsInLine) {
+		return false;
+	}
+
+	const char marker = ll->chars[i];
+	if ((marker == '-') || (marker == '+') || (marker == '*')) {
+		i++;
+	} else if ((marker >= '0') && (marker <= '9')) {
+		while ((i < ll->numCharsInLine) && (ll->chars[i] >= '0') && (ll->chars[i] <= '9')) {
+			i++;
+		}
+		if ((i >= ll->numCharsInLine) || ((ll->chars[i] != '.') && (ll->chars[i] != ')'))) {
+			return false;
+		}
+		i++;
+	} else {
+		return false;
+	}
+
+	if ((i >= ll->numCharsInLine) || !IsSpaceOrTab(ll->chars[i])) {
+		return false;
+	}
+	while ((i < ll->numCharsInLine) && IsSpaceOrTab(ll->chars[i])) {
+		i++;
+	}
+
+	return (p > markerStart) && (p <= i);
+}
+
 PrintParameters::PrintParameters() {
 	magnification = 0;
 	colourMode = SC_PRINT_NORMAL;
@@ -583,9 +623,11 @@ void EditView::LayoutLine(const EditModel &model, Sci::Line line, Surface *surfa
 							- posLineStart;
 						p = model.pdoc->MovePositionOutsideChar(p + 1 + posLineStart, 1) - posLineStart;
 						continue;
-					} else if ((vstyle.wrapState == eWrapWord) && (ll->styles[p] != ll->styles[p - 1])) {
+					} else if ((vstyle.wrapState == eWrapWord) && (ll->styles[p] != ll->styles[p - 1])
+						&& !IsMarkdownListMarkerPrefixBreak(ll, p)) {
 						lastGoodBreak = p;
-					} else if (IsSpaceOrTab(ll->chars[p - 1]) && !IsSpaceOrTab(ll->chars[p])) {
+					} else if (IsSpaceOrTab(ll->chars[p - 1]) && !IsSpaceOrTab(ll->chars[p])
+						&& !IsMarkdownListMarkerPrefixBreak(ll, p)) {
 						lastGoodBreak = p;
 					}
 				}
