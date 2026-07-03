@@ -301,16 +301,23 @@ void EditorManager::updateEditorSyntax(CustomEditor *editor, const QString &file
 
     if(lexer)
     {
-        QFont editorFont = editor->font();
-        for (int i = 0; i <= QsciScintillaBase::STYLE_MAX; ++i)
-        {
-            lexer->setFont(editorFont, i);
-        }
-
         applyLexerTheme(lexer);
 
         lexer->setParent(editor);
         editor->setLexer(lexer);
+
+        // Force the editor font onto every style *after* attaching the lexer.
+        // setLexer() (through detachLexer) issues SCI_STYLERESETDEFAULT +
+        // SCI_STYLECLEARALL, which resets all styles to the Qt application UI
+        // font.  QScintilla only restores the styles the lexer actually
+        // describes, so the remaining predefined styles keep the (often taller)
+        // UI font.  Scintilla derives the line height from the tallest style,
+        // so those stray styles silently inflate the vertical line spacing on
+        // every re-lex (e.g. saving an already-open file).  Applying the font
+        // now — with the lexer's fontChanged signal connected to the editor —
+        // pushes the monospace font to all styles and keeps the spacing stable.
+        applyUniformStyleFont(editor, lexer);
+
         if (oldLexer && oldLexer != lexer)
         {
             oldLexer->deleteLater();
@@ -384,6 +391,20 @@ void EditorManager::reapplyThemeToAllEditors()
     });
 }
 
+void EditorManager::applyUniformStyleFont(CustomEditor *editor, QsciLexer *lexer)
+{
+    if (!editor || !lexer) return;
+
+    // The lexer's fontChanged signal is connected to the editor by setLexer(),
+    // so setting the font here reaches every Scintilla style (not just the ones
+    // the lexer describes) and keeps the line height tied to the editor font.
+    const QFont editorFont = editor->font();
+    for (int i = 0; i <= QsciScintillaBase::STYLE_MAX; ++i)
+    {
+        lexer->setFont(editorFont, i);
+    }
+}
+
 void EditorManager::reapplyEditorSyntax(CustomEditor *editor)
 {
     if (!editor) return;
@@ -394,6 +415,10 @@ void EditorManager::reapplyEditorSyntax(CustomEditor *editor)
         applyLexerTheme(lexer);
         // Re-set the lexer to trigger QScintilla internal refresh
         editor->setLexer(lexer);
+        // Re-setting the lexer resets all styles to the UI font (see
+        // updateEditorSyntax); restore the editor font across every style so a
+        // theme change does not inflate the line spacing.
+        applyUniformStyleFont(editor, lexer);
     }
     else
     {

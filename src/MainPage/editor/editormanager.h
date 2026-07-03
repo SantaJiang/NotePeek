@@ -42,6 +42,7 @@ private:
     void purgeOldEditorPointers();
     void applyEditorColors(CustomEditor *editor);
     void applyLexerTheme(class QsciLexer *lexer);
+    void applyUniformStyleFont(CustomEditor *editor, class QsciLexer *lexer);
     void reapplyEditorSyntax(CustomEditor *editor);
     void applyBaseEditorColors(CustomEditor *editor);
 
