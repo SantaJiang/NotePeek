@@ -54,7 +54,7 @@ public:
     void copyCurrentSelection();
 
     // Chrome
-    void setSplitViewButtonChecked(bool checked);
+    void setSplitViewButtonCollapseMode(bool collapseMode);
     void setSplitViewButtonVisible(bool visible);
     void setTopbarVisible(bool visible);
 

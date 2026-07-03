@@ -76,6 +76,13 @@ namespace FindReplace {
     inline QColor highlightIndicator() { return isDarkMode() ? QColor(0xF5,0x9E,0x0B) : QColor(0xF5,0x9E,0x0B); }
 }
 
+// ---------- editor splitter ----------
+
+namespace Splitter {
+    inline QColor handleBg()           { return isDarkMode() ? QColor(0x3a,0x3a,0x3a) : QColor(0xd0,0xd4,0xdc); }
+    inline QColor handleBorder()       { return isDarkMode() ? QColor(0x5a,0x5a,0x5a) : QColor(0xa8,0xaf,0xba); }
+}
+
 // ---------- editor-switch popup ----------
 
 namespace SwitchPopup {

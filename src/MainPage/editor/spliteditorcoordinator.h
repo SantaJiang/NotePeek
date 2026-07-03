@@ -42,6 +42,10 @@ signals:
 
 private:
     void connectController(DocumentController *controller);
+    DocumentController *otherController(DocumentController *controller) const;
+    DocumentController *visibleSingleController() const;
+    void setSingleVisibleController(DocumentController *controller);
+    void collapseSplitPane(DocumentController *controller);
     void syncOpenedFileToOtherPanes(DocumentController *source, const QString &filePath);
     void syncClosedFileToOtherPanes(DocumentController *source, const QString &filePath);
     void syncRenamedFileToOtherPanes(DocumentController *source,
@@ -49,13 +53,14 @@ private:
                                      const QString &oldFilePath,
                                      const QString &newFilePath);
     void reloadExternallyChangedFile(DocumentController *source, const QString &filePath);
-    void showSameFileInRightPane();
+    void showSameFileInOtherPane(DocumentController *source);
 
     DocumentController *m_leftController;
     DocumentController *m_rightController;
     QSplitter *m_splitter;
     DocumentController *m_activeController;
     bool m_syncingEditorPanes;
+    bool m_splitViewEnabled;
     bool m_singleFileWindow;
 };
 

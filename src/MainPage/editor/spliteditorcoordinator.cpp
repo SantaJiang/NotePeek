@@ -26,6 +26,7 @@ SplitEditorCoordinator::SplitEditorCoordinator(DocumentController *leftControlle
     , m_splitter(splitter)
     , m_activeController(leftController)
     , m_syncingEditorPanes(false)
+    , m_splitViewEnabled(false)
     , m_singleFileWindow(singleFileWindow)
 {
     connectController(m_leftController);
@@ -59,26 +60,33 @@ void SplitEditorCoordinator::setSplitViewEnabled(bool enabled)
         enabled = false;
     }
 
-    if (!enabled && activeController() == m_rightController)
+    if (!enabled)
     {
-        setActiveController(m_leftController);
+        setSingleVisibleController(visibleSingleController());
+        return;
     }
 
-    m_rightController->pane()->setVisible(enabled);
-    m_leftController->pane()->setSplitViewButtonChecked(enabled);
-    m_rightController->pane()->setSplitViewButtonChecked(enabled);
-    m_leftController->pane()->setSplitViewButtonVisible(!enabled);
-    m_rightController->pane()->setSplitViewButtonVisible(enabled);
-
-    if (enabled)
+    DocumentController *source = activeController();
+    if (!source || !source->pane()->isVisible())
     {
-        const QList<int> sizes = m_splitter->sizes();
-        if (sizes.size() < 2 || sizes.at(1) == 0)
-        {
-            m_splitter->setSizes({ 1, 1 });
-        }
-        showSameFileInRightPane();
+        source = visibleSingleController();
     }
+
+    m_splitViewEnabled = true;
+    m_leftController->pane()->setVisible(true);
+    m_rightController->pane()->setVisible(true);
+    m_leftController->pane()->setSplitViewButtonCollapseMode(true);
+    m_rightController->pane()->setSplitViewButtonCollapseMode(true);
+    m_leftController->pane()->setSplitViewButtonVisible(true);
+    m_rightController->pane()->setSplitViewButtonVisible(true);
+
+    const QList<int> sizes = m_splitter->sizes();
+    if (sizes.size() < 2 || sizes.at(0) == 0 || sizes.at(1) == 0)
+    {
+        m_splitter->setSizes({ 1, 1 });
+    }
+
+    showSameFileInOtherPane(source);
 }
 
 bool SplitEditorCoordinator::closeAllEditors()
@@ -179,6 +187,50 @@ void SplitEditorCoordinator::updateActivePaneForFocus(QWidget *widget)
     }
 }
 
+DocumentController *SplitEditorCoordinator::otherController(DocumentController *controller) const
+{
+    return controller == m_leftController ? m_rightController : m_leftController;
+}
+
+DocumentController *SplitEditorCoordinator::visibleSingleController() const
+{
+    if (m_rightController->pane()->isVisible() && !m_leftController->pane()->isVisible())
+    {
+        return m_rightController;
+    }
+
+    return m_leftController;
+}
+
+void SplitEditorCoordinator::setSingleVisibleController(DocumentController *controller)
+{
+    if (!controller)
+    {
+        controller = m_leftController;
+    }
+
+    m_splitViewEnabled = false;
+    m_leftController->pane()->setVisible(controller == m_leftController);
+    m_rightController->pane()->setVisible(controller == m_rightController);
+
+    m_leftController->pane()->setSplitViewButtonCollapseMode(false);
+    m_rightController->pane()->setSplitViewButtonCollapseMode(false);
+    m_leftController->pane()->setSplitViewButtonVisible(controller == m_leftController);
+    m_rightController->pane()->setSplitViewButtonVisible(controller == m_rightController);
+
+    setActiveController(controller);
+}
+
+void SplitEditorCoordinator::collapseSplitPane(DocumentController *controller)
+{
+    if (!m_splitViewEnabled)
+    {
+        return;
+    }
+
+    setSingleVisibleController(otherController(controller));
+}
+
 void SplitEditorCoordinator::connectController(DocumentController *controller)
 {
     if (!controller)
@@ -221,7 +273,19 @@ void SplitEditorCoordinator::connectController(DocumentController *controller)
     });
     connect(controller->pane(), &EditorPane::splitViewToggled, this, [this, controller](bool checked) {
         setActiveController(controller);
-        setSplitViewEnabled(checked);
+        if (m_splitViewEnabled)
+        {
+            collapseSplitPane(controller);
+            return;
+        }
+
+        if (checked)
+        {
+            setSplitViewEnabled(true);
+            return;
+        }
+
+        controller->pane()->setSplitViewButtonCollapseMode(false);
     });
 }
 
@@ -318,65 +382,59 @@ void SplitEditorCoordinator::reloadExternallyChangedFile(DocumentController *sou
     }
 }
 
-void SplitEditorCoordinator::showSameFileInRightPane()
+void SplitEditorCoordinator::showSameFileInOtherPane(DocumentController *source)
 {
-    CustomEditor *leftEditor = m_leftController->currentEditor();
-    if (!leftEditor)
+    if (!source)
+    {
+        source = visibleSingleController();
+    }
+
+    DocumentController *target = otherController(source);
+    CustomEditor *sourceEditor = source->currentEditor();
+    if (!sourceEditor || !target)
         return;
 
-    const QString currentFilePath = leftEditor->filePath();
-    if (currentFilePath.isEmpty())
-    {
-        // An untitled document is shared into the right pane so both
-        // sides edit the same Scintilla document.
-        m_rightController->openSharedDocument(leftEditor, true);
-
-        CustomEditor *rightEditor = m_rightController->currentEditor();
-        if (rightEditor)
+    const auto mirrorEditorPosition = [](CustomEditor *from, CustomEditor *to) {
+        if (!from || !to)
         {
-            int line = 0;
-            int index = 0;
-            leftEditor->getCursorPosition(&line, &index);
-            const int firstVisibleLine = leftEditor->SendScintilla(QsciScintillaBase::SCI_GETFIRSTVISIBLELINE);
-            const int xOffset = leftEditor->SendScintilla(QsciScintillaBase::SCI_GETXOFFSET);
-
-            const int targetLine = qMin(line, rightEditor->lines() - 1);
-            const int targetIndex = qMin(index, rightEditor->lineLength(targetLine));
-            rightEditor->setCursorPosition(targetLine, targetIndex);
-            rightEditor->SendScintilla(QsciScintillaBase::SCI_SETFIRSTVISIBLELINE, firstVisibleLine);
-            rightEditor->SendScintilla(QsciScintillaBase::SCI_SETXOFFSET, xOffset);
+            return;
         }
 
-        setActiveController(m_leftController);
+        int line = 0;
+        int index = 0;
+        from->getCursorPosition(&line, &index);
+        const int firstVisibleLine = from->SendScintilla(QsciScintillaBase::SCI_GETFIRSTVISIBLELINE);
+        const int xOffset = from->SendScintilla(QsciScintillaBase::SCI_GETXOFFSET);
+
+        const int targetLine = qBound(0, line, qMax(0, to->lines() - 1));
+        const int targetIndex = qBound(0, index, to->lineLength(targetLine));
+        to->setCursorPosition(targetLine, targetIndex);
+        to->SendScintilla(QsciScintillaBase::SCI_SETFIRSTVISIBLELINE, firstVisibleLine);
+        to->SendScintilla(QsciScintillaBase::SCI_SETXOFFSET, xOffset);
+    };
+
+    const QString currentFilePath = sourceEditor->filePath();
+    if (currentFilePath.isEmpty())
+    {
+        // An untitled document is shared into the other pane so both
+        // sides edit the same Scintilla document.
+        target->openSharedDocument(sourceEditor, true);
+        mirrorEditorPosition(sourceEditor, target->currentEditor());
+        setActiveController(source);
         return;
     }
 
     QScopedValueRollback<bool> syncing(m_syncingEditorPanes, true);
-    for (int i = 0; i < m_leftController->pane()->count(); ++i)
+    for (int i = 0; i < source->pane()->count(); ++i)
     {
-        const QString filePath = m_leftController->pane()->filePathAt(i);
-        if (!filePath.isEmpty() && m_rightController->indexOfFile(filePath) == -1)
+        const QString filePath = source->pane()->filePathAt(i);
+        if (!filePath.isEmpty() && target->indexOfFile(filePath) == -1)
         {
-            m_rightController->openFile(filePath, false);
+            target->openFile(filePath, false);
         }
     }
 
-    int line = 0;
-    int index = 0;
-    leftEditor->getCursorPosition(&line, &index);
-    const int firstVisibleLine = leftEditor->SendScintilla(QsciScintillaBase::SCI_GETFIRSTVISIBLELINE);
-    const int xOffset = leftEditor->SendScintilla(QsciScintillaBase::SCI_GETXOFFSET);
-
-    m_rightController->openFile(currentFilePath, true);
-
-    CustomEditor *rightEditor = m_rightController->currentEditor();
-    if (rightEditor)
-    {
-        const int targetLine = qMin(line, rightEditor->lines() - 1);
-        const int targetIndex = qMin(index, rightEditor->lineLength(targetLine));
-        rightEditor->setCursorPosition(targetLine, targetIndex);
-        rightEditor->SendScintilla(QsciScintillaBase::SCI_SETFIRSTVISIBLELINE, firstVisibleLine);
-        rightEditor->SendScintilla(QsciScintillaBase::SCI_SETXOFFSET, xOffset);
-    }
-    setActiveController(m_leftController);
+    target->openFile(currentFilePath, true);
+    mirrorEditorPosition(sourceEditor, target->currentEditor());
+    setActiveController(source);
 }
