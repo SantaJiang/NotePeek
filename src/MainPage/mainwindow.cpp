@@ -14,6 +14,7 @@
 #include <QApplication>
 #include <QProcess>
 #include <QDockWidget>
+#include <QSplitter>
 #include "editor/customeditor.h"
 #include "editor/documentcontroller.h"
 #include "editor/editorpane.h"
@@ -49,6 +50,21 @@ bool isPathInsideDirectory(const QString &path, const QString &directory)
            || (!relativePath.startsWith("../")
                && relativePath != ".."
                && !QDir::isAbsolutePath(relativePath));
+}
+
+void applyEditorSplitterStyle(QSplitter *splitter)
+{
+    if (!splitter)
+    {
+        return;
+    }
+
+    splitter->setHandleWidth(1);
+    splitter->setStyleSheet(QStringLiteral(
+                                "QSplitter::handle:horizontal {"
+                                "  width: 1px;"
+                                "  background-color: %1;"
+                                "}").arg(ThemeColors::Splitter::handleBg().name()));
 }
 
 } // namespace
@@ -105,6 +121,7 @@ MainWindow::MainWindow(QWidget *parent)
 
     ui->editorSplitter->setStretchFactor(0, 1);
     ui->editorSplitter->setStretchFactor(1, 1);
+    applyEditorSplitterStyle(ui->editorSplitter);
     m_editorCoordinator = new SplitEditorCoordinator(m_leftController,
                                                      m_rightController,
                                                      ui->editorSplitter,
@@ -169,6 +186,7 @@ MainWindow::MainWindow(QWidget *parent)
 #if QT_VERSION >= QT_VERSION_CHECK(6, 5, 0)
     connect(QGuiApplication::styleHints(), &QStyleHints::colorSchemeChanged,
             this, [this]() {
+                applyEditorSplitterStyle(ui->editorSplitter);
                 m_editorCoordinator->reapplyThemeToEditorPanes();
                 m_editorCoordinator->refreshVisibleMarkdownPreviews();
             });
@@ -234,6 +252,7 @@ void MainWindow::changeEvent(QEvent *event)
 
     if (event->type() == QEvent::PaletteChange)
     {
+        applyEditorSplitterStyle(ui->editorSplitter);
         m_editorCoordinator->reapplyThemeToEditorPanes();
         m_editorCoordinator->refreshVisibleMarkdownPreviews();
     }

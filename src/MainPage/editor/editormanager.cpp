@@ -29,6 +29,11 @@ bool shouldUseSoftWrap(const QString &filePath, LexerFactory::Language lang)
         break;
     }
 
+    if (lang != LexerFactory::Unknown)
+    {
+        return false;
+    }
+
     const QFileInfo fileInfo(filePath);
     const QString suffix = fileInfo.suffix().toLower();
     static const QSet<QString> proseExtensions = {

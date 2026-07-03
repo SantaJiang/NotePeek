@@ -26,8 +26,7 @@ EditorPane::EditorPane(QWidget *parent)
         ui->pushButton_splitView->setFont(QFont(fontFamilies.first()));
     }
     ui->pushButton_closeDoc->setText(QChar(0xf00d));
-    ui->pushButton_splitView->setText(QChar(0xf0db));
-    ui->pushButton_splitView->setToolTip(tr("Split editor"));
+    setSplitViewButtonCollapseMode(false);
 
     ui->tabWidget->setTabsClosable(true);
     ui->tabWidget->setDocumentMode(true);
@@ -249,10 +248,15 @@ void EditorPane::copyCurrentSelection()
     }
 }
 
-void EditorPane::setSplitViewButtonChecked(bool checked)
+void EditorPane::setSplitViewButtonCollapseMode(bool collapseMode)
 {
     const QSignalBlocker blocker(ui->pushButton_splitView);
-    ui->pushButton_splitView->setChecked(checked);
+    ui->pushButton_splitView->setChecked(false);
+    ui->pushButton_splitView->setIcon(QIcon());
+    ui->pushButton_splitView->setText(collapseMode ? QChar(0xf147) : QChar(0xf0db));
+    ui->pushButton_splitView->setToolTip(collapseMode
+                                             ? tr("Collapse this editor pane")
+                                             : tr("Split editor"));
 }
 
 void EditorPane::setSplitViewButtonVisible(bool visible)
