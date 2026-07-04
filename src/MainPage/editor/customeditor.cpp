@@ -1,10 +1,12 @@
 #include "editor/customeditor.h"
 #include <QMimeData>
+#include <QFrame>
 
 CustomEditor::CustomEditor(QWidget *parent)
     : QsciScintilla{parent}
 {
     setAcceptDrops(true);
+    setFrameShape(QFrame::NoFrame);
 }
 
 void CustomEditor::setFilePath(const QString &path)

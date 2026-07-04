@@ -83,6 +83,20 @@ namespace Splitter {
     inline QColor handleBorder()       { return isDarkMode() ? QColor(0x5a,0x5a,0x5a) : QColor(0xa8,0xaf,0xba); }
 }
 
+// ---------- editor pane top bar ----------
+
+namespace EditorTopBar {
+    inline QColor background()         { return isDarkMode() ? QColor(0x2b,0x2b,0x2b) : QColor(0xf3,0xf3,0xf3); }
+    inline QColor border()             { return isDarkMode() ? QColor(0x45,0x45,0x45) : QColor(0xd6,0xd6,0xd6); }
+    inline QColor text()               { return isDarkMode() ? QColor(0xd0,0xd0,0xd0) : QColor(0x5f,0x5f,0x5f); }
+    inline QColor mutedText()          { return isDarkMode() ? QColor(0x9a,0x9a,0x9a) : QColor(0x78,0x78,0x78); }
+    inline QColor hoverBg()            { return isDarkMode() ? QColor(0x3a,0x3a,0x3a) : QColor(0xe5,0xe5,0xe5); }
+    inline QColor pressedBg()          { return isDarkMode() ? QColor(0x46,0x46,0x46) : QColor(0xdb,0xdb,0xdb); }
+    inline QColor popupBg()            { return isDarkMode() ? QColor(0x2f,0x2f,0x2f) : QColor(0xff,0xff,0xff); }
+    inline QColor selectionBg()        { return isDarkMode() ? QColor(0x09,0x47,0x7b) : QColor(0xd9,0xe8,0xff); }
+    inline QColor selectionText()      { return isDarkMode() ? QColor(0xff,0xff,0xff) : QColor(0x1f,0x1f,0x1f); }
+}
+
 // ---------- editor-switch popup ----------
 
 namespace SwitchPopup {

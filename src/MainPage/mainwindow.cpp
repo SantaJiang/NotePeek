@@ -64,7 +64,33 @@ void applyEditorSplitterStyle(QSplitter *splitter)
                                 "QSplitter::handle:horizontal {"
                                 "  width: 1px;"
                                 "  background-color: %1;"
-                                "}").arg(ThemeColors::Splitter::handleBg().name()));
+                                "  border: 0;"
+                                "  margin: 0;"
+                                "  padding: 0;"
+                                "}").arg(ThemeColors::EditorTopBar::border().name()));
+}
+
+void applyMainWindowSeparatorStyle(QMainWindow *window)
+{
+    if (!window)
+    {
+        return;
+    }
+
+    const QString separatorColor = ThemeColors::EditorTopBar::border().name();
+    window->setStyleSheet(QStringLiteral(
+                              "QMainWindow::separator {"
+                              "  background-color: %1;"
+                              "  width: 1px;"
+                              "  height: 1px;"
+                              "  border: 0;"
+                              "  margin: 0;"
+                              "  padding: 0;"
+                              "}"
+                              "QMainWindow::separator:hover {"
+                              "  background-color: %1;"
+                              "}")
+                              .arg(separatorColor));
 }
 
 } // namespace
@@ -122,6 +148,7 @@ MainWindow::MainWindow(QWidget *parent)
     ui->editorSplitter->setStretchFactor(0, 1);
     ui->editorSplitter->setStretchFactor(1, 1);
     applyEditorSplitterStyle(ui->editorSplitter);
+    applyMainWindowSeparatorStyle(this);
     m_editorCoordinator = new SplitEditorCoordinator(m_leftController,
                                                      m_rightController,
                                                      ui->editorSplitter,
@@ -187,6 +214,7 @@ MainWindow::MainWindow(QWidget *parent)
     connect(QGuiApplication::styleHints(), &QStyleHints::colorSchemeChanged,
             this, [this]() {
                 applyEditorSplitterStyle(ui->editorSplitter);
+                applyMainWindowSeparatorStyle(this);
                 m_editorCoordinator->reapplyThemeToEditorPanes();
                 m_editorCoordinator->refreshVisibleMarkdownPreviews();
             });
@@ -253,6 +281,7 @@ void MainWindow::changeEvent(QEvent *event)
     if (event->type() == QEvent::PaletteChange)
     {
         applyEditorSplitterStyle(ui->editorSplitter);
+        applyMainWindowSeparatorStyle(this);
         m_editorCoordinator->reapplyThemeToEditorPanes();
         m_editorCoordinator->refreshVisibleMarkdownPreviews();
     }

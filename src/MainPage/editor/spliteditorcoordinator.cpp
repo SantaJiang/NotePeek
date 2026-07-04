@@ -159,6 +159,7 @@ void SplitEditorCoordinator::reapplyThemeToEditorPanes()
 {
     for (DocumentController *controller : controllers())
     {
+        controller->pane()->applyChromeTheme();
         controller->editorManager()->reapplyThemeToAllEditors();
     }
 }

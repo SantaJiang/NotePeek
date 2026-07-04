@@ -7,6 +7,7 @@ class CustomEditor;
 class DocumentPage;
 class EditorSwitchPopup;
 class MarkdownPreviewer;
+class QEvent;
 
 namespace Ui
 {
@@ -54,6 +55,7 @@ public:
     void copyCurrentSelection();
 
     // Chrome
+    void applyChromeTheme();
     void setSplitViewButtonCollapseMode(bool collapseMode);
     void setSplitViewButtonVisible(bool visible);
     void setTopbarVisible(bool visible);
@@ -62,6 +64,9 @@ signals:
     void pageCloseRequested(int index);
     void currentPageChanged(int index);
     void splitViewToggled(bool checked);
+
+protected:
+    void changeEvent(QEvent *event) override;
 
 private slots:
     void on_pushButton_closeDoc_clicked();
@@ -72,6 +77,8 @@ private slots:
 
 private:
     DocumentPage *pageForWidget(QWidget *widget) const;
+    void installTopbarSeparators();
+    void applyTopbarStyleSheet();
     void syncComboBoxIndex(int index);
 
     Ui::EditorPane *ui;
