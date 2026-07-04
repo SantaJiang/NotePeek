@@ -3,7 +3,9 @@
 
 #include <QDateTime>
 #include <QHash>
+#include <QPersistentModelIndex>
 #include <QSortFilterProxyModel>
+#include <QString>
 
 class QFileSystemModel;
 
@@ -14,8 +16,10 @@ class FileTypeFilterProxyModel : public QSortFilterProxyModel
 public:
     explicit FileTypeFilterProxyModel(QObject *parent = nullptr);
 
+    void setVisibleRootDirectory(const QString &dirPath);
     QString filePath(const QModelIndex &proxyIndex) const;
     bool isDir(const QModelIndex &proxyIndex) const;
+    QVariant data(const QModelIndex &index, int role = Qt::DisplayRole) const override;
 
 protected:
     bool filterAcceptsRow(int sourceRow, const QModelIndex &sourceParent) const override;
@@ -31,6 +35,8 @@ private:
     QFileSystemModel *fileSystemModel() const;
     bool isSupportedTextFile(const QString &filePath) const;
 
+    QString m_visibleRootDirectory;
+    QPersistentModelIndex m_visibleRootIndex;
     mutable QHash<QString, CacheEntry> m_supportCache;
 };
 

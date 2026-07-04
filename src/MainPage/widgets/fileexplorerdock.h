@@ -20,6 +20,7 @@ public:
 
     QDockWidget *dockWidget() const;
     void setVisible(bool visible);
+    void reapplyTheme();
     void setRootDirectory(const QString &dirPath);
     void selectFile(const QString &filePath);
     void clearSelection();

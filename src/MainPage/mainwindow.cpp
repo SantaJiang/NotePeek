@@ -282,6 +282,7 @@ void MainWindow::changeEvent(QEvent *event)
     {
         applyEditorSplitterStyle(ui->editorSplitter);
         applyMainWindowSeparatorStyle(this);
+        m_fileExplorerDock->reapplyTheme();
         m_editorCoordinator->reapplyThemeToEditorPanes();
         m_editorCoordinator->refreshVisibleMarkdownPreviews();
     }

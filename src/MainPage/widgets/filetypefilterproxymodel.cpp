@@ -2,13 +2,88 @@
 
 #include "editor/supportedfilepolicy.h"
 
+#include <QDir>
 #include <QFileInfo>
 #include <QFileSystemModel>
+#include <QFont>
+
+namespace {
+
+QString normalizedAbsolutePath(const QString &path)
+{
+    if (path.isEmpty())
+    {
+        return QString();
+    }
+
+    const QFileInfo info(path);
+    return QDir::cleanPath(info.absoluteFilePath());
+}
+
+bool isPathInsideDirectory(const QString &path, const QString &directory)
+{
+    const QString normalizedPath = normalizedAbsolutePath(path);
+    const QString normalizedDirectory = normalizedAbsolutePath(directory);
+    if (normalizedPath.isEmpty() || normalizedDirectory.isEmpty())
+    {
+        return false;
+    }
+
+    const QString relativePath = QDir(normalizedDirectory).relativeFilePath(normalizedPath);
+    return relativePath == "."
+           || (!relativePath.startsWith("../")
+               && relativePath != ".."
+               && !QDir::isAbsolutePath(relativePath));
+}
+
+bool isAncestorOfPath(const QString &candidateAncestor, const QString &path)
+{
+    const QString normalizedAncestor = normalizedAbsolutePath(candidateAncestor);
+    const QString normalizedPath = normalizedAbsolutePath(path);
+    return normalizedAncestor != normalizedPath
+           && isPathInsideDirectory(normalizedPath, normalizedAncestor);
+}
+
+} // namespace
 
 FileTypeFilterProxyModel::FileTypeFilterProxyModel(QObject *parent)
     : QSortFilterProxyModel(parent)
 {
     setRecursiveFilteringEnabled(true);
+}
+
+void FileTypeFilterProxyModel::setVisibleRootDirectory(const QString &dirPath)
+{
+    const QString normalizedPath = normalizedAbsolutePath(dirPath);
+    if (m_visibleRootDirectory == normalizedPath)
+    {
+        return;
+    }
+
+#if QT_VERSION >= QT_VERSION_CHECK(6, 10, 0)
+    beginFilterChange();
+    m_visibleRootDirectory = normalizedPath;
+    if (QFileSystemModel *model = fileSystemModel())
+    {
+        m_visibleRootIndex = model->index(m_visibleRootDirectory);
+    }
+    else
+    {
+        m_visibleRootIndex = QPersistentModelIndex();
+    }
+    endFilterChange(QSortFilterProxyModel::Direction::Rows);
+#else
+    m_visibleRootDirectory = normalizedPath;
+    if (QFileSystemModel *model = fileSystemModel())
+    {
+        m_visibleRootIndex = model->index(m_visibleRootDirectory);
+    }
+    else
+    {
+        m_visibleRootIndex = QPersistentModelIndex();
+    }
+    invalidateFilter();
+#endif
 }
 
 QString FileTypeFilterProxyModel::filePath(const QModelIndex &proxyIndex) const
@@ -21,6 +96,21 @@ bool FileTypeFilterProxyModel::isDir(const QModelIndex &proxyIndex) const
 {
     QFileSystemModel *model = fileSystemModel();
     return model && proxyIndex.isValid() && model->isDir(mapToSource(proxyIndex));
+}
+
+QVariant FileTypeFilterProxyModel::data(const QModelIndex &index, int role) const
+{
+    if (index.isValid()
+        && role == Qt::FontRole
+        && !m_visibleRootDirectory.isEmpty()
+        && mapToSource(index) == m_visibleRootIndex)
+    {
+        QFont font = QSortFilterProxyModel::data(index, role).value<QFont>();
+        font.setBold(true);
+        return font;
+    }
+
+    return QSortFilterProxyModel::data(index, role);
 }
 
 bool FileTypeFilterProxyModel::filterAcceptsRow(int sourceRow, const QModelIndex &sourceParent) const
@@ -37,12 +127,31 @@ bool FileTypeFilterProxyModel::filterAcceptsRow(int sourceRow, const QModelIndex
         return false;
     }
 
+    const QString filePath = model->filePath(index);
+    if (!m_visibleRootDirectory.isEmpty())
+    {
+        if (normalizedAbsolutePath(filePath) == m_visibleRootDirectory)
+        {
+            return true;
+        }
+
+        if (isAncestorOfPath(filePath, m_visibleRootDirectory))
+        {
+            return true;
+        }
+
+        if (!isPathInsideDirectory(filePath, m_visibleRootDirectory))
+        {
+            return false;
+        }
+    }
+
     if (model->isDir(index))
     {
         return true;
     }
 
-    return isSupportedTextFile(model->filePath(index));
+    return isSupportedTextFile(filePath);
 }
 
 QFileSystemModel *FileTypeFilterProxyModel::fileSystemModel() const
