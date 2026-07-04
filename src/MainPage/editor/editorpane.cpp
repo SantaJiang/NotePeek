@@ -4,11 +4,83 @@
 #include "editor/customeditor.h"
 #include "editor/documentpage.h"
 #include "editor/editorswitchpopup.h"
+#include "themecolors.h"
 
+#include <QAbstractItemView>
+#include <QComboBox>
+#include <QEvent>
+#include <QFrame>
 #include <QFontDatabase>
+#include <QHBoxLayout>
+#include <QPainter>
+#include <QPointer>
 #include <QShortcut>
 #include <QSignalBlocker>
+#include <QStyledItemDelegate>
 #include <QTabBar>
+
+namespace {
+
+class FileComboPopupDelegate final : public QStyledItemDelegate
+{
+public:
+    explicit FileComboPopupDelegate(QComboBox *comboBox)
+        : QStyledItemDelegate(comboBox)
+        , m_comboBox(comboBox)
+    {
+    }
+
+    void paint(QPainter *painter, const QStyleOptionViewItem &option, const QModelIndex &index) const override
+    {
+        QStyleOptionViewItem opt(option);
+        initStyleOption(&opt, index);
+
+        using namespace ThemeColors::EditorTopBar;
+        const bool current = m_comboBox && index.row() == m_comboBox->currentIndex();
+        const bool highlighted = opt.state.testFlag(QStyle::State_MouseOver);
+
+        painter->save();
+        painter->fillRect(opt.rect, highlighted ? hoverBg() : popupBg());
+
+        const int checkColumnWidth = 28;
+        const QRect checkRect(opt.rect.left() + 10, opt.rect.top(), 10, opt.rect.height());
+        const QRect textRect = opt.rect.adjusted(checkColumnWidth, 0, -8, 0);
+
+        if (current)
+        {
+            QPen checkPen(text());
+            checkPen.setWidthF(1.6);
+            checkPen.setCapStyle(Qt::RoundCap);
+            checkPen.setJoinStyle(Qt::RoundJoin);
+            painter->setRenderHint(QPainter::Antialiasing, true);
+            painter->setPen(checkPen);
+
+            const int centerY = checkRect.center().y();
+            const QPoint p1(checkRect.left(), centerY);
+            const QPoint p2(checkRect.left() + 4, centerY + 4);
+            const QPoint p3(checkRect.right(), centerY - 5);
+            painter->drawLine(p1, p2);
+            painter->drawLine(p2, p3);
+        }
+
+        painter->setPen(text());
+        painter->setFont(opt.font);
+        painter->drawText(textRect, Qt::AlignVCenter | Qt::AlignLeft, opt.text);
+        painter->restore();
+    }
+
+    QSize sizeHint(const QStyleOptionViewItem &option, const QModelIndex &index) const override
+    {
+        QSize size = QStyledItemDelegate::sizeHint(option, index);
+        size.setHeight(qMax(size.height(), 28));
+        return size;
+    }
+
+private:
+    QPointer<QComboBox> m_comboBox;
+};
+
+} // namespace
 
 EditorPane::EditorPane(QWidget *parent)
     : QWidget(parent)
@@ -17,6 +89,13 @@ EditorPane::EditorPane(QWidget *parent)
 {
     ui->setupUi(this);
     setAcceptDrops(false);
+
+    ui->topbar->setAttribute(Qt::WA_StyledBackground, true);
+    installTopbarSeparators();
+    ui->comboBox_files->setFrame(false);
+    ui->comboBox_files->setSizeAdjustPolicy(QComboBox::AdjustToMinimumContentsLengthWithIcon);
+    ui->comboBox_files->setItemDelegate(new FileComboPopupDelegate(ui->comboBox_files));
+    applyChromeTheme();
 
     const int fontId = QFontDatabase::addApplicationFont("://resource/fontawesome-webfont.ttf");
     const QStringList fontFamilies = QFontDatabase::applicationFontFamilies(fontId);
@@ -31,6 +110,12 @@ EditorPane::EditorPane(QWidget *parent)
     ui->tabWidget->setTabsClosable(true);
     ui->tabWidget->setDocumentMode(true);
     ui->tabWidget->tabBar()->setVisible(false);
+    ui->tabWidget->setStyleSheet(QStringLiteral(
+        "QTabWidget#tabWidget::pane {"
+        "  border: 0;"
+        "  margin: 0;"
+        "  padding: 0;"
+        "}"));
 
     connect(ui->tabWidget, &QTabWidget::tabCloseRequested, this, &EditorPane::pageCloseRequested);
     connect(ui->tabWidget, &QTabWidget::currentChanged, this, &EditorPane::onTabCurrentChanged);
@@ -259,6 +344,21 @@ void EditorPane::setSplitViewButtonCollapseMode(bool collapseMode)
                                              : tr("Split editor"));
 }
 
+void EditorPane::applyChromeTheme()
+{
+    applyTopbarStyleSheet();
+}
+
+void EditorPane::changeEvent(QEvent *event)
+{
+    QWidget::changeEvent(event);
+
+    if (event->type() == QEvent::PaletteChange)
+    {
+        applyChromeTheme();
+    }
+}
+
 void EditorPane::setSplitViewButtonVisible(bool visible)
 {
     ui->pushButton_splitView->setVisible(visible);
@@ -324,11 +424,128 @@ DocumentPage *EditorPane::pageForWidget(QWidget *widget) const
     return qobject_cast<DocumentPage *>(widget);
 }
 
+void EditorPane::installTopbarSeparators()
+{
+    auto *layout = qobject_cast<QHBoxLayout *>(ui->topbar->layout());
+    if (!layout || ui->topbar->findChild<QFrame *>(QStringLiteral("editorTopbarSeparator")))
+    {
+        return;
+    }
+
+    const auto createSeparator = [this]() {
+        auto *separator = new QFrame(ui->topbar);
+        separator->setObjectName(QStringLiteral("editorTopbarSeparator"));
+        separator->setProperty("editorTopbarSeparator", true);
+        separator->setFixedWidth(1);
+        separator->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Expanding);
+        return separator;
+    };
+
+    layout->insertWidget(layout->indexOf(ui->comboBox_files) + 1, createSeparator());
+    layout->insertWidget(layout->indexOf(ui->pushButton_closeDoc) + 1, createSeparator());
+    layout->insertWidget(layout->indexOf(ui->pushButton_splitView), createSeparator());
+}
+
+void EditorPane::applyTopbarStyleSheet()
+{
+    using namespace ThemeColors::EditorTopBar;
+
+    const QString topbarStyle = QStringLiteral(
+        "QWidget#topbar {"
+        "  background-color: %1;"
+        "  border-top: 1px solid %2;"
+        "  border-bottom: 1px solid %2;"
+        "}"
+        "QFrame#editorTopbarSeparator {"
+        "  background-color: %2;"
+        "  border: 0;"
+        "  margin: 0;"
+        "}"
+        "QComboBox#comboBox_files {"
+        "  background-color: transparent;"
+        "  color: %3;"
+        "  border: 0;"
+        "  padding: 0 22px 0 8px;"
+        "}"
+        "QComboBox#comboBox_files:hover {"
+        "  background-color: %4;"
+        "}"
+        "QComboBox#comboBox_files::drop-down {"
+        "  subcontrol-origin: padding;"
+        "  subcontrol-position: top right;"
+        "  width: 22px;"
+        "  border: 0;"
+        "}"
+        "QToolButton#pushButton_closeDoc,"
+        "QToolButton#pushButton_splitView {"
+        "  background-color: transparent;"
+        "  color: %6;"
+        "  border: 0;"
+        "  padding: 0;"
+        "  margin: 2px;"
+        "  border-radius: 4px;"
+        "}"
+        "QToolButton#pushButton_closeDoc:hover,"
+        "QToolButton#pushButton_splitView:hover {"
+        "  background-color: %4;"
+        "  color: %3;"
+        "}"
+        "QToolButton#pushButton_closeDoc:pressed,"
+        "QToolButton#pushButton_splitView:pressed {"
+        "  background-color: %5;"
+        "  color: %3;"
+        "}"
+        "QToolButton#pushButton_splitView:checked {"
+        "  background-color: %5;"
+        "  color: %3;"
+        "}");
+
+    ui->topbar->setStyleSheet(topbarStyle.arg(background().name(QColor::HexRgb),
+                                             border().name(QColor::HexRgb),
+                                             text().name(QColor::HexRgb),
+                                             hoverBg().name(QColor::HexRgb),
+                                             pressedBg().name(QColor::HexRgb),
+                                             mutedText().name(QColor::HexRgb)));
+
+    if (QAbstractItemView *view = ui->comboBox_files->view())
+    {
+        view->setMouseTracking(true);
+        view->viewport()->setMouseTracking(true);
+        view->setStyleSheet(QStringLiteral(
+                                "QAbstractItemView {"
+                                "  background-color: %1;"
+                                "  color: %2;"
+                                "  border: 1px solid %3;"
+                                "  outline: 0;"
+                                "  selection-background-color: %4;"
+                                "  selection-color: %5;"
+                                "}"
+                                "QAbstractItemView::item {"
+                                "  min-height: 22px;"
+                                "  padding: 2px 8px;"
+                                "}"
+                                "QAbstractItemView::item:hover {"
+                                "  background-color: %6;"
+                                "  color: %2;"
+                                "}")
+                                .arg(popupBg().name(QColor::HexRgb),
+                                     text().name(QColor::HexRgb),
+                                     border().name(QColor::HexRgb),
+                                     selectionBg().name(QColor::HexRgb),
+                                     selectionText().name(QColor::HexRgb),
+                                     hoverBg().name(QColor::HexRgb)));
+    }
+}
+
 void EditorPane::syncComboBoxIndex(int index)
 {
     if (index >= 0 && index < ui->comboBox_files->count())
     {
         const QSignalBlocker blocker(ui->comboBox_files);
         ui->comboBox_files->setCurrentIndex(index);
+        if (QAbstractItemView *view = ui->comboBox_files->view())
+        {
+            view->viewport()->update();
+        }
     }
 }
