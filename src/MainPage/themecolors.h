@@ -97,6 +97,17 @@ namespace EditorTopBar {
     inline QColor selectionText()      { return isDarkMode() ? QColor(0xff,0xff,0xff) : QColor(0x1f,0x1f,0x1f); }
 }
 
+// ---------- file tree ----------
+
+namespace FileTree {
+    inline QColor background()         { return isDarkMode() ? QColor(0x18,0x18,0x18) : QColor(0xfb,0xfb,0xfb); }
+    inline QColor text()               { return isDarkMode() ? QColor(0xee,0xee,0xee) : QColor(0x1f,0x23,0x28); }
+    inline QColor selectionBg()        { return isDarkMode() ? QColor(0x2f,0x5d,0x8c) : QColor(0xd9,0xe8,0xff); }
+    inline QColor selectionText()      { return isDarkMode() ? QColor(0xff,0xff,0xff) : QColor(0x1f,0x23,0x28); }
+    inline QColor hoverBg()            { return isDarkMode() ? QColor(0x2a,0x2a,0x2a) : QColor(0xef,0xf4,0xff); }
+    inline QColor border()             { return isDarkMode() ? QColor(0x3a,0x3a,0x3a) : QColor(0xd6,0xd6,0xd6); }
+}
+
 // ---------- editor-switch popup ----------
 
 namespace SwitchPopup {
