@@ -7,7 +7,7 @@
 namespace {
 
 constexpr int kMinFontSize = 6;
-constexpr int kMaxFontSize = 96;
+constexpr int kMaxFontSize = 288;
 
 // QFontDatabase became fully static in Qt6 but is instance-based in Qt5; wrap
 // the two queries the preferences need so the code builds against both.

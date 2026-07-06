@@ -432,13 +432,13 @@ Do you want to save your changes?</source>
     </message>
     <message>
         <location filename="../src/MainPage/preferencesdialog.cpp" line="64"/>
-        <source>Text font:</source>
-        <translation>文本字体：</translation>
+        <source>Text font</source>
+        <translation>文本字体</translation>
     </message>
     <message>
         <location filename="../src/MainPage/preferencesdialog.cpp" line="65"/>
-        <source>Code font:</source>
-        <translation>代码字体：</translation>
+        <source>Code font</source>
+        <translation>代码字体</translation>
     </message>
     <message>
         <location filename="../src/MainPage/preferencesdialog.cpp" line="67"/>
@@ -447,8 +447,13 @@ Do you want to save your changes?</source>
     </message>
     <message>
         <location filename="../src/MainPage/preferencesdialog.cpp" line="71"/>
-        <source>Markdown default view:</source>
-        <translation>Markdown 默认视图：</translation>
+        <source>Startup</source>
+        <translation>启动</translation>
+    </message>
+    <message>
+        <location filename="../src/MainPage/preferencesdialog.cpp" line="72"/>
+        <source>Markdown default view</source>
+        <translation>Markdown 默认视图</translation>
     </message>
 </context>
 <context>
