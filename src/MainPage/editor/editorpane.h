@@ -49,6 +49,8 @@ public:
 
     // Markdown preview (delegates to the current page)
     bool isCurrentEditorPreviewVisible() const;
+    // True when the current page hides its source editor (Markdown preview-only).
+    bool isCurrentEditorHidden() const;
     bool toggleMarkdownPreview(MarkdownPreviewer *previewer);
     void hideMarkdownPreview(CustomEditor *editor);
     void refreshVisibleMarkdownPreview();

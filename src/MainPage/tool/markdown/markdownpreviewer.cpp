@@ -1,4 +1,5 @@
 #include "tool/markdown/markdownpreviewer.h"
+#include "apppreferences.h"
 #include "themecolors.h"
 
 #include <QByteArray>
@@ -382,6 +383,15 @@ QString MarkdownPreviewer::buildHtmlDocument(const QString &bodyHtml, RenderMode
     const QString sLnkFg        = pdfMode ? QStringLiteral("#0969da") : cssColor(MP::linkFg());
     const QString sBodyMargin   = pdfMode ? QStringLiteral("0") : QStringLiteral("28px 34px");
 
+    // Honour the configured editor fonts: the text font drives the prose body,
+    // the code font drives inline/fenced code.  Each is prepended to a fallback
+    // stack so the document still renders if the family is unavailable.
+    const AppPreferences &prefs = AppPreferences::instance();
+    const QString sBodyFontFamily = QStringLiteral("\"%1\", -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif")
+                                        .arg(prefs.textFontFamily());
+    const QString sCodeFontFamily = QStringLiteral("\"%1\", Menlo, Consolas, monospace")
+                                        .arg(prefs.codeFontFamily());
+
     return QStringLiteral(R"(<!doctype html>
 <html>
 <head>
@@ -390,7 +400,7 @@ QString MarkdownPreviewer::buildHtmlDocument(const QString &bodyHtml, RenderMode
 body {
     color: %1;
     background: %2;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    font-family: %12;
     font-size: 15px;
     line-height: 1.6;
     margin: %11;
@@ -414,7 +424,7 @@ pre {
 code {
     background: %5;
     border-radius: 4px;
-    font-family: Menlo, Consolas, monospace;
+    font-family: %13;
     padding: 0.12em 0.3em;
 }
 pre code {
@@ -443,7 +453,7 @@ img {
 </style>
 </head>
 <body>
-%12
+%14
 </body>
 </html>)")
         .arg(sBodyFg)
@@ -457,5 +467,7 @@ img {
         .arg(sTblBrd)
         .arg(sLnkFg)
         .arg(sBodyMargin)
+        .arg(sBodyFontFamily)
+        .arg(sCodeFontFamily)
         .arg(bodyHtml);
 }

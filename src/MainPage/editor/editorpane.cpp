@@ -298,6 +298,12 @@ bool EditorPane::isCurrentEditorPreviewVisible() const
     return page && page->isPreviewVisible();
 }
 
+bool EditorPane::isCurrentEditorHidden() const
+{
+    DocumentPage *page = currentPage();
+    return page && page->isEditorHidden();
+}
+
 bool EditorPane::toggleMarkdownPreview(MarkdownPreviewer *previewer)
 {
     DocumentPage *page = currentPage();

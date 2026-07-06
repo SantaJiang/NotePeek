@@ -1,4 +1,5 @@
 #include "editor/editormanager.h"
+#include "apppreferences.h"
 #include "themecolors.h"
 #include <QFileInfo>
 #include <QFontDatabase>
@@ -204,8 +205,11 @@ void EditorManager::setupEditor(CustomEditor *editor)
     // Set UTF-8 encoding
     editor->setUtf8(true);
 
-    setEditorFont(editor);
-    setMarginsFont(editor);
+    // No file path yet: seed with the code font.  updateEditorSyntax() applies
+    // the correct text/code font once the path (and therefore the lexer) is known.
+    const QFont initialFont = fontForPath(QString());
+    editor->setFont(initialFont);
+    setMarginsFont(editor, initialFont);
 
     // Apply theme-aware colors (margin background/foreground, caret line, etc.)
     applyEditorColors(editor);
@@ -266,39 +270,29 @@ void EditorManager::updateLineNumberMarginWidth(CustomEditor *editor)
     editor->setMarginWidth(0, width);
 }
 
-void EditorManager::setEditorFont(CustomEditor *editor)
+QFont EditorManager::fontForPath(const QString &filePath) const
 {
-    if (!editor)
-        return;
-
-#if defined(Q_OS_WIN)
-    QFont font("Source Code Pro", 10);
-    editor->setFont(font);
-#elif defined(Q_OS_MAC)
-    QFont font("Menlo", 12);
-    editor->setFont(font);
-#elif defined(Q_OS_LINUX)
-    QFont font;
-    QFontDatabase fontDB;
-    if (fontDB.hasFamily("Noto Sans Mono"))
-        font = QFont("Noto Sans Mono", 10);
-    else
-        font = QFont("Source Code Pro", 10);
-    editor->setFont(font);
-#endif
+    // Prose files (Markdown, plain text, README/LICENSE, …) use the text font;
+    // everything else uses the code font.  This mirrors the wrap/line-number
+    // display policy so the two fonts line up with how the file is presented.
+    const LexerFactory::Language lang = LexerFactory::languageFromFilePath(filePath);
+    const bool prose = shouldUseSoftWrap(filePath, lang);
+    return prose ? AppPreferences::instance().textFont()
+                 : AppPreferences::instance().codeFont();
 }
 
-void EditorManager::setMarginsFont(CustomEditor *editor)
+void EditorManager::setMarginsFont(CustomEditor *editor, const QFont &font)
 {
     if (!editor) return;
 
-    QFont marginFont = editor->font();
-    editor->setMarginsFont(marginFont);
+    editor->setMarginsFont(font);
 }
 
 void EditorManager::updateEditorSyntax(CustomEditor *editor, const QString &filePath)
 {
     if (!editor) return;
+
+    const QFont font = fontForPath(filePath);
 
     QsciLexer *oldLexer = editor->lexer();
     LexerFactory::Language lang = LexerFactory::languageFromFilePath(filePath);
@@ -320,8 +314,10 @@ void EditorManager::updateEditorSyntax(CustomEditor *editor, const QString &file
         // so those stray styles silently inflate the vertical line spacing on
         // every re-lex (e.g. saving an already-open file).  Applying the font
         // now — with the lexer's fontChanged signal connected to the editor —
-        // pushes the monospace font to all styles and keeps the spacing stable.
-        applyUniformStyleFont(editor, lexer);
+        // pushes the configured font to all styles and keeps the spacing stable.
+        // Note: QsciScintilla::setFont() is a no-op while a lexer is attached,
+        // so the per-style lexer API is the only way to change the font here.
+        applyUniformStyleFont(lexer, font);
 
         if (oldLexer && oldLexer != lexer)
         {
@@ -337,9 +333,9 @@ void EditorManager::updateEditorSyntax(CustomEditor *editor, const QString &file
             oldLexer->deleteLater();
         }
         editor->setAutoIndent(false);
-        setEditorFont(editor);
+        editor->setFont(font);
     }
-    setMarginsFont(editor);
+    setMarginsFont(editor, font);
     applyDisplayPolicy(editor, filePath);
     // Re-apply margin colors after lexer change (lexer can override margin colors)
     applyEditorColors(editor);
@@ -396,17 +392,44 @@ void EditorManager::reapplyThemeToAllEditors()
     });
 }
 
-void EditorManager::applyUniformStyleFont(CustomEditor *editor, QsciLexer *lexer)
+void EditorManager::applyUniformStyleFont(QsciLexer *lexer, const QFont &font)
 {
-    if (!editor || !lexer) return;
+    if (!lexer) return;
 
     // The lexer's fontChanged signal is connected to the editor by setLexer(),
     // so setting the font here reaches every Scintilla style (not just the ones
     // the lexer describes) and keeps the line height tied to the editor font.
-    const QFont editorFont = editor->font();
     for (int i = 0; i <= QsciScintillaBase::STYLE_MAX; ++i)
     {
-        lexer->setFont(editorFont, i);
+        lexer->setFont(font, i);
+    }
+}
+
+void EditorManager::applyFontPreferences()
+{
+    for (auto &editorPtr : m_editors)
+    {
+        if (!editorPtr)
+        {
+            continue;
+        }
+
+        CustomEditor *editor = editorPtr;
+        const QFont font = fontForPath(editor->filePath());
+
+        if (QsciLexer *lexer = editor->lexer())
+        {
+            // QsciScintilla::setFont() does nothing while a lexer is attached,
+            // so push the font through the lexer's per-style API.  This changes
+            // only the font of each style and leaves the syntax colours intact.
+            applyUniformStyleFont(lexer, font);
+        }
+        else
+        {
+            editor->setFont(font);
+        }
+        setMarginsFont(editor, font);
+        updateLineNumberMarginWidth(editor);
     }
 }
 
@@ -423,7 +446,7 @@ void EditorManager::reapplyEditorSyntax(CustomEditor *editor)
         // Re-setting the lexer resets all styles to the UI font (see
         // updateEditorSyntax); restore the editor font across every style so a
         // theme change does not inflate the line spacing.
-        applyUniformStyleFont(editor, lexer);
+        applyUniformStyleFont(lexer, fontForPath(editor->filePath()));
     }
     else
     {

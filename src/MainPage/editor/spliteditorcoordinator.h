@@ -31,6 +31,7 @@ public:
     void setSplitViewEnabled(bool enabled);
     bool closeAllEditors();
     void reapplyThemeToEditorPanes();
+    void applyFontPreferencesToEditors();
     void refreshVisibleMarkdownPreviews();
     void updateActivePaneForFocus(QWidget *widget);
 

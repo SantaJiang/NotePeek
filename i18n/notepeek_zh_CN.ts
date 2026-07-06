@@ -274,6 +274,16 @@ Searched entire document.</source>
         <translation></translation>
     </message>
     <message>
+        <location filename="../src/MainPage/mainwindow.ui" line="298"/>
+        <source>Preferences</source>
+        <translation>首选项</translation>
+    </message>
+    <message>
+        <location filename="../src/MainPage/mainwindow.ui" line="301"/>
+        <source>Ctrl+,</source>
+        <translation></translation>
+    </message>
+    <message>
         <location filename="../src/MainPage/mainwindow.ui" line="209"/>
         <source>Undo</source>
         <translation>撤销</translation>
@@ -386,6 +396,59 @@ Do you want to save your changes?</source>
         <location filename="../src/MainPage/mainwindow.cpp" line="263"/>
         <source>For Yueyue</source>
         <translation>致玥玥</translation>
+    </message>
+</context>
+<context>
+    <name>PreferencesDialog</name>
+    <message>
+        <location filename="../src/MainPage/preferencesdialog.cpp" line="34"/>
+        <source> pt</source>
+        <translation> 磅</translation>
+    </message>
+    <message>
+        <location filename="../src/MainPage/preferencesdialog.cpp" line="47"/>
+        <source>Show file tree on startup</source>
+        <translation>启动时显示文件树</translation>
+    </message>
+    <message>
+        <location filename="../src/MainPage/preferencesdialog.cpp" line="52"/>
+        <source>Preferences</source>
+        <translation>首选项</translation>
+    </message>
+    <message>
+        <location filename="../src/MainPage/preferencesdialog.cpp" line="58"/>
+        <source>Source</source>
+        <translation>源码</translation>
+    </message>
+    <message>
+        <location filename="../src/MainPage/preferencesdialog.cpp" line="59"/>
+        <source>Preview</source>
+        <translation>预览</translation>
+    </message>
+    <message>
+        <location filename="../src/MainPage/preferencesdialog.cpp" line="61"/>
+        <source>Editor Fonts</source>
+        <translation>编辑器字体</translation>
+    </message>
+    <message>
+        <location filename="../src/MainPage/preferencesdialog.cpp" line="64"/>
+        <source>Text font:</source>
+        <translation>文本字体：</translation>
+    </message>
+    <message>
+        <location filename="../src/MainPage/preferencesdialog.cpp" line="65"/>
+        <source>Code font:</source>
+        <translation>代码字体：</translation>
+    </message>
+    <message>
+        <location filename="../src/MainPage/preferencesdialog.cpp" line="67"/>
+        <source>General</source>
+        <translation>常规</translation>
+    </message>
+    <message>
+        <location filename="../src/MainPage/preferencesdialog.cpp" line="71"/>
+        <source>Markdown default view:</source>
+        <translation>Markdown 默认视图：</translation>
     </message>
 </context>
 <context>

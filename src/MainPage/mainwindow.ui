@@ -90,6 +90,8 @@
     <addaction name="action_save"/>
     <addaction name="action_saveAs"/>
     <addaction name="separator"/>
+    <addaction name="action_preferences"/>
+    <addaction name="separator"/>
     <addaction name="action_exit"/>
    </widget>
    <widget class="QMenu" name="menuHelp">
@@ -291,6 +293,14 @@
   <action name="action_markdownExportPdf">
    <property name="text">
     <string>Export to PDF...</string>
+   </property>
+  </action>
+  <action name="action_preferences">
+   <property name="text">
+    <string>Preferences</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+,</string>
    </property>
   </action>
  </widget>

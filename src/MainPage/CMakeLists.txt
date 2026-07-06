@@ -5,6 +5,8 @@ set(NOTEPEEK_QT_LIBS
 )
 
 add_library(notepeek_core STATIC
+    apppreferences.cpp
+    apppreferences.h
     editor/documentio.cpp
     editor/documentio.h
     editor/documentpersistenceservice.cpp
@@ -58,6 +60,8 @@ add_library(notepeek_widgets STATIC
     mainwindow.cpp
     mainwindow.h
     mainwindow.ui
+    preferencesdialog.cpp
+    preferencesdialog.h
     editor/customeditor.cpp
     editor/customeditor.h
     editor/documentcontroller.cpp

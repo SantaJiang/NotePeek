@@ -4,6 +4,7 @@
 #include <QObject>
 #include <QPointer>
 #include <QList>
+#include <QFont>
 #include <QUrl>
 #include <QtGlobal>
 
@@ -29,6 +30,11 @@ public:
     // Re-apply theme colours to every open editor (call on palette change)
     void reapplyThemeToAllEditors();
 
+    // Re-apply the configured text/code fonts to every open editor (call after
+    // the user changes font preferences).  Works for source editors with a
+    // lexer attached, which ignore QsciScintilla::setFont().
+    void applyFontPreferences();
+
 signals:
     void editorCreated(CustomEditor *editor);
     void editorClosed(CustomEditor *editor);
@@ -36,13 +42,15 @@ signals:
 
 private:
     void setupScrollBarDecorator(CustomEditor *editor);
-    void setEditorFont(CustomEditor *editor);
-    void setMarginsFont(CustomEditor *editor);
+    // The text font for prose files, the code font for source files, as
+    // configured in AppPreferences.
+    QFont fontForPath(const QString &filePath) const;
+    void setMarginsFont(CustomEditor *editor, const QFont &font);
     void applyDisplayPolicy(CustomEditor *editor, const QString &filePath);
     void purgeOldEditorPointers();
     void applyEditorColors(CustomEditor *editor);
     void applyLexerTheme(class QsciLexer *lexer);
-    void applyUniformStyleFont(CustomEditor *editor, class QsciLexer *lexer);
+    void applyUniformStyleFont(class QsciLexer *lexer, const QFont &font);
     void reapplyEditorSyntax(CustomEditor *editor);
     void applyBaseEditorColors(CustomEditor *editor);
 

@@ -164,6 +164,14 @@ void SplitEditorCoordinator::reapplyThemeToEditorPanes()
     }
 }
 
+void SplitEditorCoordinator::applyFontPreferencesToEditors()
+{
+    for (DocumentController *controller : controllers())
+    {
+        controller->editorManager()->applyFontPreferences();
+    }
+}
+
 void SplitEditorCoordinator::refreshVisibleMarkdownPreviews()
 {
     for (DocumentController *controller : controllers())

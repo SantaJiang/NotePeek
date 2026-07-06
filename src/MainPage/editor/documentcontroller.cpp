@@ -1,5 +1,6 @@
 #include "editor/documentcontroller.h"
 
+#include "apppreferences.h"
 #include "decorators/highlightedscrollbardecorator.h"
 #include "editor/customeditor.h"
 #include "editor/documentpage.h"
@@ -144,6 +145,17 @@ void DocumentController::openFile(const QString &filePath, bool activate)
     }
 
     editor->setText(content);
+
+    // Honour the "open Markdown in preview" preference for freshly opened files.
+    if (AppPreferences::instance().markdownDefaultPreview() && m_markdownPreviewer)
+    {
+        if (auto *markdownPage = qobject_cast<MarkdownDocumentPage *>(page))
+        {
+            // Background opens must not steal focus from the file being
+            // activated elsewhere (e.g. the split-view mirror).
+            markdownPage->setInitialViewMode(true, m_markdownPreviewer, activate);
+        }
+    }
 
     setCurrentFile(editor, filePath);
     m_editorManager->updateLineNumberMarginWidth(editor);

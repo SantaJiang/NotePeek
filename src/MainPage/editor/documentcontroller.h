@@ -12,6 +12,7 @@ class EditorManager;
 class ExternalFileWatcher;
 class FindReplaceManager;
 class EditorPane;
+class MarkdownPreviewer;
 
 // Drives the document lifecycle of one editor pane: open/save/close
 // workflows, save prompts, the default blank document policy, shared
@@ -31,6 +32,10 @@ public:
     CustomEditor *currentEditor() const;
     void setCreateDefaultWhenEmpty(bool createDefault);
     void attachFindReplaceManager(FindReplaceManager *manager);
+
+    // Used to realize the "open Markdown in preview" preference when a file is
+    // opened.  Optional: without it, Markdown files simply open in source view.
+    void setMarkdownPreviewer(MarkdownPreviewer *previewer) { m_markdownPreviewer = previewer; }
 
     // File workflow
     void openFile(const QString &filePath, bool activate = true);
@@ -86,6 +91,7 @@ private:
     ExternalFileWatcher *m_externalFileWatcher;
     CustomEditor *m_defaultEditor;
     bool m_createDefaultWhenEmpty;
+    MarkdownPreviewer *m_markdownPreviewer = nullptr;
 };
 
 #endif // DOCUMENTCONTROLLER_H
