@@ -6,7 +6,6 @@
 class QCheckBox;
 class QComboBox;
 class QFontComboBox;
-class QSpinBox;
 
 // The application settings window (File ▸ Preferences).  Editing is
 // non-destructive: changes are only committed to AppPreferences when the user
@@ -29,9 +28,9 @@ private:
     void commit();
 
     QFontComboBox *m_textFontCombo;
-    QSpinBox *m_textFontSize;
+    QComboBox *m_textFontSize;
     QFontComboBox *m_codeFontCombo;
-    QSpinBox *m_codeFontSize;
+    QComboBox *m_codeFontSize;
     QCheckBox *m_showFileTree;
     QComboBox *m_markdownDefaultView;
 };

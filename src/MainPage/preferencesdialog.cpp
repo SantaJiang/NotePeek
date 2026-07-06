@@ -1,41 +1,261 @@
 #include "preferencesdialog.h"
 
 #include "apppreferences.h"
+#include "themecolors.h"
 
+#include <QAbstractItemView>
 #include <QCheckBox>
 #include <QComboBox>
 #include <QDialogButtonBox>
 #include <QFontComboBox>
-#include <QFormLayout>
-#include <QGroupBox>
+#include <QFrame>
 #include <QHBoxLayout>
+#include <QIntValidator>
 #include <QLabel>
+#include <QLineEdit>
+#include <QPalette>
 #include <QPushButton>
-#include <QSpinBox>
 #include <QVBoxLayout>
 
 namespace {
 
 constexpr int kMinFontSize = 6;
-constexpr int kMaxFontSize = 72;
+constexpr int kMaxFontSize = 288;
+constexpr int kDialogWidth = 520;
+constexpr int kLabelWidth = 150;
+constexpr int kCommonFontSizes[] = {9, 10, 11, 12, 13, 14, 18, 24, 36, 48, 64, 72, 96, 144, 288};
 
-// A family picker paired with a point-size spin box, laid out horizontally so
+void polishDialogPalette(QWidget *widget)
+{
+    using namespace ThemeColors::Preferences;
+
+    QPalette palette = widget->palette();
+    palette.setColor(QPalette::Window, windowBg());
+    palette.setColor(QPalette::WindowText, text());
+    palette.setColor(QPalette::Base, inputBg());
+    palette.setColor(QPalette::AlternateBase, panelBg());
+    palette.setColor(QPalette::Text, text());
+    palette.setColor(QPalette::Button, panelBg());
+    palette.setColor(QPalette::ButtonText, text());
+    palette.setColor(QPalette::Highlight, accent());
+    palette.setColor(QPalette::HighlightedText, accentText());
+    widget->setPalette(palette);
+}
+
+QLabel *makeTitleLabel(const QString &text, QWidget *parent)
+{
+    auto *label = new QLabel(text, parent);
+    label->setObjectName(QStringLiteral("dialogTitle"));
+    return label;
+}
+
+QLabel *makeSectionTitle(const QString &text, QWidget *parent)
+{
+    auto *label = new QLabel(text, parent);
+    label->setObjectName(QStringLiteral("sectionTitle"));
+    return label;
+}
+
+QHBoxLayout *makeSettingsRow(const QString &labelText, QWidget *control, QWidget *parent)
+{
+    auto *row = new QHBoxLayout;
+    row->setContentsMargins(0, 0, 0, 0);
+    row->setSpacing(16);
+
+    auto *label = new QLabel(labelText, parent);
+    label->setObjectName(QStringLiteral("rowLabel"));
+    label->setFixedWidth(kLabelWidth);
+    label->setAlignment(Qt::AlignLeft | Qt::AlignVCenter);
+
+    control->setParent(parent);
+    row->addWidget(label);
+    row->addWidget(control, 1);
+    return row;
+}
+
+QFrame *makeSection(const QString &title, QWidget *parent)
+{
+    auto *section = new QFrame(parent);
+    section->setObjectName(QStringLiteral("settingsSection"));
+    section->setFrameShape(QFrame::NoFrame);
+    section->setAttribute(Qt::WA_StyledBackground, true);
+
+    auto *layout = new QVBoxLayout(section);
+    layout->setContentsMargins(16, 14, 16, 16);
+    layout->setSpacing(12);
+    layout->addWidget(makeSectionTitle(title, section));
+
+    return section;
+}
+
+void configureFontCombo(QFontComboBox *combo)
+{
+    combo->setEditable(false);
+    combo->setInsertPolicy(QComboBox::NoInsert);
+}
+
+void configureFontSizeCombo(QComboBox *combo)
+{
+    combo->setEditable(true);
+    combo->setInsertPolicy(QComboBox::NoInsert);
+    combo->setFixedWidth(92);
+    combo->lineEdit()->setValidator(new QIntValidator(kMinFontSize, kMaxFontSize, combo));
+
+    for (int size : kCommonFontSizes)
+    {
+        combo->addItem(QString::number(size), size);
+    }
+}
+
+int currentFontSize(QComboBox *combo)
+{
+    bool ok = false;
+    const int pointSize = combo->currentText().trimmed().toInt(&ok);
+    if (ok)
+    {
+        return pointSize;
+    }
+
+    const QVariant data = combo->currentData();
+    return data.isValid() ? data.toInt() : AppPreferences::defaultFontSize();
+}
+
+void setCurrentFontSize(QComboBox *combo, int pointSize)
+{
+    const int index = combo->findData(pointSize);
+    if (index >= 0)
+    {
+        combo->setCurrentIndex(index);
+        return;
+    }
+
+    combo->setEditText(QString::number(pointSize));
+}
+
+// A family picker paired with a point-size dropdown, laid out horizontally so
 // the two fonts line up neatly in the form.
-QWidget *makeFontRow(QFontComboBox *combo, QSpinBox *size, QWidget *parent)
+QWidget *makeFontRow(QFontComboBox *combo, QComboBox *size, QWidget *parent)
 {
     auto *row = new QWidget(parent);
     auto *layout = new QHBoxLayout(row);
     layout->setContentsMargins(0, 0, 0, 0);
-    layout->setSpacing(8);
+    layout->setSpacing(10);
 
     combo->setParent(row);
     size->setParent(row);
-    size->setRange(kMinFontSize, kMaxFontSize);
-    size->setSuffix(QObject::tr(" pt"));
 
     layout->addWidget(combo, 1);
     layout->addWidget(size);
     return row;
+}
+
+QString preferencesStyleSheet()
+{
+    using namespace ThemeColors::Preferences;
+
+    return QStringLiteral(
+        "QDialog {"
+        "  background-color: %1;"
+        "  color: %5;"
+        "}"
+        "QLabel#dialogTitle {"
+        "  color: %5;"
+        "  font-size: 17px;"
+        "  font-weight: 600;"
+        "}"
+        "QLabel#sectionTitle {"
+        "  color: %5;"
+        "  font-weight: 600;"
+        "}"
+        "QLabel#rowLabel {"
+        "  color: %6;"
+        "}"
+        "QFrame#settingsSection {"
+        "  background-color: %2;"
+        "  border: 1px solid %4;"
+        "  border-radius: 6px;"
+        "}"
+        "QComboBox,"
+        "QFontComboBox {"
+        "  background-color: %3;"
+        "  color: %5;"
+        "  border: 1px solid %4;"
+        "  border-radius: 4px;"
+        "  min-height: 24px;"
+        "  padding: 3px 8px;"
+        "}"
+        "QComboBox:hover,"
+        "QFontComboBox:hover {"
+        "  border-color: %9;"
+        "}"
+        "QComboBox:focus,"
+        "QFontComboBox:focus {"
+        "  border-color: %9;"
+        "}"
+        "QComboBox::drop-down,"
+        "QFontComboBox::drop-down {"
+        "  width: 24px;"
+        "  border: 0;"
+        "}"
+        "QComboBox QLineEdit {"
+        "  background-color: transparent;"
+        "  color: %5;"
+        "  border: 0;"
+        "  padding: 0;"
+        "}"
+        "QCheckBox {"
+        "  color: %5;"
+        "  spacing: 8px;"
+        "}"
+        "QPushButton {"
+        "  background-color: %3;"
+        "  color: %5;"
+        "  border: 1px solid %4;"
+        "  border-radius: 4px;"
+        "  min-width: 72px;"
+        "  padding: 5px 14px;"
+        "}"
+        "QPushButton:hover {"
+        "  background-color: %7;"
+        "}"
+        "QPushButton:pressed {"
+        "  background-color: %8;"
+        "}"
+        "QPushButton:default {"
+        "  background-color: %9;"
+        "  border-color: %9;"
+        "  color: %10;"
+        "}"
+        "QPushButton:default:hover {"
+        "  background-color: %11;"
+        "  border-color: %11;"
+        "}"
+        "QAbstractItemView {"
+        "  background-color: %2;"
+        "  color: %5;"
+        "  border: 1px solid %4;"
+        "  outline: 0;"
+        "  selection-background-color: %7;"
+        "  selection-color: %5;"
+        "}"
+        "QAbstractItemView::item {"
+        "  min-height: 22px;"
+        "  padding: 2px 8px;"
+        "}"
+        "QAbstractItemView::item:hover {"
+        "  background-color: %7;"
+        "}")
+        .arg(windowBg().name(QColor::HexRgb),
+             panelBg().name(QColor::HexRgb),
+             inputBg().name(QColor::HexRgb),
+             border().name(QColor::HexRgb),
+             text().name(QColor::HexRgb),
+             mutedText().name(QColor::HexRgb),
+             hoverBg().name(QColor::HexRgb),
+             pressedBg().name(QColor::HexRgb),
+             accent().name(QColor::HexRgb),
+             accentText().name(QColor::HexRgb),
+             accentPressed().name(QColor::HexRgb));
 }
 
 } // namespace
@@ -43,32 +263,42 @@ QWidget *makeFontRow(QFontComboBox *combo, QSpinBox *size, QWidget *parent)
 PreferencesDialog::PreferencesDialog(QWidget *parent)
     : QDialog(parent)
     , m_textFontCombo(new QFontComboBox(this))
-    , m_textFontSize(new QSpinBox(this))
+    , m_textFontSize(new QComboBox(this))
     , m_codeFontCombo(new QFontComboBox(this))
-    , m_codeFontSize(new QSpinBox(this))
+    , m_codeFontSize(new QComboBox(this))
     , m_showFileTree(new QCheckBox(tr("Show file tree on startup"), this))
     , m_markdownDefaultView(new QComboBox(this))
 {
     setWindowTitle(tr("Preferences"));
     setModal(true);
+    polishDialogPalette(this);
+    setStyleSheet(preferencesStyleSheet());
 
     // The code font must be monospaced; restrict the picker accordingly.
+    configureFontCombo(m_textFontCombo);
+    configureFontCombo(m_codeFontCombo);
     m_codeFontCombo->setFontFilters(QFontComboBox::MonospacedFonts);
+    configureFontSizeCombo(m_textFontSize);
+    configureFontSizeCombo(m_codeFontSize);
 
     m_markdownDefaultView->addItem(tr("Source"));
     m_markdownDefaultView->addItem(tr("Preview"));
 
-    auto *fontsGroup = new QGroupBox(tr("Editor Fonts"), this);
-    auto *fontsForm = new QFormLayout(fontsGroup);
-    fontsForm->setLabelAlignment(Qt::AlignLeft);
-    fontsForm->addRow(tr("Text font:"), makeFontRow(m_textFontCombo, m_textFontSize, fontsGroup));
-    fontsForm->addRow(tr("Code font:"), makeFontRow(m_codeFontCombo, m_codeFontSize, fontsGroup));
+    auto *header = new QWidget(this);
+    auto *headerLayout = new QVBoxLayout(header);
+    headerLayout->setContentsMargins(0, 0, 0, 0);
+    headerLayout->setSpacing(2);
+    headerLayout->addWidget(makeTitleLabel(tr("Preferences"), header));
 
-    auto *generalGroup = new QGroupBox(tr("General"), this);
-    auto *generalForm = new QFormLayout(generalGroup);
-    generalForm->setLabelAlignment(Qt::AlignLeft);
-    generalForm->addRow(QString(), m_showFileTree);
-    generalForm->addRow(tr("Markdown default view:"), m_markdownDefaultView);
+    auto *fontsSection = makeSection(tr("Editor Fonts"), this);
+    auto *fontsLayout = qobject_cast<QVBoxLayout *>(fontsSection->layout());
+    fontsLayout->addLayout(makeSettingsRow(tr("Text font"), makeFontRow(m_textFontCombo, m_textFontSize, fontsSection), fontsSection));
+    fontsLayout->addLayout(makeSettingsRow(tr("Code font"), makeFontRow(m_codeFontCombo, m_codeFontSize, fontsSection), fontsSection));
+
+    auto *generalSection = makeSection(tr("General"), this);
+    auto *generalLayout = qobject_cast<QVBoxLayout *>(generalSection->layout());
+    generalLayout->addLayout(makeSettingsRow(tr("Startup"), m_showFileTree, generalSection));
+    generalLayout->addLayout(makeSettingsRow(tr("Markdown default view"), m_markdownDefaultView, generalSection));
 
     auto *buttons = new QDialogButtonBox(QDialogButtonBox::Ok
                                              | QDialogButtonBox::Apply
@@ -76,14 +306,15 @@ PreferencesDialog::PreferencesDialog(QWidget *parent)
                                          this);
 
     auto *layout = new QVBoxLayout(this);
-    layout->setContentsMargins(18, 18, 18, 18);
+    layout->setContentsMargins(20, 20, 20, 18);
     layout->setSpacing(14);
-    layout->addWidget(fontsGroup);
-    layout->addWidget(generalGroup);
+    layout->addWidget(header);
+    layout->addWidget(fontsSection);
+    layout->addWidget(generalSection);
     layout->addStretch();
     layout->addWidget(buttons);
 
-    setMinimumWidth(420);
+    setMinimumWidth(kDialogWidth);
 
     loadFromPreferences();
 
@@ -101,9 +332,9 @@ void PreferencesDialog::loadFromPreferences()
     const AppPreferences &prefs = AppPreferences::instance();
 
     m_textFontCombo->setCurrentFont(QFont(prefs.textFontFamily()));
-    m_textFontSize->setValue(prefs.textFontSize());
+    setCurrentFontSize(m_textFontSize, prefs.textFontSize());
     m_codeFontCombo->setCurrentFont(QFont(prefs.codeFontFamily()));
-    m_codeFontSize->setValue(prefs.codeFontSize());
+    setCurrentFontSize(m_codeFontSize, prefs.codeFontSize());
     m_showFileTree->setChecked(prefs.showFileTreeOnStartup());
     m_markdownDefaultView->setCurrentIndex(prefs.markdownDefaultPreview() ? 1 : 0);
 }
@@ -112,8 +343,8 @@ void PreferencesDialog::commit()
 {
     AppPreferences &prefs = AppPreferences::instance();
 
-    prefs.setTextFont(m_textFontCombo->currentFont().family(), m_textFontSize->value());
-    prefs.setCodeFont(m_codeFontCombo->currentFont().family(), m_codeFontSize->value());
+    prefs.setTextFont(m_textFontCombo->currentFont().family(), currentFontSize(m_textFontSize));
+    prefs.setCodeFont(m_codeFontCombo->currentFont().family(), currentFontSize(m_codeFontSize));
     prefs.setShowFileTreeOnStartup(m_showFileTree->isChecked());
     prefs.setMarkdownDefaultPreview(m_markdownDefaultView->currentIndex() == 1);
 
