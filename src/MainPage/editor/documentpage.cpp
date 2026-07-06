@@ -44,6 +44,11 @@ bool DocumentPage::isPreviewVisible() const
     return false;
 }
 
+bool DocumentPage::isEditorHidden() const
+{
+    return false;
+}
+
 bool DocumentPage::togglePreview(MarkdownPreviewer *previewer)
 {
     Q_UNUSED(previewer);
@@ -87,6 +92,8 @@ MarkdownDocumentPage::MarkdownDocumentPage(CustomEditor *editor, QWidget *parent
     , m_previewer(nullptr)
     , m_updateTimer(new QTimer(this))
     , m_syncingScroll(false)
+    , m_mode(SourceOnly)
+    , m_homeMode(SourceOnly)
 {
     auto *layout = new QVBoxLayout(this);
     layout->setContentsMargins(0, 0, 0, 0);
@@ -110,7 +117,12 @@ MarkdownDocumentPage::MarkdownDocumentPage(CustomEditor *editor, QWidget *parent
 
 bool MarkdownDocumentPage::isPreviewVisible() const
 {
-    return m_preview && m_preview->isVisible();
+    return m_mode != SourceOnly;
+}
+
+bool MarkdownDocumentPage::isEditorHidden() const
+{
+    return m_mode == PreviewOnly;
 }
 
 CustomEditor *MarkdownDocumentPage::takeEditor()
@@ -126,37 +138,85 @@ CustomEditor *MarkdownDocumentPage::takeEditor()
 
 bool MarkdownDocumentPage::togglePreview(MarkdownPreviewer *previewer)
 {
-    if (isPreviewVisible())
-    {
-        hidePreview();
-        return false;
-    }
-
-    ensurePreview(previewer);
-    m_preview->show();
-    if (m_splitter->sizes().size() == 2)
-    {
-        const int width = qMax(1, m_splitter->width());
-        m_splitter->setSizes({width / 2, width / 2});
-    }
-    updatePreview();
-    m_preview->setFocus();
-    emit copyAvailableChanged(hasCopySelection());
-    return true;
+    // From the split view, collapse back to whichever single pane the file
+    // opened in (source or preview).  From either single pane, expand to the
+    // split view showing both.
+    setViewMode(m_mode == Split ? m_homeMode : Split, previewer);
+    return isPreviewVisible();
 }
 
 void MarkdownDocumentPage::hidePreview()
 {
-    if (!m_editor)
+    setViewMode(SourceOnly, nullptr);
+}
+
+void MarkdownDocumentPage::setInitialViewMode(bool preview, MarkdownPreviewer *previewer, bool giveFocus)
+{
+    m_homeMode = preview ? PreviewOnly : SourceOnly;
+    setViewMode(m_homeMode, previewer, giveFocus);
+}
+
+void MarkdownDocumentPage::setViewMode(ViewMode mode, MarkdownPreviewer *previewer, bool giveFocus)
+{
+    if (mode != SourceOnly)
     {
-        return;
+        ensurePreview(previewer);
+        // Without a preview widget (no previewer ever supplied) fall back to
+        // the source view instead of showing an empty pane.
+        if (!m_preview)
+        {
+            mode = SourceOnly;
+        }
     }
 
-    if (m_preview)
+    m_mode = mode;
+
+    switch (mode)
     {
-        m_preview->hide();
+    case SourceOnly:
+        if (m_editor)
+        {
+            m_editor->show();
+        }
+        if (m_preview)
+        {
+            m_preview->hide();
+        }
+        break;
+    case PreviewOnly:
+        m_preview->show();
+        if (m_editor)
+        {
+            m_editor->hide();
+        }
+        break;
+    case Split:
+        if (m_editor)
+        {
+            m_editor->show();
+        }
+        m_preview->show();
+        if (m_splitter->sizes().size() == 2)
+        {
+            const int width = qMax(1, m_splitter->width());
+            m_splitter->setSizes({width / 2, width / 2});
+        }
+        break;
     }
-    m_editor->setFocus();
+
+    if (mode != SourceOnly)
+    {
+        updatePreview();
+        if (giveFocus)
+        {
+            m_preview->setFocus();
+        }
+    }
+    else if (m_editor && giveFocus)
+    {
+        m_editor->setFocus();
+    }
+
     emit copyAvailableChanged(hasCopySelection());
 }
 
@@ -231,13 +291,18 @@ bool MarkdownDocumentPage::eventFilter(QObject *watched, QEvent *event)
 
 void MarkdownDocumentPage::ensurePreview(MarkdownPreviewer *previewer)
 {
-    if (m_preview)
+    // Remember the previewer, but never clobber a good one with a null passed
+    // by an internal transition (e.g. hidePreview()).
+    if (previewer)
     {
         m_previewer = previewer;
+    }
+
+    if (m_preview || !m_previewer)
+    {
         return;
     }
 
-    m_previewer = previewer;
     m_preview = m_previewer->createPreviewWidget(QString(), QString(), this);
     connect(m_preview, &QLiteHtmlWidget::copyAvailable,
             this, &DocumentPage::copyAvailableChanged);

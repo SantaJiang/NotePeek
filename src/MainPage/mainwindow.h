@@ -48,6 +48,7 @@ private slots:
     void on_action_switchHeaderSource_triggered();
     void on_action_markdownPreview_triggered();
     void on_action_markdownExportPdf_triggered();
+    void on_action_preferences_triggered();
 
     void onFileDraged(const QList<QUrl> &urls);
     void openFileInNewWindow(const QString &filePath);
@@ -62,6 +63,10 @@ private:
     void refreshHighlights();
     void openFileAndSetRootDirectory(const QString &fileName);
     void updateToolActions();
+    // Re-apply font preferences to every open editor and refresh visible
+    // Markdown previews.  Does not touch the file-tree dock (that setting only
+    // seeds the next launch) or reopen documents.
+    void applyPreferences();
     DocumentController *activeController() const;
     void applyActiveController(DocumentController *controller);
 

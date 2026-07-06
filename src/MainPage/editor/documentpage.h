@@ -22,6 +22,10 @@ public:
     virtual CustomEditor *takeEditor();
 
     virtual bool isPreviewVisible() const;
+    // True when the source editor is not visible/editable (Markdown preview-only
+    // mode).  The main window uses this to disable editing actions that would
+    // otherwise operate on the hidden editor.
+    virtual bool isEditorHidden() const;
     virtual bool togglePreview(MarkdownPreviewer *previewer);
     virtual void hidePreview();
     virtual void refreshPreview();
@@ -48,9 +52,19 @@ class MarkdownDocumentPage : public DocumentPage
     Q_OBJECT
 
 public:
+    // How a Markdown page is laid out.  SourceOnly shows just the editor,
+    // PreviewOnly shows just the rendered preview, and Split shows both.
+    enum ViewMode
+    {
+        SourceOnly,
+        PreviewOnly,
+        Split
+    };
+
     explicit MarkdownDocumentPage(CustomEditor *editor, QWidget *parent = nullptr);
 
     bool isPreviewVisible() const override;
+    bool isEditorHidden() const override;
     CustomEditor *takeEditor() override;
     bool togglePreview(MarkdownPreviewer *previewer) override;
     void hidePreview() override;
@@ -58,10 +72,17 @@ public:
     void copyCurrentSelection() override;
     bool hasCopySelection() const override;
 
+    // Choose the mode a freshly opened Markdown file starts in (source or
+    // preview).  The chosen single-pane mode becomes the "home" the split
+    // toggle returns to.  giveFocus is false for background opens so the file
+    // being activated elsewhere keeps keyboard focus.
+    void setInitialViewMode(bool preview, MarkdownPreviewer *previewer, bool giveFocus = true);
+
 protected:
     bool eventFilter(QObject *watched, QEvent *event) override;
 
 private:
+    void setViewMode(ViewMode mode, MarkdownPreviewer *previewer, bool giveFocus = true);
     void ensurePreview(MarkdownPreviewer *previewer);
     void updatePreview();
     void schedulePreviewUpdate();
@@ -83,6 +104,8 @@ private:
     QTimer *m_updateTimer;
     QVector<QPair<int, int>> m_previewLineMap;
     bool m_syncingScroll;
+    ViewMode m_mode;
+    ViewMode m_homeMode;
 };
 
 #endif // DOCUMENTPAGE_H

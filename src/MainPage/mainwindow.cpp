@@ -1,5 +1,7 @@
 #include "mainwindow.h"
 #include "ui_mainwindow.h"
+#include "apppreferences.h"
+#include "preferencesdialog.h"
 #include "themecolors.h"
 #include <QFileDialog>
 #include <QScreen>
@@ -131,6 +133,11 @@ MainWindow::MainWindow(QWidget *parent)
     m_leftController = new DocumentController(ui->editorPane, !hasFileArg, this);
     m_rightController = new DocumentController(ui->editorPaneRight, false, this);
 
+    // Both panes need the previewer so the "open Markdown in preview" preference
+    // can render on open.
+    m_leftController->setMarkdownPreviewer(m_markdownPreviewer);
+    m_rightController->setMarkdownPreviewer(m_markdownPreviewer);
+
     ui->widget_findreplace->setFindReplaceManager(m_findReplaceManager);
 
     m_fileExplorerDock = new FileExplorerDock(this);
@@ -142,7 +149,12 @@ MainWindow::MainWindow(QWidget *parent)
     connect(m_fileExplorerDock, &FileExplorerDock::openInNewWindowRequested,
             this, &MainWindow::openFileInNewWindow);
 
-    m_fileExplorerDock->setVisible(false);
+    // Seed the file-tree visibility from the preference.  This only sets the
+    // startup state; the user's manual toggles during a session are never
+    // overwritten by applying preferences later.
+    const bool showFileTree = AppPreferences::instance().showFileTreeOnStartup();
+    m_fileExplorerDock->setVisible(showFileTree);
+    ui->action_showSlideBar->setChecked(showFileTree);
     ui->widget_findreplace->setVisible(false);
 
     ui->editorSplitter->setStretchFactor(0, 1);
@@ -411,6 +423,24 @@ void MainWindow::on_action_showSlideBar_triggered(bool checked)
     m_fileExplorerDock->setVisible(checked);
 }
 
+void MainWindow::on_action_preferences_triggered()
+{
+    PreferencesDialog dialog(this);
+    connect(&dialog, &PreferencesDialog::applied, this, &MainWindow::applyPreferences);
+    dialog.exec();
+}
+
+void MainWindow::applyPreferences()
+{
+    // Fonts apply live to every open editor in both panes (including editors
+    // hidden behind a Markdown preview), then previews re-render with the new
+    // fonts.  The file-tree preference intentionally only affects the next
+    // launch, and the Markdown default-view preference only affects files
+    // opened afterwards, so neither is touched here.
+    m_editorCoordinator->applyFontPreferencesToEditors();
+    m_editorCoordinator->refreshVisibleMarkdownPreviews();
+}
+
 void MainWindow::on_action_undo_triggered()
 {
     DocumentController *controller = activeController();
@@ -569,13 +599,19 @@ void MainWindow::openFileInNewWindow(const QString &filePath)
 
 void MainWindow::updateEditActions(bool available)
 {
-    const bool editingAvailable = activeController()->currentEditor() != nullptr;
-    ui->action_cut->setEnabled(editingAvailable && available);
+    DocumentController *controller = activeController();
+    // In Markdown preview-only mode the source editor is hidden; actions that
+    // would edit or search it are disabled so they cannot act on unseen text.
+    // Copy stays governed by `available`, which already reflects a preview
+    // selection, so text can still be copied out of the preview.
+    const bool sourceEditable = controller->currentEditor() != nullptr
+                                && !controller->pane()->isCurrentEditorHidden();
+    ui->action_cut->setEnabled(sourceEditable && available);
     ui->action_copy->setEnabled(available);
-    ui->action_paste->setEnabled(editingAvailable);
-    ui->action_undo->setEnabled(editingAvailable);
-    ui->action_redo->setEnabled(editingAvailable);
-    ui->action_find->setEnabled(editingAvailable);
+    ui->action_paste->setEnabled(sourceEditable);
+    ui->action_undo->setEnabled(sourceEditable);
+    ui->action_redo->setEnabled(sourceEditable);
+    ui->action_find->setEnabled(sourceEditable);
 }
 
 void MainWindow::updateWindowTitle(bool modified)
@@ -606,6 +642,14 @@ void MainWindow::updateToolActions()
     CustomEditor *editor = controller->currentEditor();
     const QString filePath = editor ? editor->filePath() : QString();
     const bool previewVisible = controller->pane()->isCurrentEditorPreviewVisible();
+
+    // The find/replace bar operates on the source editor.  When the source is
+    // hidden (Markdown preview-only) collapse it so it is not bound to an
+    // editor the user cannot see.
+    if (controller->pane()->isCurrentEditorHidden() && ui->widget_findreplace->isVisible())
+    {
+        ui->widget_findreplace->setVisible(false);
+    }
 
     const bool cppSupported = !filePath.isEmpty() && m_headerSourceManager->isCppFile(filePath);
     const bool markdownSupported = !filePath.isEmpty() && m_markdownPreviewer->isMarkdownFile(filePath);
