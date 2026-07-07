@@ -40,6 +40,7 @@ protected:
     void showEvent(QShowEvent *event) override;
     void hideEvent(QHideEvent *event) override;
     void keyPressEvent(QKeyEvent *event) override;
+    void changeEvent(QEvent *event) override;
 
 private slots:
     void onCloseClicked();
@@ -51,6 +52,8 @@ private slots:
     void onBackwardsToggled(bool checked);
 
 private:
+    void applyChromeTheme();
+
     Ui::FindReplaceWidget *ui;
     FindReplaceManager *m_manager;
 };

@@ -1,6 +1,7 @@
 #include "editor/documentpage.h"
 
 #include "editor/customeditor.h"
+#include "themecolors.h"
 #include "tool/markdown/markdownpreviewer.h"
 
 #include <QAbstractScrollArea>
@@ -8,14 +9,42 @@
 #include <QClipboard>
 #include <QEvent>
 #include <QGuiApplication>
+#include <QPainter>
 #include <QRegularExpression>
 #include <QScrollBar>
 #include <QSet>
 #include <QSplitter>
 #include <QTimer>
 #include <QVBoxLayout>
+#include <QWidget>
 
 #include <qlitehtmlwidget.h>
+
+namespace {
+
+// Thin vertical accent bar drawn over the preview viewport to mark the block
+// matching the source cursor line.  It is a transparent, click-through child of
+// the viewport positioned manually as the cursor moves and the preview scrolls.
+class PreviewLineMarker final : public QWidget
+{
+public:
+    explicit PreviewLineMarker(QWidget *parent)
+        : QWidget(parent)
+    {
+        setAttribute(Qt::WA_TransparentForMouseEvents, true);
+        setAttribute(Qt::WA_NoSystemBackground, true);
+        hide();
+    }
+
+protected:
+    void paintEvent(QPaintEvent *) override
+    {
+        QPainter painter(this);
+        painter.fillRect(rect(), ThemeColors::MarkdownPreview::linkFg());
+    }
+};
+
+} // namespace
 
 DocumentPage::DocumentPage(CustomEditor *editor, QWidget *parent)
     : QWidget(parent)
@@ -91,6 +120,8 @@ MarkdownDocumentPage::MarkdownDocumentPage(CustomEditor *editor, QWidget *parent
     , m_preview(nullptr)
     , m_previewer(nullptr)
     , m_updateTimer(new QTimer(this))
+    , m_previewLineMarker(nullptr)
+    , m_currentSourceLine(1)
     , m_syncingScroll(false)
     , m_mode(SourceOnly)
 {
@@ -107,6 +138,8 @@ MarkdownDocumentPage::MarkdownDocumentPage(CustomEditor *editor, QWidget *parent
 
     connect(editor, &CustomEditor::copyAvailable, this, &DocumentPage::copyAvailableChanged);
     connect(editor, &CustomEditor::textChanged, this, &MarkdownDocumentPage::schedulePreviewUpdate);
+    connect(editor, &CustomEditor::cursorPositionChanged,
+            this, &MarkdownDocumentPage::onEditorCursorMoved);
     connect(m_updateTimer, &QTimer::timeout, this, &MarkdownDocumentPage::updatePreview);
     connect(editor->verticalScrollBar(), &QScrollBar::valueChanged,
             this, &MarkdownDocumentPage::syncPreviewScrollFromEditor);
@@ -172,6 +205,10 @@ void MarkdownDocumentPage::setViewMode(ViewMode mode, MarkdownPreviewer *preview
         if (m_preview)
         {
             m_preview->hide();
+        }
+        if (m_previewLineMarker)
+        {
+            m_previewLineMarker->hide();
         }
         break;
     case Split:
@@ -290,9 +327,13 @@ void MarkdownDocumentPage::ensurePreview(MarkdownPreviewer *previewer)
             this, &DocumentPage::copyAvailableChanged);
     connect(m_preview->verticalScrollBar(), &QScrollBar::valueChanged,
             this, &MarkdownDocumentPage::syncEditorScrollFromPreview);
+    connect(m_preview->verticalScrollBar(), &QScrollBar::valueChanged,
+            this, &MarkdownDocumentPage::updatePreviewLineMarker);
     m_preview->installEventFilter(this);
     m_splitter->addWidget(m_preview);
     m_preview->hide();
+
+    m_previewLineMarker = new PreviewLineMarker(m_preview->viewport());
 }
 
 void MarkdownDocumentPage::updatePreview()
@@ -317,6 +358,7 @@ void MarkdownDocumentPage::updatePreview()
         if (!isPreviewVisible() || !m_preview || !m_editor)
         {
             m_syncingScroll = false;
+            updatePreviewLineMarker();
             return;
         }
 
@@ -349,6 +391,7 @@ void MarkdownDocumentPage::updatePreview()
             setScrollRatio(m_preview, ratio);
         }
         m_syncingScroll = false;
+        updatePreviewLineMarker();
     });
 }
 
@@ -490,7 +533,52 @@ void MarkdownDocumentPage::schedulePreviewScrollMapRebuild()
             bar->setValue(qBound(bar->minimum(), centeredY, bar->maximum()));
             m_syncingScroll = false;
         }
+        updatePreviewLineMarker();
     });
+}
+
+void MarkdownDocumentPage::onEditorCursorMoved(int line, int /*index*/)
+{
+    m_currentSourceLine = line + 1;
+    updatePreviewLineMarker();
+}
+
+void MarkdownDocumentPage::updatePreviewLineMarker()
+{
+    if (!m_previewLineMarker)
+    {
+        return;
+    }
+
+    if (!m_preview || !isPreviewVisible())
+    {
+        m_previewLineMarker->hide();
+        return;
+    }
+
+    const int contentY = previewYForSourceLine(m_currentSourceLine);
+    if (contentY < 0)
+    {
+        m_previewLineMarker->hide();
+        return;
+    }
+
+    QWidget *viewport = m_preview->viewport();
+    const int viewportY = contentY - m_preview->verticalScrollBar()->value();
+
+    // One preview text line is a good approximation of the marked block height.
+    const int markerHeight = qMax(18, m_preview->fontMetrics().height() + 6);
+    const int markerWidth = 3;
+
+    if (viewportY + markerHeight < 0 || viewportY > viewport->height())
+    {
+        m_previewLineMarker->hide();
+        return;
+    }
+
+    m_previewLineMarker->setGeometry(0, viewportY, markerWidth, markerHeight);
+    m_previewLineMarker->show();
+    m_previewLineMarker->raise();
 }
 
 int MarkdownDocumentPage::sourceLineAtEditorCenter() const

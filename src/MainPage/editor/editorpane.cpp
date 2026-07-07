@@ -469,8 +469,8 @@ void EditorPane::installTopbarSeparators()
 
     layout->insertWidget(layout->indexOf(ui->comboBox_files) + 1, createSeparator());
     layout->insertWidget(layout->indexOf(ui->pushButton_closeDoc) + 1, createSeparator());
-    layout->insertWidget(layout->indexOf(ui->pushButton_sidePreview), createSeparator());
-    layout->insertWidget(layout->indexOf(ui->pushButton_splitView), createSeparator());
+    // No separators around the side-preview / split buttons: they read as a
+    // single divider-free control group at the right edge of the top bar.
 }
 
 void EditorPane::applyTopbarStyleSheet()
