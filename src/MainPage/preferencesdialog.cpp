@@ -227,7 +227,7 @@ PreferencesDialog::PreferencesDialog(QWidget *parent)
     , m_codeFontCombo(new QFontComboBox(this))
     , m_codeFontSize(new QComboBox(this))
     , m_showFileTree(new QCheckBox(tr("Show file tree on startup"), this))
-    , m_markdownDefaultView(new QComboBox(this))
+    , m_markdownSidePreview(new QCheckBox(tr("Open with side preview"), this))
 {
     setWindowTitle(tr("Preferences"));
     setModal(true);
@@ -241,9 +241,6 @@ PreferencesDialog::PreferencesDialog(QWidget *parent)
     configureFontSizeCombo(m_textFontSize);
     configureFontSizeCombo(m_codeFontSize);
 
-    m_markdownDefaultView->addItem(tr("Source"));
-    m_markdownDefaultView->addItem(tr("Preview"));
-
     auto *fontsSection = makeSection(tr("Editor Fonts"), this);
     auto *fontsLayout = qobject_cast<QVBoxLayout *>(fontsSection->layout());
     fontsLayout->addLayout(makeSettingsRow(tr("Text font"), makeFontRow(m_textFontCombo, m_textFontSize, fontsSection), fontsSection));
@@ -252,7 +249,7 @@ PreferencesDialog::PreferencesDialog(QWidget *parent)
     auto *generalSection = makeSection(tr("General"), this);
     auto *generalLayout = qobject_cast<QVBoxLayout *>(generalSection->layout());
     generalLayout->addLayout(makeSettingsRow(tr("Startup"), m_showFileTree, generalSection));
-    generalLayout->addLayout(makeSettingsRow(tr("Markdown default view"), m_markdownDefaultView, generalSection));
+    generalLayout->addLayout(makeSettingsRow(tr("Markdown"), m_markdownSidePreview, generalSection));
 
     auto *buttons = new QDialogButtonBox(QDialogButtonBox::Ok
                                              | QDialogButtonBox::Apply
@@ -290,7 +287,7 @@ void PreferencesDialog::loadFromPreferences()
     m_codeFontCombo->setCurrentFont(QFont(prefs.codeFontFamily()));
     setCurrentFontSize(m_codeFontSize, prefs.codeFontSize());
     m_showFileTree->setChecked(prefs.showFileTreeOnStartup());
-    m_markdownDefaultView->setCurrentIndex(prefs.markdownDefaultPreview() ? 1 : 0);
+    m_markdownSidePreview->setChecked(prefs.markdownDefaultPreview());
 }
 
 void PreferencesDialog::commit()
@@ -300,7 +297,7 @@ void PreferencesDialog::commit()
     prefs.setTextFont(m_textFontCombo->currentFont().family(), currentFontSize(m_textFontSize));
     prefs.setCodeFont(m_codeFontCombo->currentFont().family(), currentFontSize(m_codeFontSize));
     prefs.setShowFileTreeOnStartup(m_showFileTree->isChecked());
-    prefs.setMarkdownDefaultPreview(m_markdownDefaultView->currentIndex() == 1);
+    prefs.setMarkdownDefaultPreview(m_markdownSidePreview->isChecked());
 
     prefs.save();
 

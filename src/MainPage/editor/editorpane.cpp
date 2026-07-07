@@ -103,9 +103,13 @@ EditorPane::EditorPane(QWidget *parent)
     {
         ui->pushButton_closeDoc->setFont(QFont(fontFamilies.first()));
         ui->pushButton_splitView->setFont(QFont(fontFamilies.first()));
+        ui->pushButton_sidePreview->setFont(QFont(fontFamilies.first()));
     }
     ui->pushButton_closeDoc->setText(QChar(0xf00d));
+    ui->pushButton_sidePreview->setText(QChar(0xf0f6));
+    ui->pushButton_sidePreview->setToolTip(tr("Side preview"));
     setSplitViewButtonCollapseMode(false);
+    updateSidePreviewButton();
 
     ui->tabWidget->setTabsClosable(true);
     ui->tabWidget->setDocumentMode(true);
@@ -389,6 +393,21 @@ void EditorPane::on_pushButton_splitView_clicked(bool checked)
     emit splitViewToggled(checked);
 }
 
+void EditorPane::on_pushButton_sidePreview_clicked(bool /*checked*/)
+{
+    // The controller decides the resulting mode and refreshes the button state.
+    emit sidePreviewToggleRequested();
+}
+
+void EditorPane::updateSidePreviewButton()
+{
+    auto *markdownPage = qobject_cast<MarkdownDocumentPage *>(currentPage());
+    ui->pushButton_sidePreview->setVisible(markdownPage != nullptr);
+
+    const QSignalBlocker blocker(ui->pushButton_sidePreview);
+    ui->pushButton_sidePreview->setChecked(markdownPage && markdownPage->isPreviewVisible());
+}
+
 void EditorPane::on_comboBox_files_currentIndexChanged(int index)
 {
     if (index >= 0 && index < ui->tabWidget->count())
@@ -400,6 +419,7 @@ void EditorPane::on_comboBox_files_currentIndexChanged(int index)
 void EditorPane::onTabCurrentChanged(int index)
 {
     syncComboBoxIndex(index);
+    updateSidePreviewButton();
     emit currentPageChanged(index);
 }
 
@@ -449,6 +469,7 @@ void EditorPane::installTopbarSeparators()
 
     layout->insertWidget(layout->indexOf(ui->comboBox_files) + 1, createSeparator());
     layout->insertWidget(layout->indexOf(ui->pushButton_closeDoc) + 1, createSeparator());
+    layout->insertWidget(layout->indexOf(ui->pushButton_sidePreview), createSeparator());
     layout->insertWidget(layout->indexOf(ui->pushButton_splitView), createSeparator());
 }
 
@@ -483,6 +504,7 @@ void EditorPane::applyTopbarStyleSheet()
         "  border: 0;"
         "}"
         "QToolButton#pushButton_closeDoc,"
+        "QToolButton#pushButton_sidePreview,"
         "QToolButton#pushButton_splitView {"
         "  background-color: transparent;"
         "  color: %6;"
@@ -492,15 +514,18 @@ void EditorPane::applyTopbarStyleSheet()
         "  border-radius: 4px;"
         "}"
         "QToolButton#pushButton_closeDoc:hover,"
+        "QToolButton#pushButton_sidePreview:hover,"
         "QToolButton#pushButton_splitView:hover {"
         "  background-color: %4;"
         "  color: %3;"
         "}"
         "QToolButton#pushButton_closeDoc:pressed,"
+        "QToolButton#pushButton_sidePreview:pressed,"
         "QToolButton#pushButton_splitView:pressed {"
         "  background-color: %5;"
         "  color: %3;"
         "}"
+        "QToolButton#pushButton_sidePreview:checked,"
         "QToolButton#pushButton_splitView:checked {"
         "  background-color: %5;"
         "  color: %3;"

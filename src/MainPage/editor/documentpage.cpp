@@ -93,7 +93,6 @@ MarkdownDocumentPage::MarkdownDocumentPage(CustomEditor *editor, QWidget *parent
     , m_updateTimer(new QTimer(this))
     , m_syncingScroll(false)
     , m_mode(SourceOnly)
-    , m_homeMode(SourceOnly)
 {
     auto *layout = new QVBoxLayout(this);
     layout->setContentsMargins(0, 0, 0, 0);
@@ -117,12 +116,7 @@ MarkdownDocumentPage::MarkdownDocumentPage(CustomEditor *editor, QWidget *parent
 
 bool MarkdownDocumentPage::isPreviewVisible() const
 {
-    return m_mode != SourceOnly;
-}
-
-bool MarkdownDocumentPage::isEditorHidden() const
-{
-    return m_mode == PreviewOnly;
+    return m_mode == Split;
 }
 
 CustomEditor *MarkdownDocumentPage::takeEditor()
@@ -138,10 +132,8 @@ CustomEditor *MarkdownDocumentPage::takeEditor()
 
 bool MarkdownDocumentPage::togglePreview(MarkdownPreviewer *previewer)
 {
-    // From the split view, collapse back to whichever single pane the file
-    // opened in (source or preview).  From either single pane, expand to the
-    // split view showing both.
-    setViewMode(m_mode == Split ? m_homeMode : Split, previewer);
+    // Flip the side preview on or off beside the source editor.
+    setViewMode(m_mode == Split ? SourceOnly : Split, previewer);
     return isPreviewVisible();
 }
 
@@ -152,8 +144,7 @@ void MarkdownDocumentPage::hidePreview()
 
 void MarkdownDocumentPage::setInitialViewMode(bool preview, MarkdownPreviewer *previewer, bool giveFocus)
 {
-    m_homeMode = preview ? PreviewOnly : SourceOnly;
-    setViewMode(m_homeMode, previewer, giveFocus);
+    setViewMode(preview ? Split : SourceOnly, previewer, giveFocus);
 }
 
 void MarkdownDocumentPage::setViewMode(ViewMode mode, MarkdownPreviewer *previewer, bool giveFocus)
@@ -183,13 +174,6 @@ void MarkdownDocumentPage::setViewMode(ViewMode mode, MarkdownPreviewer *preview
             m_preview->hide();
         }
         break;
-    case PreviewOnly:
-        m_preview->show();
-        if (m_editor)
-        {
-            m_editor->hide();
-        }
-        break;
     case Split:
         if (m_editor)
         {
@@ -204,15 +188,13 @@ void MarkdownDocumentPage::setViewMode(ViewMode mode, MarkdownPreviewer *preview
         break;
     }
 
-    if (mode != SourceOnly)
+    if (mode == Split)
     {
         updatePreview();
-        if (giveFocus)
-        {
-            m_preview->setFocus();
-        }
     }
-    else if (m_editor && giveFocus)
+
+    // The source editor is always visible now, so keep keyboard focus there.
+    if (m_editor && giveFocus)
     {
         m_editor->setFocus();
     }

@@ -55,6 +55,9 @@ public:
     void hideMarkdownPreview(CustomEditor *editor);
     void refreshVisibleMarkdownPreview();
     void copyCurrentSelection();
+    // Show the side-preview button only for Markdown pages and reflect whether
+    // the preview is currently open.
+    void updateSidePreviewButton();
 
     // Chrome
     void applyChromeTheme();
@@ -66,6 +69,7 @@ signals:
     void pageCloseRequested(int index);
     void currentPageChanged(int index);
     void splitViewToggled(bool checked);
+    void sidePreviewToggleRequested();
 
 protected:
     void changeEvent(QEvent *event) override;
@@ -73,6 +77,7 @@ protected:
 private slots:
     void on_pushButton_closeDoc_clicked();
     void on_pushButton_splitView_clicked(bool checked);
+    void on_pushButton_sidePreview_clicked(bool checked);
     void on_comboBox_files_currentIndexChanged(int index);
     void onTabCurrentChanged(int index);
     void showEditorSwitchPopup();
