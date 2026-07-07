@@ -10,6 +10,7 @@ class MarkdownPreviewer;
 class QLiteHtmlWidget;
 class QSplitter;
 class QTimer;
+class QWidget;
 
 class DocumentPage : public QWidget
 {
@@ -88,6 +89,8 @@ private:
     void syncEditorScrollFromPreview();
     void rebuildPreviewScrollMap();
     void schedulePreviewScrollMapRebuild();
+    void onEditorCursorMoved(int line, int index);
+    void updatePreviewLineMarker();
     int sourceLineAtEditorCenter() const;
     void scrollEditorToSourceLineCentered(int line);
     int previewYForSourceLine(int line) const;
@@ -101,6 +104,10 @@ private:
     MarkdownPreviewer *m_previewer;
     QTimer *m_updateTimer;
     QVector<QPair<int, int>> m_previewLineMap;
+    // Thin accent bar painted over the preview viewport marking the block that
+    // corresponds to the source cursor line (VS Code-style).
+    QWidget *m_previewLineMarker;
+    int m_currentSourceLine;
     bool m_syncingScroll;
     ViewMode m_mode;
 };

@@ -61,7 +61,11 @@ FileExplorerDock::FileExplorerDock(QWidget *parent)
     m_fileFilterProxy->setDynamicSortFilter(true);
 
     m_treeView->setModel(m_fileFilterProxy);
-    m_treeView->setAnimated(true);
+    // Keep expansion instant: QFileSystemModel populates directory children
+    // asynchronously, so an animated expand of a not-yet-cached folder starts on
+    // an empty node and jumps when rows arrive mid-animation (the "flicker").
+    // Disabling animation makes folder expansion consistent and flicker-free.
+    m_treeView->setAnimated(false);
     m_treeView->setAllColumnsShowFocus(true);
     m_treeView->setExpandsOnDoubleClick(true);
     m_treeView->setFrameShape(QFrame::NoFrame);

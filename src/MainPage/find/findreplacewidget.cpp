@@ -1,6 +1,8 @@
 #include "find/findreplacewidget.h"
 #include "ui_findreplacewidget.h"
 #include "find/findreplacemanager.h"
+#include "themecolors.h"
+#include <QEvent>
 #include <QKeyEvent>
 #include <QLineEdit>
 #include <QFontDatabase>
@@ -11,6 +13,11 @@ FindReplaceWidget::FindReplaceWidget(QWidget *parent)
     , m_manager(nullptr)
 {
     ui->setupUi(this);
+
+    // Draw a chrome separator line along the top edge so the bar reads as part
+    // of the editor frame, matching the editor top bar's borders.
+    setAttribute(Qt::WA_StyledBackground, true);
+    applyChromeTheme();
 
     const int fontId = QFontDatabase::addApplicationFont("://resource/fontawesome-webfont.ttf");
     const QStringList fontFamilies = QFontDatabase::applicationFontFamilies(fontId);
@@ -40,6 +47,25 @@ FindReplaceWidget::FindReplaceWidget(QWidget *parent)
 FindReplaceWidget::~FindReplaceWidget()
 {
     delete ui;
+}
+
+void FindReplaceWidget::applyChromeTheme()
+{
+    setStyleSheet(QStringLiteral(
+                      "FindReplaceWidget {"
+                      "  border-top: 1px solid %1;"
+                      "}")
+                      .arg(ThemeColors::EditorTopBar::border().name(QColor::HexRgb)));
+}
+
+void FindReplaceWidget::changeEvent(QEvent *event)
+{
+    QWidget::changeEvent(event);
+
+    if (event->type() == QEvent::PaletteChange)
+    {
+        applyChromeTheme();
+    }
 }
 
 void FindReplaceWidget::setFindReplaceManager(FindReplaceManager *manager)
