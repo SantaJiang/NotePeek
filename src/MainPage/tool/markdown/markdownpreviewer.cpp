@@ -386,11 +386,14 @@ QString MarkdownPreviewer::buildHtmlDocument(const QString &bodyHtml, RenderMode
     // Honour the configured editor fonts: the text font drives the prose body,
     // the code font drives inline/fenced code.  Each is prepended to a fallback
     // stack so the document still renders if the family is unavailable.
+    // The trailing emoji families give color glyphs (📄 etc.) a font to fall
+    // back to when the primary family lacks them, across macOS/Windows/Linux.
     const AppPreferences &prefs = AppPreferences::instance();
-    const QString sBodyFontFamily = QStringLiteral("\"%1\", -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif")
-                                        .arg(prefs.textFontFamily());
-    const QString sCodeFontFamily = QStringLiteral("\"%1\", Menlo, Consolas, monospace")
-                                        .arg(prefs.codeFontFamily());
+    const QString sEmojiFallback = QStringLiteral("\"Apple Color Emoji\", \"Segoe UI Emoji\", \"Noto Color Emoji\"");
+    const QString sBodyFontFamily = QStringLiteral("\"%1\", -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif, %2")
+                                        .arg(prefs.textFontFamily(), sEmojiFallback);
+    const QString sCodeFontFamily = QStringLiteral("\"%1\", Menlo, Consolas, monospace, %2")
+                                        .arg(prefs.codeFontFamily(), sEmojiFallback);
 
     return QStringLiteral(R"(<!doctype html>
 <html>

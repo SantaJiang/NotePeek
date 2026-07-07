@@ -2,6 +2,7 @@
     <qresource prefix="/">
         <file>resource/SourceCodePro-Regular.ttf</file>
         <file>resource/FiraCode-Regular.ttf</file>
+        <file>resource/NotoColorEmoji.ttf</file>
         <file>resource/notepeek.svg</file>
         <file>resource/fontawesome-webfont.ttf</file>
     </qresource>
