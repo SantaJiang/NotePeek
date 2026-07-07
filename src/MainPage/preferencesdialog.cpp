@@ -42,13 +42,6 @@ void polishDialogPalette(QWidget *widget)
     widget->setPalette(palette);
 }
 
-QLabel *makeTitleLabel(const QString &text, QWidget *parent)
-{
-    auto *label = new QLabel(text, parent);
-    label->setObjectName(QStringLiteral("dialogTitle"));
-    return label;
-}
-
 QLabel *makeSectionTitle(const QString &text, QWidget *parent)
 {
     auto *label = new QLabel(text, parent);
@@ -158,11 +151,6 @@ QString preferencesStyleSheet()
         "  background-color: %1;"
         "  color: %5;"
         "}"
-        "QLabel#dialogTitle {"
-        "  color: %5;"
-        "  font-size: 17px;"
-        "  font-weight: 600;"
-        "}"
         "QLabel#sectionTitle {"
         "  color: %5;"
         "  font-weight: 600;"
@@ -174,34 +162,6 @@ QString preferencesStyleSheet()
         "  background-color: %2;"
         "  border: 1px solid %4;"
         "  border-radius: 6px;"
-        "}"
-        "QComboBox,"
-        "QFontComboBox {"
-        "  background-color: %3;"
-        "  color: %5;"
-        "  border: 1px solid %4;"
-        "  border-radius: 4px;"
-        "  min-height: 24px;"
-        "  padding: 3px 8px;"
-        "}"
-        "QComboBox:hover,"
-        "QFontComboBox:hover {"
-        "  border-color: %9;"
-        "}"
-        "QComboBox:focus,"
-        "QFontComboBox:focus {"
-        "  border-color: %9;"
-        "}"
-        "QComboBox::drop-down,"
-        "QFontComboBox::drop-down {"
-        "  width: 24px;"
-        "  border: 0;"
-        "}"
-        "QComboBox QLineEdit {"
-        "  background-color: transparent;"
-        "  color: %5;"
-        "  border: 0;"
-        "  padding: 0;"
         "}"
         "QCheckBox {"
         "  color: %5;"
@@ -284,12 +244,6 @@ PreferencesDialog::PreferencesDialog(QWidget *parent)
     m_markdownDefaultView->addItem(tr("Source"));
     m_markdownDefaultView->addItem(tr("Preview"));
 
-    auto *header = new QWidget(this);
-    auto *headerLayout = new QVBoxLayout(header);
-    headerLayout->setContentsMargins(0, 0, 0, 0);
-    headerLayout->setSpacing(2);
-    headerLayout->addWidget(makeTitleLabel(tr("Preferences"), header));
-
     auto *fontsSection = makeSection(tr("Editor Fonts"), this);
     auto *fontsLayout = qobject_cast<QVBoxLayout *>(fontsSection->layout());
     fontsLayout->addLayout(makeSettingsRow(tr("Text font"), makeFontRow(m_textFontCombo, m_textFontSize, fontsSection), fontsSection));
@@ -308,13 +262,13 @@ PreferencesDialog::PreferencesDialog(QWidget *parent)
     auto *layout = new QVBoxLayout(this);
     layout->setContentsMargins(20, 20, 20, 18);
     layout->setSpacing(14);
-    layout->addWidget(header);
     layout->addWidget(fontsSection);
     layout->addWidget(generalSection);
     layout->addStretch();
     layout->addWidget(buttons);
 
-    setMinimumWidth(kDialogWidth);
+    // Lock the dialog to a fixed size so it cannot be resized/maximised.
+    setFixedSize(kDialogWidth, sizeHint().height());
 
     loadFromPreferences();
 

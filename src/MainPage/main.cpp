@@ -89,6 +89,13 @@ int main(int argc, char *argv[])
     {
         qWarning() << "Failed to load Fira Code from resource";
     }
+    // Bundle a color-emoji family so glyphs like 📄 render even on systems that
+    // ship no emoji font (common on Linux).  It sits last in the Markdown font
+    // fallback stacks, behind the platform-native emoji fonts on macOS/Windows.
+    if (QFontDatabase::addApplicationFont(QStringLiteral("://resource/NotoColorEmoji.ttf")) == -1)
+    {
+        qWarning() << "Failed to load Noto Color Emoji from resource";
+    }
 
     // Load persisted user preferences after the fonts are registered so font
     // validation sees the bundled families.
