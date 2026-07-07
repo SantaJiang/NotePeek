@@ -63,6 +63,9 @@ private:
     void refreshHighlights();
     void openFileAndSetRootDirectory(const QString &fileName);
     void updateToolActions();
+    // Toggle the Markdown side preview for the given pane (used by both the
+    // Tools menu action and each pane's side-preview toolbar button).
+    void toggleMarkdownSidePreviewFor(DocumentController *controller);
     // Re-apply font preferences to every open editor and refresh visible
     // Markdown previews.  Does not touch the file-tree dock (that setting only
     // seeds the next launch) or reopen documents.

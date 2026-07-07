@@ -53,18 +53,16 @@ class MarkdownDocumentPage : public DocumentPage
 
 public:
     // How a Markdown page is laid out.  SourceOnly shows just the editor,
-    // PreviewOnly shows just the rendered preview, and Split shows both.
+    // Split shows the editor with the rendered preview beside it.
     enum ViewMode
     {
         SourceOnly,
-        PreviewOnly,
         Split
     };
 
     explicit MarkdownDocumentPage(CustomEditor *editor, QWidget *parent = nullptr);
 
     bool isPreviewVisible() const override;
-    bool isEditorHidden() const override;
     CustomEditor *takeEditor() override;
     bool togglePreview(MarkdownPreviewer *previewer) override;
     void hidePreview() override;
@@ -72,10 +70,10 @@ public:
     void copyCurrentSelection() override;
     bool hasCopySelection() const override;
 
-    // Choose the mode a freshly opened Markdown file starts in (source or
-    // preview).  The chosen single-pane mode becomes the "home" the split
-    // toggle returns to.  giveFocus is false for background opens so the file
-    // being activated elsewhere keeps keyboard focus.
+    // Choose whether a freshly opened Markdown file starts with the side
+    // preview showing (Split) or just the source (SourceOnly).  giveFocus is
+    // false for background opens so the file being activated elsewhere keeps
+    // keyboard focus.
     void setInitialViewMode(bool preview, MarkdownPreviewer *previewer, bool giveFocus = true);
 
 protected:
@@ -105,7 +103,6 @@ private:
     QVector<QPair<int, int>> m_previewLineMap;
     bool m_syncingScroll;
     ViewMode m_mode;
-    ViewMode m_homeMode;
 };
 
 #endif // DOCUMENTPAGE_H

@@ -163,6 +163,10 @@ Searched entire document.</source>
         <translation></translation>
     </message>
     <message>
+        <source>Side Preview</source>
+        <translation>侧边预览</translation>
+    </message>
+    <message>
         <location filename="../src/MainPage/mainwindow.ui" line="75"/>
         <source>File</source>
         <translation>文件</translation>
@@ -451,9 +455,12 @@ Do you want to save your changes?</source>
         <translation>启动</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/preferencesdialog.cpp" line="72"/>
-        <source>Markdown default view</source>
-        <translation>Markdown 默认视图</translation>
+        <source>Markdown</source>
+        <translation>Markdown</translation>
+    </message>
+    <message>
+        <source>Open with side preview</source>
+        <translation>打开时显示侧边预览</translation>
     </message>
 </context>
 <context>
@@ -571,6 +578,21 @@ Do you want to save your changes?</source>
         <location filename="../src/MainPage/widgets/qscieditorinfostatusbar.cpp" line="216"/>
         <source>INS</source>
         <translation></translation>
+    </message>
+</context>
+<context>
+    <name>EditorPane</name>
+    <message>
+        <source>Side preview</source>
+        <translation>侧边预览</translation>
+    </message>
+    <message>
+        <source>Split editor</source>
+        <translation>拆分编辑器</translation>
+    </message>
+    <message>
+        <source>Collapse this editor pane</source>
+        <translation>折叠此编辑器面板</translation>
     </message>
 </context>
 </TS>

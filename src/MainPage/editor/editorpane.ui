@@ -126,6 +126,28 @@
        </spacer>
       </item>
       <item alignment="Qt::AlignmentFlag::AlignVCenter">
+       <widget class="QToolButton" name="pushButton_sidePreview">
+        <property name="minimumSize">
+         <size>
+          <width>25</width>
+          <height>25</height>
+         </size>
+        </property>
+        <property name="maximumSize">
+         <size>
+          <width>25</width>
+          <height>25</height>
+         </size>
+        </property>
+        <property name="checkable">
+         <bool>true</bool>
+        </property>
+        <property name="text">
+         <string/>
+        </property>
+       </widget>
+      </item>
+      <item alignment="Qt::AlignmentFlag::AlignVCenter">
        <widget class="QToolButton" name="pushButton_splitView">
         <property name="minimumSize">
          <size>

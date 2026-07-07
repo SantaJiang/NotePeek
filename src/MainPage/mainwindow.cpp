@@ -138,6 +138,13 @@ MainWindow::MainWindow(QWidget *parent)
     m_leftController->setMarkdownPreviewer(m_markdownPreviewer);
     m_rightController->setMarkdownPreviewer(m_markdownPreviewer);
 
+    // Each pane's side-preview toolbar button toggles the preview for its own
+    // pane, mirroring the Tools ▸ Markdown ▸ Side Preview action.
+    connect(m_leftController->pane(), &EditorPane::sidePreviewToggleRequested,
+            this, [this]() { toggleMarkdownSidePreviewFor(m_leftController); });
+    connect(m_rightController->pane(), &EditorPane::sidePreviewToggleRequested,
+            this, [this]() { toggleMarkdownSidePreviewFor(m_rightController); });
+
     ui->widget_findreplace->setFindReplaceManager(m_findReplaceManager);
 
     m_fileExplorerDock = new FileExplorerDock(this);
@@ -521,13 +528,19 @@ void MainWindow::on_action_switchHeaderSource_triggered()
 
 void MainWindow::on_action_markdownPreview_triggered()
 {
-    DocumentController *controller = activeController();
+    toggleMarkdownSidePreviewFor(activeController());
+}
+
+void MainWindow::toggleMarkdownSidePreviewFor(DocumentController *controller)
+{
+    if (!controller)
+        return;
+
     CustomEditor *editor = controller->currentEditor();
     if (!editor)
         return;
 
-    const QString currentFilePath = editor->filePath();
-    if (!m_markdownPreviewer->isMarkdownFile(currentFilePath))
+    if (!m_markdownPreviewer->isMarkdownFile(editor->filePath()))
         return;
 
     const bool previewVisible = controller->pane()->toggleMarkdownPreview(m_markdownPreviewer);
@@ -536,6 +549,7 @@ void MainWindow::on_action_markdownPreview_triggered()
         ui->widget_findreplace->setVisible(false);
     }
 
+    controller->pane()->updateSidePreviewButton();
     updateEditActions(editor->hasSelectedText());
     updateToolActions();
 }
@@ -658,10 +672,11 @@ void MainWindow::updateToolActions()
     ui->menuToolCpp->setEnabled(cppSupported && !previewVisible);
     ui->action_markdownPreview->setEnabled(markdownSupported);
     ui->action_markdownPreview->setChecked(markdownSupported && previewVisible);
-    ui->action_markdownPreview->setText(previewVisible ? tr("Hide Markdown Preview") : tr("Preview Markdown"));
     ui->action_markdownExportPdf->setEnabled(markdownSupported);
     ui->menuToolMarkdown->setEnabled(markdownSupported);
     ui->menuTool->setEnabled(true);
+
+    controller->pane()->updateSidePreviewButton();
 }
 
 void MainWindow::onSearchResultsChanged()

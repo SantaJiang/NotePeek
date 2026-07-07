@@ -32,7 +32,7 @@ private:
     QFontComboBox *m_codeFontCombo;
     QComboBox *m_codeFontSize;
     QCheckBox *m_showFileTree;
-    QComboBox *m_markdownDefaultView;
+    QCheckBox *m_markdownSidePreview;
 };
 
 #endif // PREFERENCESDIALOG_H
