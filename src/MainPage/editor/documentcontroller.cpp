@@ -3,6 +3,7 @@
 #include "apppreferences.h"
 #include "decorators/highlightedscrollbardecorator.h"
 #include "editor/customeditor.h"
+#include "editor/documentio.h"
 #include "editor/documentpage.h"
 #include "editor/documentpersistenceservice.h"
 #include "editor/documentregistry.h"
@@ -14,6 +15,7 @@
 #include "find/findreplacemanager.h"
 
 #include <QApplication>
+#include <QEventLoop>
 #include <QFileInfo>
 #include <QMap>
 #include <QMessageBox>
@@ -44,6 +46,10 @@ DocumentController::DocumentController(EditorPane *pane,
             this, &DocumentController::filesDropped);
     connect(m_externalFileWatcher, &ExternalFileWatcher::externalFileChanged,
             this, &DocumentController::externalFileChanged);
+    connect(m_persistence, &DocumentPersistenceService::fileLoaded,
+            this, &DocumentController::onFileLoaded);
+    connect(m_persistence, &DocumentPersistenceService::fileSaved,
+            this, &DocumentController::onFileSaved);
     connect(m_pane, &EditorPane::pageCloseRequested,
             this, &DocumentController::requestClose);
     connect(m_pane, &EditorPane::currentPageChanged,
@@ -113,65 +119,18 @@ void DocumentController::openFile(const QString &filePath, bool activate)
     {
         return;
     }
+    editor->setFilePath(filePath);
+    editor->setReadOnly(true);
 
     const QFileInfo fileInfo(filePath);
     DocumentPage *page = createPage(editor, filePath);
     const int tabIndex = m_pane->addPage(page, fileInfo.fileName(), filePath);
     m_pane->setCurrentIndex(tabIndex);
-
-    QApplication::setOverrideCursor(Qt::WaitCursor);
-    QString content;
-    QString errorMessage;
-    const bool loaded = m_persistence->loadFile(filePath, &content, &errorMessage);
-    QApplication::restoreOverrideCursor();
-
-    if (!loaded)
-    {
-        m_pane->removePage(tabIndex);
-        emit editorClosed(editor);
-        m_editorManager->forgetEditor(editor);
-        page->deleteLater();
-
-        if (m_createDefaultWhenEmpty && m_pane->count() == 0)
-        {
-            createDefaultDocument();
-        }
-
-        QMessageBox::warning(m_pane, tr("NotePeek"),
-                             tr("Cannot read file %1:\n%2.")
-                             .arg(filePath)
-                             .arg(errorMessage));
-        return;
-    }
-
-    editor->setText(content);
-
-    // Honour the "open Markdown in preview" preference for freshly opened files.
-    if (AppPreferences::instance().markdownDefaultPreview() && m_markdownPreviewer)
-    {
-        if (auto *markdownPage = qobject_cast<MarkdownDocumentPage *>(page))
-        {
-            // Background opens must not steal focus from the file being
-            // activated elsewhere (e.g. the split-view mirror).
-            markdownPage->setInitialViewMode(true, m_markdownPreviewer, activate);
-        }
-    }
-
-    setCurrentFile(editor, filePath);
-    m_editorManager->updateLineNumberMarginWidth(editor);
-    closeDefaultEditorIfUnused();
-    if (activate)
-    {
-        m_pane->focusEditor(editor);
-    }
-    else if (previousIndex >= 0 && previousIndex < m_pane->count())
-    {
-        m_pane->setCurrentIndex(previousIndex);
-    }
-
-    emit fileOpened(editor, filePath);
-
     connectEditorSignals(editor);
+
+    const quint64 requestId = m_nextAsyncRequestId++;
+    m_pendingLoads.insert(requestId, { editor, page, filePath, previousIndex, activate });
+    m_persistence->loadFileAsync({ requestId, filePath });
 }
 
 void DocumentController::newDocument()
@@ -221,7 +180,12 @@ bool DocumentController::maybeSave(CustomEditor *editor)
     if (result == QDialog::Accepted)
     {
         const QString filePath = editor->filePath();
-        return filePath.isEmpty() ? saveAs() : saveFile(editor, filePath);
+        if (filePath.isEmpty())
+        {
+            const QString fileName = m_persistence->promptSaveFileName(m_pane);
+            return !fileName.isEmpty() && saveFileSynchronously(editor, fileName);
+        }
+        return saveFileSynchronously(editor, filePath);
     }
     if (result == FileSaveDialog::DontSave)
     {
@@ -248,7 +212,7 @@ bool DocumentController::saveEditorForClose(CustomEditor *editor)
         }
     }
 
-    return saveFile(editor, filePath);
+    return saveFileSynchronously(editor, filePath);
 }
 
 bool DocumentController::saveFile(CustomEditor *editor, const QString &filePath)
@@ -261,12 +225,165 @@ bool DocumentController::saveFile(CustomEditor *editor, const QString &filePath)
                                     : QFileInfo(editor->filePath()).absoluteFilePath();
     const QString newFilePath = QFileInfo(filePath).absoluteFilePath();
 
-    QApplication::setOverrideCursor(Qt::WaitCursor);
     QString errorMessage;
-    const bool saved = m_persistence->saveEditor(editor, filePath, &errorMessage);
-    QApplication::restoreOverrideCursor();
+    QByteArray utf8Content;
+    if (!m_persistence->saveEditorSnapshot(editor, filePath, &utf8Content, &errorMessage))
+    {
+        QMessageBox::warning(m_pane, tr("NotePeek"),
+                             tr("Cannot prepare file %1 for saving:\n%2.")
+                             .arg(filePath)
+                             .arg(errorMessage));
+        return false;
+    }
 
-    if (!saved)
+    const quint64 requestId = m_nextAsyncRequestId++;
+    m_pendingSaves.insert(requestId, { editor, oldFilePath, newFilePath });
+    m_persistence->saveFileAsync({ requestId, filePath, utf8Content });
+
+    editor->setModified(false);
+    emit editorModificationChanged(editor, false);
+    if (editor == currentEditor())
+    {
+        emit modificationChanged(false);
+    }
+
+    const int index = m_pane->indexOfEditor(editor);
+    if (index != -1)
+    {
+        QString title = QFileInfo(filePath).fileName();
+        if (title.isEmpty())
+        {
+            title = tr("untitled.txt");
+        }
+        m_pane->setPageTitle(index, title + tr(" (saving)"));
+    }
+    return true;
+}
+
+void DocumentController::onFileLoaded(const DocumentLoadResult &result)
+{
+    const PendingLoad pending = m_pendingLoads.take(result.requestId);
+    if (!pending.editor || !pending.page || pending.filePath != result.filePath)
+    {
+        return;
+    }
+
+    CustomEditor *editor = pending.editor.data();
+    DocumentPage *page = pending.page.data();
+    const int tabIndex = m_pane->indexOfEditor(editor);
+    if (tabIndex == -1)
+    {
+        return;
+    }
+
+    editor->setReadOnly(false);
+
+    if (!result.success)
+    {
+        m_pane->removePage(tabIndex);
+        emit editorClosed(editor);
+        m_editorManager->forgetEditor(editor);
+        page->deleteLater();
+
+        if (m_createDefaultWhenEmpty && m_pane->count() == 0)
+        {
+            createDefaultDocument();
+        }
+
+        QMessageBox::warning(m_pane, tr("NotePeek"),
+                             tr("Cannot read file %1:\n%2.")
+                             .arg(result.filePath)
+                             .arg(result.errorMessage));
+        return;
+    }
+
+    editor->setUpdatesEnabled(false);
+    editor->setText(result.content);
+    editor->setUpdatesEnabled(true);
+
+    if (!result.largeFile && AppPreferences::instance().markdownDefaultPreview() && m_markdownPreviewer)
+    {
+        if (auto *markdownPage = qobject_cast<MarkdownDocumentPage *>(page))
+        {
+            markdownPage->setInitialViewMode(true, m_markdownPreviewer, pending.activate);
+        }
+    }
+
+    setCurrentFile(editor, result.filePath);
+    m_editorManager->updateLineNumberMarginWidth(editor);
+    closeDefaultEditorIfUnused();
+    if (pending.activate)
+    {
+        m_pane->focusEditor(editor);
+    }
+    else if (pending.previousIndex >= 0 && pending.previousIndex < m_pane->count())
+    {
+        m_pane->setCurrentIndex(pending.previousIndex);
+    }
+
+    emit fileOpened(editor, result.filePath);
+}
+
+void DocumentController::onFileSaved(const DocumentSaveResult &result)
+{
+    const PendingSave pending = m_pendingSaves.take(result.requestId);
+    if (pending.newFilePath.isEmpty())
+    {
+        return;
+    }
+
+    CustomEditor *editor = pending.editor.data();
+    if (!result.success)
+    {
+        if (editor && !editor->isModified())
+        {
+            editor->setModified(true);
+            emit editorModificationChanged(editor, true);
+            if (editor == currentEditor())
+            {
+                emit modificationChanged(true);
+            }
+        }
+
+        QMessageBox::warning(m_pane, tr("NotePeek"),
+                             tr("Cannot write file %1:\n%2.")
+                             .arg(result.filePath)
+                             .arg(result.errorMessage));
+        return;
+    }
+
+    if (!editor)
+    {
+        return;
+    }
+
+    applySavedFileState(editor, result.filePath, pending.oldFilePath, pending.newFilePath);
+}
+
+bool DocumentController::saveFileSynchronously(CustomEditor *editor, const QString &filePath)
+{
+    if (!editor)
+    {
+        return false;
+    }
+
+    const QString oldFilePath = editor->filePath().isEmpty()
+                                    ? QString()
+                                    : QFileInfo(editor->filePath()).absoluteFilePath();
+    const QString newFilePath = QFileInfo(filePath).absoluteFilePath();
+
+    QString errorMessage;
+    QByteArray utf8Content;
+    if (!m_persistence->saveEditorSnapshot(editor, filePath, &utf8Content, &errorMessage))
+    {
+        QMessageBox::warning(m_pane, tr("NotePeek"),
+                             tr("Cannot prepare file %1 for saving:\n%2.")
+                             .arg(filePath)
+                             .arg(errorMessage));
+        return false;
+    }
+
+    if (!DocumentIO::saveUtf8File(filePath, utf8Content, &errorMessage))
     {
         QMessageBox::warning(m_pane, tr("NotePeek"),
                              tr("Cannot write file %1:\n%2.")
@@ -275,15 +392,57 @@ bool DocumentController::saveFile(CustomEditor *editor, const QString &filePath)
         return false;
     }
 
+    editor->setModified(false);
+    applySavedFileState(editor, filePath, oldFilePath, newFilePath);
+    return true;
+}
+
+void DocumentController::applySavedFileState(CustomEditor *editor,
+                                             const QString &filePath,
+                                             const QString &oldFilePath,
+                                             const QString &newFilePath)
+{
+    if (!editor)
+    {
+        return;
+    }
+
     recordFileState(newFilePath);
-    setCurrentFile(editor, filePath);
+    editor->setFilePath(filePath);
     m_editorManager->updateEditorSyntax(editor, filePath);
+
+    const QString shownName = QFileInfo(filePath).fileName();
+    const int index = m_pane->indexOfEditor(editor);
+    if (index != -1)
+    {
+        m_pane->setPageTitle(index, shownName + (editor->isModified() ? QStringLiteral("*") : QString()));
+        m_pane->setPageToolTip(index, filePath);
+    }
+
     if (newFilePath != oldFilePath)
     {
         refreshPageTypeForFile(editor, filePath);
         emit filePathChanged(editor, oldFilePath, newFilePath);
     }
-    return true;
+
+    emit editorModificationChanged(editor, editor->isModified());
+    if (editor == currentEditor())
+    {
+        emit modificationChanged(editor->isModified());
+        emit currentFileChanged(editor, filePath);
+    }
+    refreshWatchedFiles();
+}
+
+void DocumentController::waitForPendingSaves()
+{
+    while (!m_pendingSaves.isEmpty())
+    {
+        QEventLoop loop;
+        connect(m_persistence, &DocumentPersistenceService::fileSaved,
+                &loop, &QEventLoop::quit);
+        loop.exec();
+    }
 }
 
 void DocumentController::requestClose(int index)
@@ -386,6 +545,11 @@ void DocumentController::openSharedDocument(CustomEditor *sourceEditor, bool act
     }
 
     const QString filePath = sourceEditor->filePath();
+    if (!filePath.isEmpty())
+    {
+        closeFileIfUnmodified(filePath);
+    }
+
     QString displayName = filePath.isEmpty() ? tr("Untitled") : QFileInfo(filePath).fileName();
     if (sourceEditor->isModified())
     {
@@ -596,7 +760,6 @@ void DocumentController::onEditorModificationChanged()
 
     emit editorModificationChanged(editor, editor->isModified());
 
-    refreshWatchedFiles();
     if (!editor->isModified() && !editor->filePath().isEmpty())
     {
         m_externalFileWatcher->requestExternalChangeCheck(editor->filePath());

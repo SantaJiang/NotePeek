@@ -2,11 +2,13 @@ set(NOTEPEEK_QT_LIBS
     Qt${NOTEPEEK_QT_MAJOR}::Widgets
     Qt${NOTEPEEK_QT_MAJOR}::PrintSupport
     Qt${NOTEPEEK_QT_MAJOR}::Svg
+    Qt${NOTEPEEK_QT_MAJOR}::Concurrent
 )
 
 add_library(notepeek_core STATIC
     apppreferences.cpp
     apppreferences.h
+    editor/performanceconstants.h
     editor/documentio.cpp
     editor/documentio.h
     editor/documentpersistenceservice.cpp

@@ -4,6 +4,7 @@
 #include <QDateTime>
 #include <QHash>
 #include <QPersistentModelIndex>
+#include <QSet>
 #include <QSortFilterProxyModel>
 #include <QString>
 
@@ -33,10 +34,12 @@ private:
     };
 
     QFileSystemModel *fileSystemModel() const;
+    bool isIgnoredDirectory(const QString &filePath) const;
     bool isSupportedTextFile(const QString &filePath) const;
 
     QString m_visibleRootDirectory;
     QPersistentModelIndex m_visibleRootIndex;
+    QSet<QString> m_ignoredDirectoryNames;
     mutable QHash<QString, CacheEntry> m_supportCache;
 };
 

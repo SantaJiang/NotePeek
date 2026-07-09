@@ -54,8 +54,6 @@ private:
     void reapplyEditorSyntax(CustomEditor *editor);
     void applyBaseEditorColors(CustomEditor *editor);
 
-    static constexpr qint64 LARGE_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
-
     QList<QPointer<CustomEditor>> m_editors;
 };
 

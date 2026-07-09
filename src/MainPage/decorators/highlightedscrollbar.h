@@ -3,6 +3,7 @@
 
 #include <QScrollBar>
 #include <QPainter>
+#include <QVector>
 
 class QsciScintilla;
 
@@ -17,6 +18,8 @@ public:
     void setSearchIndicator(int indicator) { searchIndicator = indicator; }
     void setBookmarkMarker(int marker) { bookmarkMarker = marker; }
     void updateScrollBarFromEditor();
+    void refreshSearchMarkers();
+    void refreshBookmarkMarkers();
 
 protected:
     void paintEvent(QPaintEvent *event) override;
@@ -39,6 +42,8 @@ private:
     int searchIndicator = -1;
     int bookmarkMarker = -1;
     bool m_blockSignals = false;
+    QVector<int> m_searchLines;
+    QVector<int> m_bookmarkLines;
 
     // Tick mark dimensions
     static constexpr int DEFAULT_TICK_HEIGHT = 3;

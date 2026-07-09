@@ -18,18 +18,26 @@ set(CMAKE_AUTOUIC ON)
 set(CMAKE_AUTORCC ON)
 
 include(GNUInstallDirs)
+include(CTest)
 
 # Try Qt6 first, fall back to Qt5
-find_package(Qt6 QUIET COMPONENTS Widgets PrintSupport Svg LinguistTools)
+find_package(Qt6 QUIET COMPONENTS Widgets PrintSupport Svg Concurrent LinguistTools)
 if(Qt6_FOUND)
     set(NOTEPEEK_QT_MAJOR 6)
     qt_standard_project_setup()
 else()
-    find_package(Qt5 5.15 REQUIRED COMPONENTS Widgets PrintSupport Svg LinguistTools)
+    find_package(Qt5 5.15 REQUIRED COMPONENTS Widgets PrintSupport Svg Concurrent LinguistTools)
     set(NOTEPEEK_QT_MAJOR 5)
 endif()
 
 add_subdirectory(src)
+
+if(BUILD_TESTING)
+    find_package(Qt${NOTEPEEK_QT_MAJOR} QUIET COMPONENTS Test)
+    if(TARGET Qt${NOTEPEEK_QT_MAJOR}::Test)
+        add_subdirectory(tests)
+    endif()
+endif()
 
 # ---- CPack ----
 set(CPACK_PACKAGE_NAME "NotePeek")

@@ -2,6 +2,7 @@
 #include "themecolors.h"
 #include <Qsci/qsciscintilla.h>
 #include <QTimer>
+#include <utility>
 
 HighlightedScrollBar::HighlightedScrollBar(QsciScintilla *editor, Qt::Orientation orientation, QWidget *parent)
     : QScrollBar(orientation, parent),
@@ -70,32 +71,60 @@ void HighlightedScrollBar::updateScrollBarFromEditor()
 
 void HighlightedScrollBar::drawSearchResults(QPainter &p)
 {
-    if (searchIndicator == -1) return;
-
-    // Walk every range marked with the search indicator
-    int length = editor->length();
-    int currentPos = 0;
-
-    while (currentPos < length) {
-        int startPos = editor->SendScintilla(QsciScintillaBase::SCI_INDICATORSTART, searchIndicator, currentPos);
-        int endPos = editor->SendScintilla(QsciScintillaBase::SCI_INDICATOREND, searchIndicator, currentPos);
-
-        if (startPos == -1 || endPos == -1 || startPos >= endPos) break;
-
-        drawTickMark(p, posToScrollBarY(startPos), DEFAULT_TICK_HEIGHT, ThemeColors::ScrollBar::searchResult());
-        currentPos = endPos + 1;
+    for (int line : std::as_const(m_searchLines)) {
+        drawTickMark(p, lineToScrollBarY(line), DEFAULT_TICK_HEIGHT, ThemeColors::ScrollBar::searchResult());
     }
 }
 
 void HighlightedScrollBar::drawBookmarks(QPainter &p)
 {
-    if (bookmarkMarker == -1) return;
+    for (int line : std::as_const(m_bookmarkLines)) {
+        drawTickMark(p, lineToScrollBarY(line), DEFAULT_TICK_HEIGHT, ThemeColors::ScrollBar::bookmark());
+    }
+}
+
+void HighlightedScrollBar::refreshSearchMarkers()
+{
+    m_searchLines.clear();
+    if (!editor || searchIndicator == -1)
+    {
+        update();
+        return;
+    }
+
+    const int length = editor->SendScintilla(QsciScintillaBase::SCI_GETLENGTH);
+    int currentPos = 0;
+    while (currentPos < length)
+    {
+        const int startPos = editor->SendScintilla(QsciScintillaBase::SCI_INDICATORSTART, searchIndicator, currentPos);
+        const int endPos = editor->SendScintilla(QsciScintillaBase::SCI_INDICATOREND, searchIndicator, currentPos);
+        if (startPos == -1 || endPos == -1 || startPos >= endPos)
+        {
+            break;
+        }
+
+        m_searchLines.append(editor->SendScintilla(QsciScintillaBase::SCI_LINEFROMPOSITION, startPos));
+        currentPos = endPos + 1;
+    }
+    update();
+}
+
+void HighlightedScrollBar::refreshBookmarkMarkers()
+{
+    m_bookmarkLines.clear();
+    if (!editor || bookmarkMarker == -1)
+    {
+        update();
+        return;
+    }
 
     int line = 0;
-    while ((line = editor->markerFindNext(line, 1 << bookmarkMarker)) != -1) {
-        drawTickMark(p, lineToScrollBarY(line), DEFAULT_TICK_HEIGHT, ThemeColors::ScrollBar::bookmark());
-        line++;
+    while ((line = editor->markerFindNext(line, 1 << bookmarkMarker)) != -1)
+    {
+        m_bookmarkLines.append(line);
+        ++line;
     }
+    update();
 }
 
 void HighlightedScrollBar::drawCurrentLine(QPainter &p)

@@ -1,6 +1,7 @@
 #include "editor/documentpage.h"
 
 #include "editor/customeditor.h"
+#include "editor/performanceconstants.h"
 #include "themecolors.h"
 #include "tool/markdown/markdownpreviewer.h"
 
@@ -10,7 +11,6 @@
 #include <QEvent>
 #include <QGuiApplication>
 #include <QPainter>
-#include <QRegularExpression>
 #include <QScrollBar>
 #include <QSet>
 #include <QSplitter>
@@ -19,6 +19,8 @@
 #include <QWidget>
 
 #include <qlitehtmlwidget.h>
+
+#include <utility>
 
 namespace {
 
@@ -123,6 +125,8 @@ MarkdownDocumentPage::MarkdownDocumentPage(CustomEditor *editor, QWidget *parent
     , m_previewLineMarker(nullptr)
     , m_currentSourceLine(1)
     , m_syncingScroll(false)
+    , m_nextPreviewRequestId(1)
+    , m_latestPreviewRequestId(0)
     , m_mode(SourceOnly)
 {
     auto *layout = new QVBoxLayout(this);
@@ -329,6 +333,9 @@ void MarkdownDocumentPage::ensurePreview(MarkdownPreviewer *previewer)
             this, &MarkdownDocumentPage::syncEditorScrollFromPreview);
     connect(m_preview->verticalScrollBar(), &QScrollBar::valueChanged,
             this, &MarkdownDocumentPage::updatePreviewLineMarker);
+    connect(m_previewer, &MarkdownPreviewer::previewRendered,
+            this, &MarkdownDocumentPage::onPreviewRendered,
+            Qt::UniqueConnection);
     m_preview->installEventFilter(this);
     m_splitter->addWidget(m_preview);
     m_preview->hide();
@@ -343,13 +350,38 @@ void MarkdownDocumentPage::updatePreview()
         return;
     }
 
+    const int documentLength = int(m_editor->SendScintilla(QsciScintillaBase::SCI_GETLENGTH));
+    if (documentLength > PerformanceConstants::MarkdownLargePreviewLimit)
+    {
+        m_latestPreviewRequestId = 0;
+        m_previewSourceLines.clear();
+        m_previewLineMap.clear();
+        m_previewer->updatePreview(m_preview,
+                                   tr("Preview disabled for large Markdown files."),
+                                   m_editor->filePath());
+        updatePreviewLineMarker();
+        return;
+    }
+
+    m_latestPreviewRequestId = m_nextPreviewRequestId++;
+    m_previewer->renderPreviewAsync(m_latestPreviewRequestId, m_editor->text(), m_editor->filePath());
+}
+
+void MarkdownDocumentPage::onPreviewRendered(const MarkdownRenderResult &result)
+{
+    if (result.requestId != m_latestPreviewRequestId || !m_previewer || !m_preview || !m_editor || !isPreviewVisible())
+    {
+        return;
+    }
+
     const int sourceLine = sourceLineAtEditorCenter();
     const double ratio = previewScrollRatio();
     const int firstVisibleLine = int(m_editor->SendScintilla(QsciScintillaBase::SCI_GETFIRSTVISIBLELINE));
     const int xOffset = int(m_editor->SendScintilla(QsciScintillaBase::SCI_GETXOFFSET));
 
     m_syncingScroll = true;
-    m_previewer->updatePreview(m_preview, m_editor->text(), m_editor->filePath());
+    m_previewer->applyRenderedPreview(m_preview, result);
+    m_previewSourceLines = result.sourceLines;
     rebuildPreviewScrollMap();
     m_editor->SendScintilla(QsciScintillaBase::SCI_SETFIRSTVISIBLELINE, firstVisibleLine);
     m_editor->SendScintilla(QsciScintillaBase::SCI_SETXOFFSET, xOffset);
@@ -483,13 +515,9 @@ void MarkdownDocumentPage::rebuildPreviewScrollMap()
         return;
     }
 
-    static const QRegularExpression anchorPattern(QStringLiteral("id=\"np-src-line-(\\d+)\""));
     QSet<int> seenLines;
-    QRegularExpressionMatchIterator it = anchorPattern.globalMatch(m_preview->html());
-    while (it.hasNext())
+    for (int line : std::as_const(m_previewSourceLines))
     {
-        const QRegularExpressionMatch match = it.next();
-        const int line = match.captured(1).toInt();
         if (seenLines.contains(line))
         {
             continue;

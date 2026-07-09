@@ -1,6 +1,7 @@
 #include "find/findreplacemanager.h"
 #include "themecolors.h"
 #include "editor/customeditor.h"
+#include "editor/performanceconstants.h"
 #include "decorators/highlightedscrollbardecorator.h"
 #include <QMessageBox>
 #include <QFileInfo>
@@ -367,7 +368,7 @@ bool FindReplaceManager::isLargeFile() const
 
     QString filePath = m_editor->filePath();
     QFileInfo fileInfo(filePath);
-    return (fileInfo.size() > LARGE_FILE_SIZE);
+    return (fileInfo.size() > PerformanceConstants::LargeFileSize);
 }
 
 bool FindReplaceManager::selectionMatchesSearchResults(int position, int length) const

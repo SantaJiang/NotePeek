@@ -19,6 +19,7 @@
 #include "widgets/qscieditorinfostatusbar.h"
 #include <QMainWindow>
 #include <Qsci/qsciscintilla.h>
+#include <Qsci/qsciscintillabase.h>
 #include <Qsci/qscilexer.h>
 
 QsciEditorInfoStatusBar::QsciEditorInfoStatusBar(QMainWindow *window)
@@ -122,7 +123,7 @@ void QsciEditorInfoStatusBar::toggleOvertypeMode()
 void QsciEditorInfoStatusBar::updateDocumentSize(QsciScintilla *editor)
 {
     QString sizeText = tr("Length: %1    Lines: %2")
-                       .arg(editor->text().length())
+                       .arg(editor->SendScintilla(QsciScintillaBase::SCI_GETLENGTH))
                        .arg(editor->lines());
     docSize->setText(sizeText);
 }
@@ -136,8 +137,9 @@ void QsciEditorInfoStatusBar::updateSelectionInfo(QsciScintilla *editor)
 
     if (editor->hasSelectedText())
     {
-        QString selectedText = editor->selectedText();
-        int chars = selectedText.length();
+        const int start = editor->positionFromLineIndex(lineFrom, indexFrom);
+        const int end = editor->positionFromLineIndex(lineTo, indexTo);
+        const int chars = qMax(0, end - start);
         int lines = 1;
 
         // Count lines in selection
