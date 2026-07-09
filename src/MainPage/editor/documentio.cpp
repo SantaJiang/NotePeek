@@ -54,3 +54,35 @@ bool DocumentIO::saveTextFile(const QString &filePath, const QString &content, Q
     out << content;
     return true;
 }
+
+bool DocumentIO::saveUtf8File(const QString &filePath, const QByteArray &content, QString *errorMessage)
+{
+    QFile file(filePath);
+    if (!file.open(QFile::WriteOnly))
+    {
+        if (errorMessage)
+        {
+            *errorMessage = file.errorString();
+        }
+        return false;
+    }
+
+    const char *data = content.constData();
+    qint64 remaining = content.size();
+    while (remaining > 0)
+    {
+        const qint64 written = file.write(data, remaining);
+        if (written <= 0)
+        {
+            if (errorMessage)
+            {
+                *errorMessage = written < 0 ? file.errorString() : QStringLiteral("No data was written.");
+            }
+            return false;
+        }
+        data += written;
+        remaining -= written;
+    }
+
+    return true;
+}

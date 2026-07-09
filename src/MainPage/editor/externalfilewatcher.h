@@ -9,6 +9,7 @@
 #include <QString>
 
 class QFileSystemWatcher;
+class QTimer;
 
 class ExternalFileWatcher : public QObject
 {
@@ -42,7 +43,9 @@ private:
     bool hasFileStateChanged(const QString &filePath) const;
 
     QFileSystemWatcher *m_fileWatcher;
+    QTimer *m_changeCheckTimer;
     QSet<QString> m_trackedFilePaths;
+    QSet<QString> m_pendingChangeChecks;
     QHash<QString, WatchedFileState> m_fileStates;
 };
 

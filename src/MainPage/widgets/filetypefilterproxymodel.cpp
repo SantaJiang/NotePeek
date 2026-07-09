@@ -1,5 +1,6 @@
 #include "widgets/filetypefilterproxymodel.h"
 
+#include "editor/performanceconstants.h"
 #include "editor/supportedfilepolicy.h"
 
 #include <QDir>
@@ -48,6 +49,17 @@ bool isAncestorOfPath(const QString &candidateAncestor, const QString &path)
 
 FileTypeFilterProxyModel::FileTypeFilterProxyModel(QObject *parent)
     : QSortFilterProxyModel(parent)
+    , m_ignoredDirectoryNames({
+          QStringLiteral(".git"),
+          QStringLiteral(".svn"),
+          QStringLiteral(".hg"),
+          QStringLiteral("build"),
+          QStringLiteral("cmake-build-debug"),
+          QStringLiteral("cmake-build-release"),
+          QStringLiteral("node_modules"),
+          QStringLiteral("DerivedData"),
+          QStringLiteral("__pycache__")
+      })
 {
     setRecursiveFilteringEnabled(true);
 }
@@ -148,7 +160,7 @@ bool FileTypeFilterProxyModel::filterAcceptsRow(int sourceRow, const QModelIndex
 
     if (model->isDir(index))
     {
-        return true;
+        return !isIgnoredDirectory(filePath);
     }
 
     return isSupportedTextFile(filePath);
@@ -157,6 +169,22 @@ bool FileTypeFilterProxyModel::filterAcceptsRow(int sourceRow, const QModelIndex
 QFileSystemModel *FileTypeFilterProxyModel::fileSystemModel() const
 {
     return qobject_cast<QFileSystemModel *>(sourceModel());
+}
+
+bool FileTypeFilterProxyModel::isIgnoredDirectory(const QString &filePath) const
+{
+    if (m_visibleRootDirectory.isEmpty())
+    {
+        return false;
+    }
+
+    const QString normalizedPath = normalizedAbsolutePath(filePath);
+    if (normalizedPath == m_visibleRootDirectory || isAncestorOfPath(filePath, m_visibleRootDirectory))
+    {
+        return false;
+    }
+
+    return m_ignoredDirectoryNames.contains(QFileInfo(filePath).fileName());
 }
 
 bool FileTypeFilterProxyModel::isSupportedTextFile(const QString &filePath) const
@@ -177,6 +205,10 @@ bool FileTypeFilterProxyModel::isSupportedTextFile(const QString &filePath) cons
     }
 
     const bool supported = SupportedFilePolicy::isSupportedTextFile(absolutePath);
+    if (m_supportCache.size() >= PerformanceConstants::SupportCacheLimit)
+    {
+        m_supportCache.clear();
+    }
     m_supportCache.insert(absolutePath, { fileInfo.size(), fileInfo.lastModified(), supported });
     return supported;
 }

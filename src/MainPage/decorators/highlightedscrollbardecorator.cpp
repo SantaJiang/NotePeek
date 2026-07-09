@@ -31,6 +31,11 @@ HighlightedScrollBarDecorator::HighlightedScrollBarDecorator(QsciScintilla *edit
 void HighlightedScrollBarDecorator::notify(const void *notificationData)
 {
     Q_UNUSED(notificationData)
+    if (m_scrollBar)
+    {
+        m_scrollBar->refreshSearchMarkers();
+        m_scrollBar->refreshBookmarkMarkers();
+    }
     updateScrollBar();
 }
 

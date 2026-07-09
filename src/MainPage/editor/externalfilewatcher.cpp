@@ -1,5 +1,7 @@
 #include "editor/externalfilewatcher.h"
 
+#include "editor/performanceconstants.h"
+
 #include <QCryptographicHash>
 #include <QDir>
 #include <QFile>
@@ -30,11 +32,25 @@ QByteArray fileContentHash(const QString &filePath)
 ExternalFileWatcher::ExternalFileWatcher(QObject *parent)
     : QObject(parent)
     , m_fileWatcher(new QFileSystemWatcher(this))
+    , m_changeCheckTimer(new QTimer(this))
 {
+    m_changeCheckTimer->setSingleShot(true);
     connect(m_fileWatcher, &QFileSystemWatcher::fileChanged,
             this, &ExternalFileWatcher::watchedFileChanged);
     connect(m_fileWatcher, &QFileSystemWatcher::directoryChanged,
             this, &ExternalFileWatcher::watchedDirectoryChanged);
+    connect(m_changeCheckTimer, &QTimer::timeout, this, [this]() {
+        const QSet<QString> pending = m_pendingChangeChecks;
+        m_pendingChangeChecks.clear();
+        for (const QString &normalizedPath : pending)
+        {
+            if (hasFileStateChanged(normalizedPath))
+            {
+                emit externalFileChanged(normalizedPath);
+            }
+        }
+        refreshWatchedFiles();
+    });
 }
 
 void ExternalFileWatcher::setTrackedFilePaths(const QSet<QString> &filePaths)
@@ -68,7 +84,10 @@ void ExternalFileWatcher::recordFileState(const QString &filePath)
     {
         state.lastModified = fileInfo.lastModified();
         state.size = fileInfo.size();
-        state.contentHash = fileContentHash(normalizedPath);
+        if (state.size <= PerformanceConstants::LargeFileSize)
+        {
+            state.contentHash = fileContentHash(normalizedPath);
+        }
     }
     m_fileStates.insert(normalizedPath, state);
 }
@@ -138,13 +157,8 @@ void ExternalFileWatcher::requestExternalChangeCheck(const QString &filePath)
         return;
     }
 
-    QTimer::singleShot(200, this, [this, normalizedPath]() {
-        if (hasFileStateChanged(normalizedPath))
-        {
-            emit externalFileChanged(normalizedPath);
-        }
-        refreshWatchedFiles();
-    });
+    m_pendingChangeChecks.insert(normalizedPath);
+    m_changeCheckTimer->start(PerformanceConstants::WatcherDirectoryDebounceMs);
 }
 
 void ExternalFileWatcher::watchedFileChanged(const QString &filePath)
@@ -201,5 +215,10 @@ bool ExternalFileWatcher::hasFileStateChanged(const QString &filePath) const
         return true;
     }
 
-    return newState.exists && oldState.contentHash != fileContentHash(normalizedPath);
+    if (!newState.exists || oldState.contentHash.isEmpty() || newState.size > PerformanceConstants::LargeFileSize)
+    {
+        return false;
+    }
+
+    return oldState.contentHash != fileContentHash(normalizedPath);
 }

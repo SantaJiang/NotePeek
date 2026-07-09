@@ -83,7 +83,7 @@ FileExplorerDock::FileExplorerDock(QWidget *parent)
     m_treeView->setUniformRowHeights(true);
     m_treeView->setVerticalScrollMode(QAbstractItemView::ScrollPerPixel);
     m_treeView->setColumnWidth(0, 250);
-    m_treeView->header()->setSectionResizeMode(0, QHeaderView::ResizeToContents);
+    m_treeView->header()->setSectionResizeMode(0, QHeaderView::Interactive);
     m_treeView->setHeaderHidden(true);
     m_treeView->viewport()->setMouseTracking(true);
     m_treeView->hideColumn(1);

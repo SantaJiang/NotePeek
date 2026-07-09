@@ -12,8 +12,12 @@
 #include <QPrinter>
 #include <QRegularExpression>
 #include <QSet>
+#include <QFutureWatcher>
 #include <QUuid>
 #include <QUrl>
+#include <QtConcurrent>
+
+#include <mutex>
 
 #include <qlitehtmlwidget.h>
 
@@ -25,6 +29,142 @@ extern "C" {
 
 namespace {
 
+enum class MarkdownRenderMode
+{
+    Screen,
+    Pdf
+};
+
+struct MarkdownRenderStyle
+{
+    QString bodyBg;
+    QString bodyFg;
+    QString headingFg;
+    QString headingBorder;
+    QString codeBg;
+    QString codeBorder;
+    QString blockquoteBorder;
+    QString blockquoteFg;
+    QString tableBorder;
+    QString linkFg;
+    QString bodyMargin;
+    QString bodyFontFamily;
+    QString codeFontFamily;
+};
+
+MarkdownRenderStyle captureMarkdownRenderStyle(MarkdownRenderMode mode)
+{
+    namespace MP = ThemeColors::MarkdownPreview;
+
+    auto cssColor = [](const QColor &c) -> QString {
+        return c.name(QColor::HexRgb);
+    };
+
+    const bool pdfMode = mode == MarkdownRenderMode::Pdf;
+    const AppPreferences &prefs = AppPreferences::instance();
+    const QString emojiFallback = QStringLiteral("\"Apple Color Emoji\", \"Segoe UI Emoji\", \"Noto Color Emoji\"");
+
+    MarkdownRenderStyle style;
+    style.bodyBg = pdfMode ? QStringLiteral("#ffffff") : cssColor(MP::bodyBg());
+    style.bodyFg = pdfMode ? QStringLiteral("#1f2328") : cssColor(MP::bodyFg());
+    style.headingFg = pdfMode ? QStringLiteral("#111827") : cssColor(MP::headingFg());
+    style.headingBorder = pdfMode ? QStringLiteral("#d0d7de") : cssColor(MP::headingBorder());
+    style.codeBg = pdfMode ? QStringLiteral("#f6f8fa") : cssColor(MP::codeBg());
+    style.codeBorder = pdfMode ? QStringLiteral("#d0d7de") : cssColor(MP::codeBorder());
+    style.blockquoteBorder = pdfMode ? QStringLiteral("#d0d7de") : cssColor(MP::blockquoteBorder());
+    style.blockquoteFg = pdfMode ? QStringLiteral("#57606a") : cssColor(MP::blockquoteFg());
+    style.tableBorder = pdfMode ? QStringLiteral("#d0d7de") : cssColor(MP::tableBorder());
+    style.linkFg = pdfMode ? QStringLiteral("#0969da") : cssColor(MP::linkFg());
+    style.bodyMargin = pdfMode ? QStringLiteral("0") : QStringLiteral("28px 34px");
+    style.bodyFontFamily = QStringLiteral("\"%1\", -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif, %2")
+                               .arg(prefs.textFontFamily(), emojiFallback);
+    style.codeFontFamily = QStringLiteral("\"%1\", Menlo, Consolas, monospace, %2")
+                               .arg(prefs.codeFontFamily(), emojiFallback);
+    return style;
+}
+
+QString buildHtmlDocumentFromStyle(const QString &bodyHtml, const MarkdownRenderStyle &style)
+{
+    return QStringLiteral(R"(<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+body {
+    color: %1;
+    background: %2;
+    font-family: %12;
+    font-size: 15px;
+    line-height: 1.6;
+    margin: %11;
+}
+h1, h2, h3, h4, h5, h6 {
+    color: %3;
+    line-height: 1.25;
+    margin: 1.35em 0 0.55em;
+}
+h1, h2 {
+    border-bottom: 1px solid %4;
+    padding-bottom: 0.25em;
+}
+pre {
+    background: %5;
+    border: 1px solid %6;
+    border-radius: 6px;
+    padding: 12px;
+    overflow: auto;
+}
+code {
+    background: %5;
+    border-radius: 4px;
+    font-family: %13;
+    padding: 0.12em 0.3em;
+}
+pre code {
+    border-radius: 0;
+    padding: 0;
+}
+blockquote {
+    border-left: 4px solid %7;
+    color: %8;
+    margin-left: 0;
+    padding-left: 1em;
+}
+table {
+    border-collapse: collapse;
+}
+th, td {
+    border: 1px solid %9;
+    padding: 6px 10px;
+}
+a {
+    color: %10;
+}
+img {
+    max-width: 100%;
+}
+</style>
+</head>
+<body>
+%14
+</body>
+</html>)")
+        .arg(style.bodyFg)
+        .arg(style.bodyBg)
+        .arg(style.headingFg)
+        .arg(style.headingBorder)
+        .arg(style.codeBg)
+        .arg(style.codeBorder)
+        .arg(style.blockquoteBorder)
+        .arg(style.blockquoteFg)
+        .arg(style.tableBorder)
+        .arg(style.linkFg)
+        .arg(style.bodyMargin)
+        .arg(style.bodyFontFamily)
+        .arg(style.codeFontFamily)
+        .arg(bodyHtml);
+}
+
 void attachGfmExtension(cmark_parser *parser, const char *name)
 {
     cmark_syntax_extension *extension = cmark_find_syntax_extension(name);
@@ -34,7 +174,15 @@ void attachGfmExtension(cmark_parser *parser, const char *name)
     }
 }
 
-QString addSourceLineAnchors(const QString &html)
+void ensureCmarkExtensionsRegistered()
+{
+    static std::once_flag once;
+    std::call_once(once, []() {
+        cmark_gfm_core_extensions_ensure_registered();
+    });
+}
+
+QString addSourceLineAnchors(const QString &html, QVector<int> *sourceLines)
 {
     static const QRegularExpression sourceposPattern(
         QStringLiteral("<([A-Za-z][A-Za-z0-9]*)\\b([^>]*)\\sdata-sourcepos=\"((\\d+):\\d+-(\\d+):\\d+)\""));
@@ -58,6 +206,10 @@ QString addSourceLineAnchors(const QString &html)
                             .arg(match.captured(2))
                             .arg(match.captured(3));
             anchoredLines.insert(line);
+            if (sourceLines)
+            {
+                sourceLines->append(line);
+            }
         }
         else
         {
@@ -68,6 +220,62 @@ QString addSourceLineAnchors(const QString &html)
 
     anchored += html.mid(lastEnd);
     return anchored;
+}
+
+QString markdownToHtmlBody(const QString &markdown, QVector<int> *sourceLines)
+{
+    const QByteArray input = markdown.toUtf8();
+
+    ensureCmarkExtensionsRegistered();
+
+    const int options = CMARK_OPT_SOURCEPOS
+                        | CMARK_OPT_UNSAFE
+                        | CMARK_OPT_TABLE_PREFER_STYLE_ATTRIBUTES
+                        | CMARK_OPT_STRIKETHROUGH_DOUBLE_TILDE;
+    cmark_parser *parser = cmark_parser_new(options);
+    if (!parser)
+    {
+        return QStringLiteral("<p>Failed to render Markdown.</p>");
+    }
+
+    attachGfmExtension(parser, "table");
+    attachGfmExtension(parser, "tasklist");
+    attachGfmExtension(parser, "strikethrough");
+    attachGfmExtension(parser, "autolink");
+    attachGfmExtension(parser, "tagfilter");
+
+    cmark_parser_feed(parser, input.constData(), static_cast<size_t>(input.size()));
+    cmark_node *document = cmark_parser_finish(parser);
+    if (!document)
+    {
+        cmark_parser_free(parser);
+        return QStringLiteral("<p>Failed to render Markdown.</p>");
+    }
+
+    char *html = cmark_render_html(document, options, cmark_parser_get_syntax_extensions(parser));
+    QString rendered;
+    if (html)
+    {
+        rendered = addSourceLineAnchors(QString::fromUtf8(html), sourceLines);
+        cmark_get_default_mem_allocator()->free(html);
+    }
+
+    cmark_node_free(document);
+    cmark_parser_free(parser);
+
+    return rendered.isEmpty() ? QStringLiteral("<p>Failed to render Markdown.</p>") : rendered;
+}
+
+MarkdownRenderResult renderMarkdownDocumentWithStyle(quint64 requestId,
+                                                     const QString &markdown,
+                                                     const QString &filePath,
+                                                     const MarkdownRenderStyle &style)
+{
+    MarkdownRenderResult result;
+    result.requestId = requestId;
+    result.filePath = filePath;
+    result.htmlDocument = buildHtmlDocumentFromStyle(markdownToHtmlBody(markdown, &result.sourceLines), style);
+    return result;
 }
 
 QByteArray loadDataUrl(const QUrl &url)
@@ -201,10 +409,17 @@ void MarkdownPreviewer::updatePreview(QLiteHtmlWidget *preview, const QString &m
 {
     if (!preview) return;
 
+    applyRenderedPreview(preview, renderMarkdownDocument(0, markdown, filePath, RenderMode::Screen));
+}
+
+void MarkdownPreviewer::applyRenderedPreview(QLiteHtmlWidget *preview, const MarkdownRenderResult &result)
+{
+    if (!preview) return;
+
     QString rootPath;
-    if (!filePath.isEmpty())
+    if (!result.filePath.isEmpty())
     {
-        const QFileInfo info(filePath);
+        const QFileInfo info(result.filePath);
         rootPath = info.absolutePath();
         preview->setUrl(QUrl::fromLocalFile(info.absoluteFilePath()));
     }
@@ -217,13 +432,27 @@ void MarkdownPreviewer::updatePreview(QLiteHtmlWidget *preview, const QString &m
         return loadPreviewResource(url, rootPath);
     });
 
-    preview->setHtml(buildHtmlDocument(markdownToHtml(markdown), RenderMode::Screen));
+    preview->setHtml(result.htmlDocument);
 
     QPalette vpPalette = preview->viewport()->palette();
     vpPalette.setColor(QPalette::Base, ThemeColors::MarkdownPreview::bodyBg());
     vpPalette.setColor(QPalette::Window, ThemeColors::MarkdownPreview::bodyBg());
     preview->viewport()->setPalette(vpPalette);
     preview->viewport()->setAutoFillBackground(true);
+}
+
+void MarkdownPreviewer::renderPreviewAsync(quint64 requestId, const QString &markdown, const QString &filePath)
+{
+    const MarkdownRenderStyle style = captureMarkdownRenderStyle(MarkdownRenderMode::Screen);
+    auto *watcher = new QFutureWatcher<MarkdownRenderResult>(this);
+    connect(watcher, &QFutureWatcher<MarkdownRenderResult>::finished, this, [this, watcher]() {
+        const MarkdownRenderResult result = watcher->result();
+        watcher->deleteLater();
+        emit previewRendered(result);
+    });
+    watcher->setFuture(QtConcurrent::run([requestId, markdown, filePath, style]() {
+        return renderMarkdownDocumentWithStyle(requestId, markdown, filePath, style);
+    }));
 }
 
 bool MarkdownPreviewer::exportToPdf(const QString &markdown, const QString &filePath, const QString &outputPath)
@@ -245,7 +474,7 @@ bool MarkdownPreviewer::exportToPdf(const QString &markdown, const QString &file
     preview.setResourceHandler([rootPath](const QUrl &url) {
         return loadPreviewResource(url, rootPath);
     });
-    preview.setHtml(buildHtmlDocument(markdownToHtml(markdown), RenderMode::Pdf));
+    preview.setHtml(renderMarkdownDocument(0, markdown, filePath, RenderMode::Pdf).htmlDocument);
 
     const QFileInfo outputInfo(outputPath);
     const QString tempPath = outputInfo.absolutePath()
@@ -317,160 +546,17 @@ bool MarkdownPreviewer::exportToPdf(const QString &markdown, const QString &file
     return true;
 }
 
-QString MarkdownPreviewer::markdownToHtml(const QString &markdown) const
+MarkdownRenderResult MarkdownPreviewer::renderMarkdownDocument(quint64 requestId,
+                                                               const QString &markdown,
+                                                               const QString &filePath,
+                                                               RenderMode mode) const
 {
-    const QByteArray input = markdown.toUtf8();
-
-    cmark_gfm_core_extensions_ensure_registered();
-
-    const int options = CMARK_OPT_SOURCEPOS
-                        | CMARK_OPT_UNSAFE
-                        | CMARK_OPT_TABLE_PREFER_STYLE_ATTRIBUTES
-                        | CMARK_OPT_STRIKETHROUGH_DOUBLE_TILDE;
-    cmark_parser *parser = cmark_parser_new(options);
-    if (!parser)
-    {
-        return QStringLiteral("<p>Failed to render Markdown.</p>");
-    }
-
-    attachGfmExtension(parser, "table");
-    attachGfmExtension(parser, "tasklist");
-    attachGfmExtension(parser, "strikethrough");
-    attachGfmExtension(parser, "autolink");
-    attachGfmExtension(parser, "tagfilter");
-
-    cmark_parser_feed(parser, input.constData(), static_cast<size_t>(input.size()));
-    cmark_node *document = cmark_parser_finish(parser);
-    if (!document)
-    {
-        cmark_parser_free(parser);
-        return QStringLiteral("<p>Failed to render Markdown.</p>");
-    }
-
-    char *html = cmark_render_html(document, options, cmark_parser_get_syntax_extensions(parser));
-    QString rendered;
-    if (html)
-    {
-        rendered = addSourceLineAnchors(QString::fromUtf8(html));
-        cmark_get_default_mem_allocator()->free(html);
-    }
-
-    cmark_node_free(document);
-    cmark_parser_free(parser);
-
-    return rendered.isEmpty() ? QStringLiteral("<p>Failed to render Markdown.</p>") : rendered;
+    const MarkdownRenderMode renderMode = mode == RenderMode::Pdf ? MarkdownRenderMode::Pdf : MarkdownRenderMode::Screen;
+    return renderMarkdownDocumentWithStyle(requestId, markdown, filePath, captureMarkdownRenderStyle(renderMode));
 }
 
 QString MarkdownPreviewer::buildHtmlDocument(const QString &bodyHtml, RenderMode mode) const
 {
-    namespace MP = ThemeColors::MarkdownPreview;
-
-    // Build colour strings in CSS format
-    auto cssColor = [](const QColor &c) -> QString {
-        return c.name(QColor::HexRgb);
-    };
-
-    const bool pdfMode = mode == RenderMode::Pdf;
-    const QString sBodyBg       = pdfMode ? QStringLiteral("#ffffff") : cssColor(MP::bodyBg());
-    const QString sBodyFg       = pdfMode ? QStringLiteral("#1f2328") : cssColor(MP::bodyFg());
-    const QString sHeadingFg    = pdfMode ? QStringLiteral("#111827") : cssColor(MP::headingFg());
-    const QString sHeadingBrd   = pdfMode ? QStringLiteral("#d0d7de") : cssColor(MP::headingBorder());
-    const QString sCodeBg       = pdfMode ? QStringLiteral("#f6f8fa") : cssColor(MP::codeBg());
-    const QString sCodeBrd      = pdfMode ? QStringLiteral("#d0d7de") : cssColor(MP::codeBorder());
-    const QString sBqBrd        = pdfMode ? QStringLiteral("#d0d7de") : cssColor(MP::blockquoteBorder());
-    const QString sBqFg         = pdfMode ? QStringLiteral("#57606a") : cssColor(MP::blockquoteFg());
-    const QString sTblBrd       = pdfMode ? QStringLiteral("#d0d7de") : cssColor(MP::tableBorder());
-    const QString sLnkFg        = pdfMode ? QStringLiteral("#0969da") : cssColor(MP::linkFg());
-    const QString sBodyMargin   = pdfMode ? QStringLiteral("0") : QStringLiteral("28px 34px");
-
-    // Honour the configured editor fonts: the text font drives the prose body,
-    // the code font drives inline/fenced code.  Each is prepended to a fallback
-    // stack so the document still renders if the family is unavailable.
-    // The trailing emoji families give color glyphs (📄 etc.) a font to fall
-    // back to when the primary family lacks them, across macOS/Windows/Linux.
-    const AppPreferences &prefs = AppPreferences::instance();
-    const QString sEmojiFallback = QStringLiteral("\"Apple Color Emoji\", \"Segoe UI Emoji\", \"Noto Color Emoji\"");
-    const QString sBodyFontFamily = QStringLiteral("\"%1\", -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif, %2")
-                                        .arg(prefs.textFontFamily(), sEmojiFallback);
-    const QString sCodeFontFamily = QStringLiteral("\"%1\", Menlo, Consolas, monospace, %2")
-                                        .arg(prefs.codeFontFamily(), sEmojiFallback);
-
-    return QStringLiteral(R"(<!doctype html>
-<html>
-<head>
-<meta charset="utf-8">
-<style>
-body {
-    color: %1;
-    background: %2;
-    font-family: %12;
-    font-size: 15px;
-    line-height: 1.6;
-    margin: %11;
-}
-h1, h2, h3, h4, h5, h6 {
-    color: %3;
-    line-height: 1.25;
-    margin: 1.35em 0 0.55em;
-}
-h1, h2 {
-    border-bottom: 1px solid %4;
-    padding-bottom: 0.25em;
-}
-pre {
-    background: %5;
-    border: 1px solid %6;
-    border-radius: 6px;
-    padding: 12px;
-    overflow: auto;
-}
-code {
-    background: %5;
-    border-radius: 4px;
-    font-family: %13;
-    padding: 0.12em 0.3em;
-}
-pre code {
-    border-radius: 0;
-    padding: 0;
-}
-blockquote {
-    border-left: 4px solid %7;
-    color: %8;
-    margin-left: 0;
-    padding-left: 1em;
-}
-table {
-    border-collapse: collapse;
-}
-th, td {
-    border: 1px solid %9;
-    padding: 6px 10px;
-}
-a {
-    color: %10;
-}
-img {
-    max-width: 100%;
-}
-</style>
-</head>
-<body>
-%14
-</body>
-</html>)")
-        .arg(sBodyFg)
-        .arg(sBodyBg)
-        .arg(sHeadingFg)
-        .arg(sHeadingBrd)
-        .arg(sCodeBg)
-        .arg(sCodeBrd)
-        .arg(sBqBrd)
-        .arg(sBqFg)
-        .arg(sTblBrd)
-        .arg(sLnkFg)
-        .arg(sBodyMargin)
-        .arg(sBodyFontFamily)
-        .arg(sCodeFontFamily)
-        .arg(bodyHtml);
+    const MarkdownRenderMode renderMode = mode == RenderMode::Pdf ? MarkdownRenderMode::Pdf : MarkdownRenderMode::Screen;
+    return buildHtmlDocumentFromStyle(bodyHtml, captureMarkdownRenderStyle(renderMode));
 }

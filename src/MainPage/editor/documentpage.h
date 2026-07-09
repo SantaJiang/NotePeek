@@ -5,6 +5,8 @@
 #include <QPair>
 #include <QVector>
 
+#include "tool/markdown/markdownpreviewer.h"
+
 class CustomEditor;
 class MarkdownPreviewer;
 class QLiteHtmlWidget;
@@ -87,6 +89,7 @@ private:
     void schedulePreviewUpdate();
     void syncPreviewScrollFromEditor();
     void syncEditorScrollFromPreview();
+    void onPreviewRendered(const MarkdownRenderResult &result);
     void rebuildPreviewScrollMap();
     void schedulePreviewScrollMapRebuild();
     void onEditorCursorMoved(int line, int index);
@@ -104,11 +107,14 @@ private:
     MarkdownPreviewer *m_previewer;
     QTimer *m_updateTimer;
     QVector<QPair<int, int>> m_previewLineMap;
+    QVector<int> m_previewSourceLines;
     // Thin accent bar painted over the preview viewport marking the block that
     // corresponds to the source cursor line (VS Code-style).
     QWidget *m_previewLineMarker;
     int m_currentSourceLine;
     bool m_syncingScroll;
+    quint64 m_nextPreviewRequestId;
+    quint64 m_latestPreviewRequestId;
     ViewMode m_mode;
 };
 

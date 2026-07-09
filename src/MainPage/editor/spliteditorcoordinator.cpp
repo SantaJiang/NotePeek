@@ -91,6 +91,11 @@ void SplitEditorCoordinator::setSplitViewEnabled(bool enabled)
 
 bool SplitEditorCoordinator::closeAllEditors()
 {
+    for (DocumentController *controller : controllers())
+    {
+        controller->waitForPendingSaves();
+    }
+
     QMap<CustomEditor *, QString> modifiedFiles;
     QHash<CustomEditor *, DocumentController *> editorOwners;
     QSet<void *> seenDocuments;
@@ -300,7 +305,7 @@ void SplitEditorCoordinator::connectController(DocumentController *controller)
 
 void SplitEditorCoordinator::syncOpenedFileToOtherPanes(DocumentController *source, const QString &filePath)
 {
-    if (m_syncingEditorPanes || filePath.isEmpty())
+    if (m_syncingEditorPanes || filePath.isEmpty() || !m_splitViewEnabled)
         return;
 
     QScopedValueRollback<bool> syncing(m_syncingEditorPanes, true);
@@ -308,14 +313,14 @@ void SplitEditorCoordinator::syncOpenedFileToOtherPanes(DocumentController *sour
     {
         if (controller != source && controller->indexOfFile(filePath) == -1)
         {
-            controller->openFile(filePath, false);
+            controller->openSharedDocument(source->currentEditor(), false);
         }
     }
 }
 
 void SplitEditorCoordinator::syncClosedFileToOtherPanes(DocumentController *source, const QString &filePath)
 {
-    if (m_syncingEditorPanes || filePath.isEmpty())
+    if (m_syncingEditorPanes || filePath.isEmpty() || !m_splitViewEnabled)
         return;
 
     QScopedValueRollback<bool> syncing(m_syncingEditorPanes, true);
@@ -434,16 +439,7 @@ void SplitEditorCoordinator::showSameFileInOtherPane(DocumentController *source)
     }
 
     QScopedValueRollback<bool> syncing(m_syncingEditorPanes, true);
-    for (int i = 0; i < source->pane()->count(); ++i)
-    {
-        const QString filePath = source->pane()->filePathAt(i);
-        if (!filePath.isEmpty() && target->indexOfFile(filePath) == -1)
-        {
-            target->openFile(filePath, false);
-        }
-    }
-
-    target->openFile(currentFilePath, true);
+    target->openSharedDocument(sourceEditor, true);
     mirrorEditorPosition(sourceEditor, target->currentEditor());
     setActiveController(source);
 }

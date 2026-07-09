@@ -10,6 +10,7 @@
 #include "editor/customeditor.h"
 #include "editor/documentregistry.h"
 #include "editor/lexerfactory.h"
+#include "editor/performanceconstants.h"
 
 namespace {
 
@@ -127,7 +128,7 @@ CustomEditor *EditorManager::createEditorForFile(const QString &filePath, bool t
     CustomEditor *editor = createEditor(fileInfo.fileName());
 
     // Load file content
-    bool isLargeFile = (fileInfo.size() > LARGE_FILE_SIZE);
+    bool isLargeFile = (fileInfo.size() > PerformanceConstants::LargeFileSize);
 
     if (isLargeFile)
     {
