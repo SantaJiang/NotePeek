@@ -441,8 +441,9 @@ void MarkdownPreviewer::applyRenderedPreview(QLiteHtmlWidget *preview, const Mar
     preview->viewport()->setAutoFillBackground(true);
 }
 
-void MarkdownPreviewer::renderPreviewAsync(quint64 requestId, const QString &markdown, const QString &filePath)
+quint64 MarkdownPreviewer::renderPreviewAsync(const QString &markdown, const QString &filePath)
 {
+    const quint64 requestId = m_nextRequestId++;
     const MarkdownRenderStyle style = captureMarkdownRenderStyle(MarkdownRenderMode::Screen);
     auto *watcher = new QFutureWatcher<MarkdownRenderResult>(this);
     connect(watcher, &QFutureWatcher<MarkdownRenderResult>::finished, this, [this, watcher]() {
@@ -453,6 +454,7 @@ void MarkdownPreviewer::renderPreviewAsync(quint64 requestId, const QString &mar
     watcher->setFuture(QtConcurrent::run([requestId, markdown, filePath, style]() {
         return renderMarkdownDocumentWithStyle(requestId, markdown, filePath, style);
     }));
+    return requestId;
 }
 
 bool MarkdownPreviewer::exportToPdf(const QString &markdown, const QString &filePath, const QString &outputPath)
