@@ -259,15 +259,15 @@ void SplitEditorCoordinator::connectController(DocumentController *controller)
     connect(controller, &DocumentController::modificationChanged, this, [this, controller](bool modified) {
         emit paneModificationChanged(controller, modified);
     });
-    connect(controller, &DocumentController::currentFileChanged, this, [this, controller](CustomEditor *, const QString &filePath) {
+    connect(controller, &DocumentController::currentFileChanged, this, [this, controller](CustomEditor *editor, const QString &filePath) {
         if (!m_syncingEditorPanes)
         {
             setActiveController(controller);
         }
-        syncOpenedFileToOtherPanes(controller, filePath);
+        syncOpenedFileToOtherPanes(controller, editor, filePath);
     });
-    connect(controller, &DocumentController::fileOpened, this, [this, controller](CustomEditor *, const QString &filePath) {
-        syncOpenedFileToOtherPanes(controller, filePath);
+    connect(controller, &DocumentController::fileOpened, this, [this, controller](CustomEditor *editor, const QString &filePath) {
+        syncOpenedFileToOtherPanes(controller, editor, filePath);
     });
     connect(controller, &DocumentController::filePathChanged, this, [this, controller](CustomEditor *editor, const QString &oldFilePath, const QString &newFilePath) {
         syncRenamedFileToOtherPanes(controller, editor, oldFilePath, newFilePath);
@@ -303,9 +303,16 @@ void SplitEditorCoordinator::connectController(DocumentController *controller)
     });
 }
 
-void SplitEditorCoordinator::syncOpenedFileToOtherPanes(DocumentController *source, const QString &filePath)
+void SplitEditorCoordinator::syncOpenedFileToOtherPanes(DocumentController *source, CustomEditor *sourceEditor, const QString &filePath)
 {
     if (m_syncingEditorPanes || filePath.isEmpty() || !m_splitViewEnabled)
+        return;
+
+    // Share the exact editor that carries the opened/current file. Falling back
+    // to currentEditor() would mis-share when the signal refers to a file that
+    // is not the active tab (e.g. a background, non-activated open).
+    CustomEditor *shared = sourceEditor ? sourceEditor : source->currentEditor();
+    if (!shared)
         return;
 
     QScopedValueRollback<bool> syncing(m_syncingEditorPanes, true);
@@ -313,7 +320,7 @@ void SplitEditorCoordinator::syncOpenedFileToOtherPanes(DocumentController *sour
     {
         if (controller != source && controller->indexOfFile(filePath) == -1)
         {
-            controller->openSharedDocument(source->currentEditor(), false);
+            controller->openSharedDocument(shared, false);
         }
     }
 }

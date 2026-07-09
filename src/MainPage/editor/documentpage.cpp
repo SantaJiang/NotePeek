@@ -125,7 +125,6 @@ MarkdownDocumentPage::MarkdownDocumentPage(CustomEditor *editor, QWidget *parent
     , m_previewLineMarker(nullptr)
     , m_currentSourceLine(1)
     , m_syncingScroll(false)
-    , m_nextPreviewRequestId(1)
     , m_latestPreviewRequestId(0)
     , m_mode(SourceOnly)
 {
@@ -363,13 +362,19 @@ void MarkdownDocumentPage::updatePreview()
         return;
     }
 
-    m_latestPreviewRequestId = m_nextPreviewRequestId++;
-    m_previewer->renderPreviewAsync(m_latestPreviewRequestId, m_editor->text(), m_editor->filePath());
+    m_latestPreviewRequestId = m_previewer->renderPreviewAsync(m_editor->text(), m_editor->filePath());
 }
 
 void MarkdownDocumentPage::onPreviewRendered(const MarkdownRenderResult &result)
 {
+    // The previewer is shared across pages/panes and broadcasts to all of them,
+    // so guard on both the request id and the file path before adopting a
+    // result into this page's preview.
     if (result.requestId != m_latestPreviewRequestId || !m_previewer || !m_preview || !m_editor || !isPreviewVisible())
+    {
+        return;
+    }
+    if (result.filePath != m_editor->filePath())
     {
         return;
     }

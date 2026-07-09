@@ -236,9 +236,17 @@ bool DocumentController::saveFile(CustomEditor *editor, const QString &filePath)
         return false;
     }
 
-    const quint64 requestId = m_nextAsyncRequestId++;
-    m_pendingSaves.insert(requestId, { editor, oldFilePath, newFilePath });
-    m_persistence->saveFileAsync({ requestId, filePath, utf8Content });
+    if (m_inFlightSavePaths.contains(newFilePath))
+    {
+        // A write to this file is already running; keep only the newest snapshot
+        // and dispatch it when the in-flight save completes, so the two writes
+        // never race on the same file.
+        m_queuedSaves.insert(newFilePath, { editor, filePath, utf8Content, oldFilePath, newFilePath });
+    }
+    else
+    {
+        dispatchAsyncSave(editor, filePath, utf8Content, oldFilePath, newFilePath);
+    }
 
     editor->setModified(false);
     emit editorModificationChanged(editor, false);
@@ -247,6 +255,24 @@ bool DocumentController::saveFile(CustomEditor *editor, const QString &filePath)
         emit modificationChanged(false);
     }
 
+    setSavingTitle(editor, filePath);
+    return true;
+}
+
+void DocumentController::dispatchAsyncSave(CustomEditor *editor,
+                                           const QString &filePath,
+                                           const QByteArray &utf8Content,
+                                           const QString &oldFilePath,
+                                           const QString &newFilePath)
+{
+    const quint64 requestId = m_nextAsyncRequestId++;
+    m_pendingSaves.insert(requestId, { editor, oldFilePath, newFilePath });
+    m_inFlightSavePaths.insert(newFilePath);
+    m_persistence->saveFileAsync({ requestId, filePath, utf8Content });
+}
+
+void DocumentController::setSavingTitle(CustomEditor *editor, const QString &filePath)
+{
     const int index = m_pane->indexOfEditor(editor);
     if (index != -1)
     {
@@ -257,7 +283,6 @@ bool DocumentController::saveFile(CustomEditor *editor, const QString &filePath)
         }
         m_pane->setPageTitle(index, title + tr(" (saving)"));
     }
-    return true;
 }
 
 void DocumentController::onFileLoaded(const DocumentLoadResult &result)
@@ -332,6 +357,8 @@ void DocumentController::onFileSaved(const DocumentSaveResult &result)
         return;
     }
 
+    m_inFlightSavePaths.remove(pending.newFilePath);
+
     CustomEditor *editor = pending.editor.data();
     if (!result.success)
     {
@@ -345,19 +372,57 @@ void DocumentController::onFileSaved(const DocumentSaveResult &result)
             }
         }
 
+        // Restore the tab title from the transient "(saving)" state so the tab
+        // does not stay stuck showing that a save is in progress.
+        if (editor)
+        {
+            const int index = m_pane->indexOfEditor(editor);
+            if (index != -1)
+            {
+                const QString shownName = QFileInfo(result.filePath).fileName();
+                m_pane->setPageTitle(index,
+                                     shownName + (editor->isModified() ? QStringLiteral("*") : QString()));
+            }
+        }
+
         QMessageBox::warning(m_pane, tr("NotePeek"),
                              tr("Cannot write file %1:\n%2.")
                              .arg(result.filePath)
                              .arg(result.errorMessage));
+        dispatchQueuedSave(pending.newFilePath);
         return;
     }
 
-    if (!editor)
+    if (editor)
+    {
+        applySavedFileState(editor, result.filePath, pending.oldFilePath, pending.newFilePath);
+    }
+
+    dispatchQueuedSave(pending.newFilePath);
+}
+
+void DocumentController::dispatchQueuedSave(const QString &newFilePath)
+{
+    const auto it = m_queuedSaves.find(newFilePath);
+    if (it == m_queuedSaves.end())
     {
         return;
     }
 
-    applySavedFileState(editor, result.filePath, pending.oldFilePath, pending.newFilePath);
+    const QueuedSave queued = it.value();
+    m_queuedSaves.erase(it);
+
+    CustomEditor *editor = queued.editor.data();
+    if (!editor)
+    {
+        // The document was closed before its coalesced save could run. The
+        // close path (maybeSave/saveEditorForClose) already persisted or
+        // discarded the content synchronously, so there is nothing to write.
+        return;
+    }
+
+    dispatchAsyncSave(editor, queued.filePath, queued.utf8Content, queued.oldFilePath, queued.newFilePath);
+    setSavingTitle(editor, queued.filePath);
 }
 
 bool DocumentController::saveFileSynchronously(CustomEditor *editor, const QString &filePath)
@@ -371,6 +436,13 @@ bool DocumentController::saveFileSynchronously(CustomEditor *editor, const QStri
                                     ? QString()
                                     : QFileInfo(editor->filePath()).absoluteFilePath();
     const QString newFilePath = QFileInfo(filePath).absoluteFilePath();
+
+    // A synchronous write must not race an async write to the same file. Drain
+    // any in-flight/queued async save first so this write is the last one.
+    if (m_inFlightSavePaths.contains(newFilePath) || m_queuedSaves.contains(newFilePath))
+    {
+        waitForPendingSaves();
+    }
 
     QString errorMessage;
     QByteArray utf8Content;

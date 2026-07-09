@@ -2,8 +2,10 @@
 #define DOCUMENTCONTROLLER_H
 
 #include <QObject>
+#include <QByteArray>
 #include <QHash>
 #include <QPointer>
+#include <QSet>
 #include <QString>
 #include <QUrl>
 
@@ -99,8 +101,24 @@ private:
         QString newFilePath;
     };
 
+    struct QueuedSave
+    {
+        QPointer<CustomEditor> editor;
+        QString filePath;
+        QByteArray utf8Content;
+        QString oldFilePath;
+        QString newFilePath;
+    };
+
     void connectEditorSignals(CustomEditor *editor);
     bool closeDefaultEditorIfUnused();
+    void dispatchAsyncSave(CustomEditor *editor,
+                           const QString &filePath,
+                           const QByteArray &utf8Content,
+                           const QString &oldFilePath,
+                           const QString &newFilePath);
+    void dispatchQueuedSave(const QString &newFilePath);
+    void setSavingTitle(CustomEditor *editor, const QString &filePath);
     bool saveFileSynchronously(CustomEditor *editor, const QString &filePath);
     void applySavedFileState(CustomEditor *editor,
                              const QString &filePath,
@@ -123,6 +141,12 @@ private:
     quint64 m_nextAsyncRequestId = 1;
     QHash<quint64, PendingLoad> m_pendingLoads;
     QHash<quint64, PendingSave> m_pendingSaves;
+    // Writes are coalesced per destination path: at most one async write to a
+    // given file is in flight, and the newest queued snapshot for that path is
+    // dispatched once it completes. This prevents two concurrent writes (rapid
+    // re-saves, or both split panes saving a shared document) from racing.
+    QSet<QString> m_inFlightSavePaths;
+    QHash<QString, QueuedSave> m_queuedSaves;
 };
 
 #endif // DOCUMENTCONTROLLER_H

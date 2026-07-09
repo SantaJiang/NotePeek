@@ -47,7 +47,7 @@ private:
     DocumentController *visibleSingleController() const;
     void setSingleVisibleController(DocumentController *controller);
     void collapseSplitPane(DocumentController *controller);
-    void syncOpenedFileToOtherPanes(DocumentController *source, const QString &filePath);
+    void syncOpenedFileToOtherPanes(DocumentController *source, CustomEditor *sourceEditor, const QString &filePath);
     void syncClosedFileToOtherPanes(DocumentController *source, const QString &filePath);
     void syncRenamedFileToOtherPanes(DocumentController *source,
                                      CustomEditor *sourceEditor,

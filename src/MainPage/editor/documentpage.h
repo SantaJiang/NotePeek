@@ -113,7 +113,6 @@ private:
     QWidget *m_previewLineMarker;
     int m_currentSourceLine;
     bool m_syncingScroll;
-    quint64 m_nextPreviewRequestId;
     quint64 m_latestPreviewRequestId;
     ViewMode m_mode;
 };
