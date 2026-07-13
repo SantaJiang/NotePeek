@@ -45,6 +45,31 @@ namespace Editor {
 // ---------- lexer syntax highlighting (dark-mode overrides) ----------
 
 namespace Lexer {
+    enum class Role {
+        Default,
+        Comment,
+        Documentation,
+        Keyword,
+        Type,
+        Builtin,
+        Function,
+        Variable,
+        Property,
+        String,
+        Escape,
+        Number,
+        Operator,
+        Preprocessor,
+        Regex,
+        Attribute,
+        Tag,
+        Link,
+        Added,
+        Removed,
+        Changed,
+        Error
+    };
+
     // Default text / paper
     inline QColor defaultPaper()       { return isDarkMode() ? QColor(0x1e,0x1e,0x1e) : QColor(0xff,0xff,0xff); }
     inline QColor defaultColor()       { return isDarkMode() ? QColor(0xd4,0xd4,0xd4) : QColor(0x00,0x00,0x00); }
@@ -59,6 +84,49 @@ namespace Lexer {
     inline QColor identifier()         { return isDarkMode() ? QColor(0xdc,0xdc,0xdc) : QColor(0x00,0x00,0x00); }
     inline QColor docKeyword()         { return isDarkMode() ? QColor(0x4e,0xc9,0xb0) : QColor(0x00,0x80,0x80); }
     inline QColor type()               { return isDarkMode() ? QColor(0x4e,0xc9,0xb0) : QColor(0x2b,0x91,0xaf); }
+    inline QColor documentation()      { return isDarkMode() ? QColor(0x60,0x8b,0x4e) : QColor(0x3f,0x7f,0x5f); }
+    inline QColor builtin()            { return isDarkMode() ? QColor(0xd7,0xba,0x7d) : QColor(0x79,0x50,0x0d); }
+    inline QColor function()           { return isDarkMode() ? QColor(0xdc,0xdc,0xaa) : QColor(0x79,0x50,0x0d); }
+    inline QColor variable()           { return isDarkMode() ? QColor(0x9c,0xdc,0xfe) : QColor(0x00,0x16,0x7c); }
+    inline QColor property()           { return isDarkMode() ? QColor(0x9c,0xdc,0xfe) : QColor(0x88,0x10,0x00); }
+    inline QColor escape()             { return isDarkMode() ? QColor(0xd7,0xba,0x7d) : QColor(0xee,0x00,0x00); }
+    inline QColor regex()              { return isDarkMode() ? QColor(0xd1,0x69,0x69) : QColor(0x81,0x1f,0x3f); }
+    inline QColor attribute()          { return isDarkMode() ? QColor(0x9c,0xdc,0xfe) : QColor(0x99,0x1f,0x66); }
+    inline QColor tag()                { return isDarkMode() ? QColor(0x56,0x9c,0xd6) : QColor(0x80,0x00,0x00); }
+    inline QColor link()               { return isDarkMode() ? QColor(0x4f,0xc1,0xff) : QColor(0x00,0x00,0xee); }
+    inline QColor added()              { return isDarkMode() ? QColor(0xb5,0xce,0xa8) : QColor(0x09,0x81,0x0a); }
+    inline QColor removed()            { return isDarkMode() ? QColor(0xf4,0x87,0x71) : QColor(0xa3,0x15,0x15); }
+    inline QColor changed()            { return isDarkMode() ? QColor(0xd7,0xba,0x7d) : QColor(0x79,0x50,0x0d); }
+    inline QColor error()              { return isDarkMode() ? QColor(0xf4,0x47,0x47) : QColor(0xcc,0x00,0x00); }
+
+    inline QColor color(Role role)
+    {
+        switch (role) {
+        case Role::Comment: return comment();
+        case Role::Documentation: return documentation();
+        case Role::Keyword: return keyword();
+        case Role::Type: return type();
+        case Role::Builtin: return builtin();
+        case Role::Function: return function();
+        case Role::Variable: return variable();
+        case Role::Property: return property();
+        case Role::String: return string();
+        case Role::Escape: return escape();
+        case Role::Number: return number();
+        case Role::Operator: return operatorColor();
+        case Role::Preprocessor: return preprocessor();
+        case Role::Regex: return regex();
+        case Role::Attribute: return attribute();
+        case Role::Tag: return tag();
+        case Role::Link: return link();
+        case Role::Added: return added();
+        case Role::Removed: return removed();
+        case Role::Changed: return changed();
+        case Role::Error: return error();
+        case Role::Default: return defaultColor();
+        }
+        return defaultColor();
+    }
 }
 
 // ---------- scroll-bar decorator ----------

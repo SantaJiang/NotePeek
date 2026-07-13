@@ -6,6 +6,12 @@
 #include <QSet>
 #include <QTimer>
 #include <Qsci/qscilexer.h>
+#include <Qsci/qscilexercpp.h>
+#include <Qsci/qscilexerdiff.h>
+#include <Qsci/qscilexerjson.h>
+#include <Qsci/qscilexermarkdown.h>
+#include <Qsci/qscilexerpython.h>
+#include <Qsci/qscilexerrust.h>
 #include "decorators/highlightedscrollbardecorator.h"
 #include "editor/customeditor.h"
 #include "editor/documentregistry.h"
@@ -13,6 +19,186 @@
 #include "editor/performanceconstants.h"
 
 namespace {
+
+using SyntaxRole = ThemeColors::Lexer::Role;
+
+SyntaxRole roleFromDescription(QString description)
+{
+    description = description.toLower();
+
+    if (description.contains(QStringLiteral("error")) || description.contains(QStringLiteral("unknown"))
+        || description.contains(QStringLiteral("unclosed")) || description.contains(QStringLiteral("bad")))
+        return SyntaxRole::Error;
+    if (description.contains(QStringLiteral("comment")) || description.contains(QStringLiteral("remark")))
+        return description.contains(QStringLiteral("doc")) ? SyntaxRole::Documentation : SyntaxRole::Comment;
+    if (description.contains(QStringLiteral("escape")) || description.contains(QStringLiteral("entity")))
+        return SyntaxRole::Escape;
+    if (description.contains(QStringLiteral("regex")) || description.contains(QStringLiteral("regular expression")))
+        return SyntaxRole::Regex;
+    if (description.contains(QStringLiteral("string")) || description.contains(QStringLiteral("character"))
+        || description.contains(QStringLiteral("quoted")))
+        return SyntaxRole::String;
+    if (description.contains(QStringLiteral("number")) || description.contains(QStringLiteral("numeric")))
+        return SyntaxRole::Number;
+    if (description.contains(QStringLiteral("preprocessor")) || description.contains(QStringLiteral("directive"))
+        || description.contains(QStringLiteral("@-rule")))
+        return SyntaxRole::Preprocessor;
+    if (description.contains(QStringLiteral("operator")) || description.contains(QStringLiteral("delimiter")))
+        return SyntaxRole::Operator;
+    if (description.contains(QStringLiteral("function")) || description.contains(QStringLiteral("method"))
+        || description.contains(QStringLiteral("command")) || description.contains(QStringLiteral("target"))
+        || description.contains(QStringLiteral("label")))
+        return SyntaxRole::Function;
+    if (description.contains(QStringLiteral("class name")) || description.contains(QStringLiteral("type"))
+        || description.contains(QStringLiteral("lifetime")))
+        return SyntaxRole::Type;
+    if (description.contains(QStringLiteral("builtin")) || description.contains(QStringLiteral("built-in"))
+        || description.contains(QStringLiteral("macro")))
+        return SyntaxRole::Builtin;
+    if (description.contains(QStringLiteral("property")) || description.contains(QStringLiteral("key"))
+        || description.contains(QStringLiteral("section")))
+        return SyntaxRole::Property;
+    if (description.contains(QStringLiteral("attribute")) || description.contains(QStringLiteral("decorator")))
+        return SyntaxRole::Attribute;
+    if (description.contains(QStringLiteral("tag")) || description.contains(QStringLiteral("heading")))
+        return SyntaxRole::Tag;
+    if (description.contains(QStringLiteral("link")) || description.contains(QStringLiteral("url"))
+        || description.contains(QStringLiteral("iri")))
+        return SyntaxRole::Link;
+    if (description.contains(QStringLiteral("keyword")) || description.contains(QStringLiteral("reserved")))
+        return SyntaxRole::Keyword;
+    if (description.contains(QStringLiteral("variable")) || description.contains(QStringLiteral("parameter"))
+        || description.contains(QStringLiteral("reference")))
+        return SyntaxRole::Variable;
+    // Most lexical scanners cannot distinguish a function/member/type use
+    // from a plain identifier.  VS Code's TextMate fallback deliberately keeps
+    // these at the editor foreground colour until semantic tokens are present.
+    if (description.contains(QStringLiteral("identifier")) || description.contains(QStringLiteral("word")))
+        return SyntaxRole::Default;
+    return SyntaxRole::Default;
+}
+
+SyntaxRole roleForStyle(QsciLexer *lexer, int style)
+{
+    if (dynamic_cast<QsciLexerDiff *>(lexer)) {
+        switch (style) {
+        case QsciLexerDiff::Comment: return SyntaxRole::Comment;
+        case QsciLexerDiff::Command: case QsciLexerDiff::Header: return SyntaxRole::Keyword;
+        case QsciLexerDiff::Position: return SyntaxRole::Link;
+        case QsciLexerDiff::LineAdded: case QsciLexerDiff::AddingPatchAdded:
+        case QsciLexerDiff::RemovingPatchAdded: return SyntaxRole::Added;
+        case QsciLexerDiff::LineRemoved: case QsciLexerDiff::AddingPatchRemoved:
+        case QsciLexerDiff::RemovingPatchRemoved: return SyntaxRole::Removed;
+        case QsciLexerDiff::LineChanged: return SyntaxRole::Changed;
+        default: break;
+        }
+    }
+    if (dynamic_cast<QsciLexerMarkdown *>(lexer)) {
+        switch (style) {
+        case QsciLexerMarkdown::StrongEmphasisAsterisks:
+        case QsciLexerMarkdown::StrongEmphasisUnderscores: return SyntaxRole::Keyword;
+        case QsciLexerMarkdown::EmphasisAsterisks:
+        case QsciLexerMarkdown::EmphasisUnderscores:
+        case QsciLexerMarkdown::StrikeOut: return SyntaxRole::Attribute;
+        case QsciLexerMarkdown::Header1: case QsciLexerMarkdown::Header2:
+        case QsciLexerMarkdown::Header3: case QsciLexerMarkdown::Header4:
+        case QsciLexerMarkdown::Header5: case QsciLexerMarkdown::Header6: return SyntaxRole::Tag;
+        case QsciLexerMarkdown::UnorderedListItem: case QsciLexerMarkdown::OrderedListItem:
+        case QsciLexerMarkdown::HorizontalRule: return SyntaxRole::Operator;
+        case QsciLexerMarkdown::BlockQuote: return SyntaxRole::Documentation;
+        case QsciLexerMarkdown::Link: return SyntaxRole::Link;
+        case QsciLexerMarkdown::CodeBackticks: case QsciLexerMarkdown::CodeDoubleBackticks:
+        case QsciLexerMarkdown::CodeBlock: return SyntaxRole::String;
+        default: break;
+        }
+    }
+    if (dynamic_cast<QsciLexerPython *>(lexer)) {
+        switch (style) {
+        case QsciLexerPython::Comment: case QsciLexerPython::CommentBlock: return SyntaxRole::Comment;
+        case QsciLexerPython::Number: return SyntaxRole::Number;
+        case QsciLexerPython::DoubleQuotedString: case QsciLexerPython::SingleQuotedString:
+        case QsciLexerPython::TripleSingleQuotedString: case QsciLexerPython::TripleDoubleQuotedString:
+        case QsciLexerPython::DoubleQuotedFString: case QsciLexerPython::SingleQuotedFString:
+        case QsciLexerPython::TripleSingleQuotedFString: case QsciLexerPython::TripleDoubleQuotedFString:
+            return SyntaxRole::String;
+        case QsciLexerPython::Keyword: return SyntaxRole::Keyword;
+        case QsciLexerPython::ClassName: return SyntaxRole::Type;
+        case QsciLexerPython::FunctionMethodName: return SyntaxRole::Function;
+        case QsciLexerPython::Operator: return SyntaxRole::Operator;
+        case QsciLexerPython::Identifier: return SyntaxRole::Variable;
+        case QsciLexerPython::HighlightedIdentifier: return SyntaxRole::Builtin;
+        case QsciLexerPython::Decorator: return SyntaxRole::Attribute;
+        case QsciLexerPython::UnclosedString: return SyntaxRole::Error;
+        default: break;
+        }
+    }
+    if (dynamic_cast<QsciLexerRust *>(lexer)) {
+        switch (style) {
+        case QsciLexerRust::CommentBlock: case QsciLexerRust::CommentLine: return SyntaxRole::Comment;
+        case QsciLexerRust::CommentBlockDoc: case QsciLexerRust::CommentLineDoc: return SyntaxRole::Documentation;
+        case QsciLexerRust::Number: return SyntaxRole::Number;
+        case QsciLexerRust::Keyword: case QsciLexerRust::KeywordSet3: case QsciLexerRust::KeywordSet4:
+        case QsciLexerRust::KeywordSet5: case QsciLexerRust::KeywordSet6: case QsciLexerRust::KeywordSet7:
+            return SyntaxRole::Keyword;
+        case QsciLexerRust::BuiltInType: return SyntaxRole::Type;
+        case QsciLexerRust::String: case QsciLexerRust::RawString: case QsciLexerRust::Character:
+        case QsciLexerRust::ByteString: case QsciLexerRust::RawByteString: case QsciLexerRust::ByteCharacter:
+            return SyntaxRole::String;
+        case QsciLexerRust::Operator: return SyntaxRole::Operator;
+        case QsciLexerRust::Identifier: return SyntaxRole::Variable;
+        case QsciLexerRust::Lifetime: return SyntaxRole::Type;
+        case QsciLexerRust::Macro: return SyntaxRole::Builtin;
+        case QsciLexerRust::LexingError: return SyntaxRole::Error;
+        default: break;
+        }
+    }
+    if (dynamic_cast<QsciLexerJSON *>(lexer)) {
+        switch (style) {
+        case QsciLexerJSON::Number: return SyntaxRole::Number;
+        case QsciLexerJSON::String: return SyntaxRole::String;
+        case QsciLexerJSON::Property: return SyntaxRole::Property;
+        case QsciLexerJSON::EscapeSequence: return SyntaxRole::Escape;
+        case QsciLexerJSON::CommentLine: case QsciLexerJSON::CommentBlock: return SyntaxRole::Comment;
+        case QsciLexerJSON::Operator: return SyntaxRole::Operator;
+        case QsciLexerJSON::IRI: case QsciLexerJSON::IRICompact: return SyntaxRole::Link;
+        case QsciLexerJSON::Keyword: case QsciLexerJSON::KeywordLD: return SyntaxRole::Keyword;
+        case QsciLexerJSON::UnclosedString: case QsciLexerJSON::Error: return SyntaxRole::Error;
+        default: break;
+        }
+    }
+    if (dynamic_cast<QsciLexerCPP *>(lexer)) {
+        const int activeStyle = style >= 64 ? style - 64 : style;
+        switch (activeStyle) {
+        case QsciLexerCPP::Comment: case QsciLexerCPP::CommentLine: return SyntaxRole::Comment;
+        case QsciLexerCPP::CommentDoc: case QsciLexerCPP::CommentLineDoc:
+        case QsciLexerCPP::CommentDocKeyword: case QsciLexerCPP::TaskMarker: return SyntaxRole::Documentation;
+        case QsciLexerCPP::CommentDocKeywordError: return SyntaxRole::Error;
+        case QsciLexerCPP::Number: return SyntaxRole::Number;
+        case QsciLexerCPP::Keyword: return SyntaxRole::Keyword;
+        case QsciLexerCPP::KeywordSet2: case QsciLexerCPP::GlobalClass: return SyntaxRole::Type;
+        case QsciLexerCPP::DoubleQuotedString: case QsciLexerCPP::SingleQuotedString:
+        case QsciLexerCPP::VerbatimString: case QsciLexerCPP::RawString:
+        case QsciLexerCPP::TripleQuotedVerbatimString: case QsciLexerCPP::HashQuotedString:
+        case QsciLexerCPP::UserLiteral: return SyntaxRole::String;
+        case QsciLexerCPP::EscapeSequence: return SyntaxRole::Escape;
+        case QsciLexerCPP::Regex: return SyntaxRole::Regex;
+        case QsciLexerCPP::PreProcessor: return SyntaxRole::Preprocessor;
+        case QsciLexerCPP::PreProcessorComment: return SyntaxRole::Comment;
+        case QsciLexerCPP::PreProcessorCommentLineDoc: return SyntaxRole::Documentation;
+        case QsciLexerCPP::Operator: return SyntaxRole::Operator;
+        // LexCPP uses Identifier for virtually every non-keyword name.  Giving
+        // it a dedicated variable colour paints functions, members and local
+        // variables alike, producing large monochrome regions.  Dark+ keeps
+        // lexical-only identifiers at the normal foreground colour; richer
+        // distinctions require semantic tokens rather than a lexer palette.
+        case QsciLexerCPP::Identifier: return SyntaxRole::Default;
+        case QsciLexerCPP::UnclosedString: return SyntaxRole::Error;
+        default: break;
+        }
+    }
+
+    return roleFromDescription(lexer->description(style));
+}
 
 long toScintillaColor(const QColor &color)
 {
@@ -504,80 +690,14 @@ void EditorManager::applyLexerTheme(QsciLexer *lexer)
 
     using namespace ThemeColors::Lexer;
 
-    // Set the default paper and text colour for the entire lexer.  setDefaultPaper()
-    // also updates STYLE_DEFAULT, which Scintilla uses for blank space past EOL/EOF.
+    // Style numbers are lexer-specific.  Apply colours only after translating
+    // each style into a semantic role; treating every lexer like C++ causes,
+    // for example, Python strings and JSON properties to receive number colours.
     lexer->setDefaultPaper(defaultPaper());
     lexer->setPaper(defaultPaper(), -1);
-    lexer->setColor(defaultColor(), -1);
-
-    // Override common syntax style colours so they are readable on the active
-    // background.  Not every lexer uses every style number, but the ones listed
-    // below cover the vast majority of languages that QScintilla ships with.
-    //
-    // Style numbers are based on the Scintilla / QScintilla conventions:
-    //   0  = default
-    //   1  = comment
-    //   2  = comment-line  /  line comment
-    //   3  = comment-doc   /  doc comment
-    //   4  = number
-    //   5  = keyword (primary set)
-    //   6  = string
-    //   7  = character
-    //   8  = UUID / literal
-    //   9  = preprocessor
-    //  10  = operator
-    //  11  = identifier
-    //  12  = string-eol (unclosed string)
-    //  13  = keyword (secondary set – often types / builtins)
-    //  14  = comment-doc-keyword (e.g. @param in JavaDoc)
-    //  15  = comment-doc-keyword-error
-    //  16  = global class / keyword set 3
-    //
-    // We only override the styles that are present; QScintilla silently
-    // ignores colour settings for style numbers it does not use.
-
-    // Comments
-    lexer->setColor(comment(), 1);
-    lexer->setColor(comment(), 2);
-    lexer->setColor(comment(), 3);
-
-    // Numbers
-    lexer->setColor(number(), 4);
-
-    // Primary keywords
-    lexer->setColor(keyword(), 5);
-
-    // Strings
-    lexer->setColor(string(), 6);
-    lexer->setColor(string(), 7);
-
-    // Preprocessor / directives
-    lexer->setColor(preprocessor(), 9);
-
-    // Operators
-    lexer->setColor(operatorColor(), 10);
-
-    // Identifiers
-    lexer->setColor(identifier(), 11);
-
-    // Unclosed strings
-    lexer->setColor(string(), 12);
-
-    // Secondary keywords (types, builtins)
-    lexer->setColor(docKeyword(), 13);
-
-    // Doc keyword
-    lexer->setColor(docKeyword(), 14);
-
-    // Keyword set 3 (global class)
-    lexer->setColor(type(), 16);
-
-    // Markdown-specific styles (QsciLexerMarkdown uses higher numbers)
-    // These are safe to set even for non-markdown lexers (ignored).
-    lexer->setColor(type(), 41);  // H1-H6 in some lexers
-    lexer->setColor(type(), 42);
-    lexer->setColor(type(), 43);
-    lexer->setColor(type(), 44);
-    lexer->setColor(type(), 45);
-    lexer->setColor(type(), 46);
+    for (int style = 0; style <= QsciScintillaBase::STYLE_MAX; ++style) {
+        if (lexer->description(style).isEmpty())
+            continue;
+        lexer->setColor(color(roleForStyle(lexer, style)), style);
+    }
 }
