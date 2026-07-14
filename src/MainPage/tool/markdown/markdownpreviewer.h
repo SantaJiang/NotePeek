@@ -8,6 +8,10 @@
 class QWidget;
 class QLiteHtmlWidget;
 
+namespace MarkdownPreviewLayout {
+inline constexpr int ScreenHorizontalMargin = 34;
+}
+
 struct MarkdownRenderResult
 {
     quint64 requestId = 0;

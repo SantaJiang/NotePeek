@@ -75,7 +75,9 @@ MarkdownRenderStyle captureMarkdownRenderStyle(MarkdownRenderMode mode)
     style.blockquoteFg = pdfMode ? QStringLiteral("#57606a") : cssColor(MP::blockquoteFg());
     style.tableBorder = pdfMode ? QStringLiteral("#d0d7de") : cssColor(MP::tableBorder());
     style.linkFg = pdfMode ? QStringLiteral("#0969da") : cssColor(MP::linkFg());
-    style.bodyMargin = pdfMode ? QStringLiteral("0") : QStringLiteral("28px 34px");
+    style.bodyMargin = pdfMode
+                           ? QStringLiteral("0")
+                           : QStringLiteral("28px %1px").arg(MarkdownPreviewLayout::ScreenHorizontalMargin);
     style.bodyFontFamily = QStringLiteral("\"%1\", -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif, %2")
                                .arg(prefs.textFontFamily(), emojiFallback);
     style.codeFontFamily = QStringLiteral("\"%1\", Menlo, Consolas, monospace, %2")
