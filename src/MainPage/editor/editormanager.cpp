@@ -379,7 +379,7 @@ void EditorManager::setupEditor(CustomEditor *editor)
     // Basic editor setup
     editor->setMargins(1);
     editor->setMarginType(0, CustomEditor::NumberMargin);
-    editor->setMarginWidth(0, 30);
+    editor->setMarginWidth(0, 0);
     // Start with the minimum scroll width so an empty document shows no horizontal
     // scrollbar; with width tracking enabled it grows as the content widens
     editor->setScrollWidth(1);
@@ -409,6 +409,7 @@ void EditorManager::setupEditor(CustomEditor *editor)
         updateLineNumberMarginWidth(editor);
     });
 
+    updateLineNumberMarginWidth(editor);
     setupScrollBarDecorator(editor);
 }
 
@@ -449,7 +450,9 @@ void EditorManager::updateLineNumberMarginWidth(CustomEditor *editor)
         digits++;
     }
 
-    const int visibleDigits = qMax(digits, 2);
+    // Keep the gutter stable through four-digit documents.  Beyond that it
+    // continues to grow one digit at a time as before.
+    const int visibleDigits = qMax(digits, 4);
     const QString sample = QString(visibleDigits, QLatin1Char('9')) + QLatin1Char(' ');
     const int width = editor->SendScintilla(QsciScintillaBase::SCI_TEXTWIDTH,
                                             QsciScintillaBase::STYLE_LINENUMBER,

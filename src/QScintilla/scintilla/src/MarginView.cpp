@@ -390,9 +390,11 @@ void MarginView::PaintMargin(Surface *surface, Sci::Line topLine, PRectangle rc,
 							sNumber = number;
 						}
 						PRectangle rcNumber = rcMarker;
-						// Right justify
+						// Centre line numbers in the gutter.  NotePeek keeps the gutter at
+						// least four digits wide, so right justification makes short line
+						// numbers appear noticeably off-centre.
 						const XYPOSITION width = surface->WidthText(fontLineNumber, sNumber.c_str(), static_cast<int>(sNumber.length()));
-						const XYPOSITION xpos = rcNumber.right - width - vs.marginNumberPadding;
+						const XYPOSITION xpos = rcNumber.left + (rcNumber.Width() - width) / 2;
 						rcNumber.left = xpos;
 						DrawTextNoClipPhase(surface, rcNumber, vs.styles[STYLE_LINENUMBER],
 							rcNumber.top + vs.maxAscent, sNumber.c_str(), static_cast<int>(sNumber.length()), drawAll);
