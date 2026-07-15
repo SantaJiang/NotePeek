@@ -23,6 +23,7 @@
 #include <QMainWindow>
 #include <QLabel>
 #include <QMouseEvent>
+#include <QEvent>
 
 
 class QsciScintilla;
@@ -79,6 +80,9 @@ public:
 signals:
     void customContextMenuRequestedForEOLLabel(const QPoint &pos);
 
+protected:
+    void changeEvent(QEvent *event) override;
+
 private slots:
     void editorCursorPositionChanged(int line, int index);
     void editorTextChanged();
@@ -92,6 +96,7 @@ private:
     void updateEol(QsciScintilla *editor);
     void updateEncoding(QsciScintilla *editor);
     void updateOverType(QsciScintilla *editor);
+    void applyChromeTheme();
 
     QLabel *docType;
     QLabel *docSize;
