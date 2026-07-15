@@ -228,6 +228,10 @@ PreferencesDialog::PreferencesDialog(QWidget *parent)
     , m_codeFontSize(new QComboBox(this))
     , m_showFileTree(new QCheckBox(tr("Show file tree on startup"), this))
     , m_markdownSidePreview(new QCheckBox(tr("Open with side preview"), this))
+    , m_codeFolding(new QCheckBox(tr("Show folding controls"), this))
+    , m_bracketAssistance(new QCheckBox(tr("Match and auto-close brackets"), this))
+    , m_smartIndentation(new QCheckBox(tr("Indent guides and smart Tab/Backspace"), this))
+    , m_documentCompletion(new QCheckBox(tr("Suggest words from the current document"), this))
 {
     setWindowTitle(tr("Preferences"));
     setModal(true);
@@ -251,6 +255,13 @@ PreferencesDialog::PreferencesDialog(QWidget *parent)
     generalLayout->addLayout(makeSettingsRow(tr("Startup"), m_showFileTree, generalSection));
     generalLayout->addLayout(makeSettingsRow(tr("Markdown"), m_markdownSidePreview, generalSection));
 
+    auto *codeSection = makeSection(tr("Code Editing"), this);
+    auto *codeLayout = qobject_cast<QVBoxLayout *>(codeSection->layout());
+    codeLayout->addLayout(makeSettingsRow(tr("Folding"), m_codeFolding, codeSection));
+    codeLayout->addLayout(makeSettingsRow(tr("Brackets"), m_bracketAssistance, codeSection));
+    codeLayout->addLayout(makeSettingsRow(tr("Indentation"), m_smartIndentation, codeSection));
+    codeLayout->addLayout(makeSettingsRow(tr("Completion"), m_documentCompletion, codeSection));
+
     auto *buttons = new QDialogButtonBox(QDialogButtonBox::Ok
                                              | QDialogButtonBox::Apply
                                              | QDialogButtonBox::Cancel,
@@ -261,6 +272,7 @@ PreferencesDialog::PreferencesDialog(QWidget *parent)
     layout->setSpacing(14);
     layout->addWidget(fontsSection);
     layout->addWidget(generalSection);
+    layout->addWidget(codeSection);
     layout->addStretch();
     layout->addWidget(buttons);
 
@@ -288,6 +300,10 @@ void PreferencesDialog::loadFromPreferences()
     setCurrentFontSize(m_codeFontSize, prefs.codeFontSize());
     m_showFileTree->setChecked(prefs.showFileTreeOnStartup());
     m_markdownSidePreview->setChecked(prefs.markdownDefaultPreview());
+    m_codeFolding->setChecked(prefs.codeFoldingEnabled());
+    m_bracketAssistance->setChecked(prefs.bracketAssistanceEnabled());
+    m_smartIndentation->setChecked(prefs.smartIndentationEnabled());
+    m_documentCompletion->setChecked(prefs.documentCompletionEnabled());
 }
 
 void PreferencesDialog::commit()
@@ -298,6 +314,10 @@ void PreferencesDialog::commit()
     prefs.setCodeFont(m_codeFontCombo->currentFont().family(), currentFontSize(m_codeFontSize));
     prefs.setShowFileTreeOnStartup(m_showFileTree->isChecked());
     prefs.setMarkdownDefaultPreview(m_markdownSidePreview->isChecked());
+    prefs.setCodeFoldingEnabled(m_codeFolding->isChecked());
+    prefs.setBracketAssistanceEnabled(m_bracketAssistance->isChecked());
+    prefs.setSmartIndentationEnabled(m_smartIndentation->isChecked());
+    prefs.setDocumentCompletionEnabled(m_documentCompletion->isChecked());
 
     prefs.save();
 

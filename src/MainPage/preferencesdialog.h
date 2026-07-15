@@ -33,6 +33,10 @@ private:
     QComboBox *m_codeFontSize;
     QCheckBox *m_showFileTree;
     QCheckBox *m_markdownSidePreview;
+    QCheckBox *m_codeFolding;
+    QCheckBox *m_bracketAssistance;
+    QCheckBox *m_smartIndentation;
+    QCheckBox *m_documentCompletion;
 };
 
 #endif // PREFERENCESDIALOG_H

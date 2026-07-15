@@ -32,6 +32,7 @@ public:
     bool closeAllEditors();
     void reapplyThemeToEditorPanes();
     void applyFontPreferencesToEditors();
+    void applyCodeFeaturePreferencesToEditors();
     void refreshVisibleMarkdownPreviews();
     void updateActivePaneForFocus(QWidget *widget);
 

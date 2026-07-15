@@ -79,6 +79,10 @@ AppPreferences::AppPreferences()
     , m_codeFontSize(defaultFontSize())
     , m_showFileTreeOnStartup(false)
     , m_markdownDefaultPreview(false)
+    , m_codeFoldingEnabled(false)
+    , m_bracketAssistanceEnabled(false)
+    , m_smartIndentationEnabled(true)
+    , m_documentCompletionEnabled(false)
 {
 }
 
@@ -140,6 +144,14 @@ void AppPreferences::load()
         settings.value(QStringLiteral("showFileTreeOnStartup"), false).toBool();
     m_markdownDefaultPreview =
         settings.value(QStringLiteral("markdownDefaultPreview"), false).toBool();
+    m_codeFoldingEnabled =
+        settings.value(QStringLiteral("codeFoldingEnabled"), false).toBool();
+    m_bracketAssistanceEnabled =
+        settings.value(QStringLiteral("bracketAssistanceEnabled"), false).toBool();
+    m_smartIndentationEnabled =
+        settings.value(QStringLiteral("smartIndentationEnabled"), true).toBool();
+    m_documentCompletionEnabled =
+        settings.value(QStringLiteral("documentCompletionEnabled"), false).toBool();
 
     settings.endGroup();
 }
@@ -155,6 +167,10 @@ void AppPreferences::save() const
     settings.setValue(QStringLiteral("codeFontSize"), m_codeFontSize);
     settings.setValue(QStringLiteral("showFileTreeOnStartup"), m_showFileTreeOnStartup);
     settings.setValue(QStringLiteral("markdownDefaultPreview"), m_markdownDefaultPreview);
+    settings.setValue(QStringLiteral("codeFoldingEnabled"), m_codeFoldingEnabled);
+    settings.setValue(QStringLiteral("bracketAssistanceEnabled"), m_bracketAssistanceEnabled);
+    settings.setValue(QStringLiteral("smartIndentationEnabled"), m_smartIndentationEnabled);
+    settings.setValue(QStringLiteral("documentCompletionEnabled"), m_documentCompletionEnabled);
 
     settings.endGroup();
 }

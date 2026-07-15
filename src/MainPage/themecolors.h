@@ -38,6 +38,8 @@ namespace Editor {
     inline QColor caretFg()            { return isDarkMode() ? QColor(0xff,0xff,0xff) : QColor(0x00,0x00,0x00); }
     inline QColor background()         { return isDarkMode() ? QColor(0x1e,0x1e,0x1e) : QColor(0xff,0xff,0xff); }
     inline QColor foreground()         { return isDarkMode() ? QColor(0xd4,0xd4,0xd4) : QColor(0x00,0x00,0x00); }
+    inline QColor indentGuide()        { return isDarkMode() ? QColor(0x40,0x40,0x40) : QColor(0xd3,0xd3,0xd3); }
+    inline QColor foldMarker()         { return isDarkMode() ? QColor(0x8a,0x8a,0x8a) : QColor(0x6b,0x6b,0x6b); }
     inline QColor matchedBraceFg()     { return isDarkMode() ? QColor(0x56,0x9c,0xd6) : Qt::blue; }
     inline QColor matchedBraceBg()     { return isDarkMode() ? QColor(0x3b,0x3b,0x3b) : Qt::yellow; }
 }

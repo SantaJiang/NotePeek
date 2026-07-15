@@ -34,6 +34,7 @@ public:
     // the user changes font preferences).  Works for source editors with a
     // lexer attached, which ignore QsciScintilla::setFont().
     void applyFontPreferences();
+    void applyCodeFeaturePreferences();
 
 signals:
     void editorCreated(CustomEditor *editor);

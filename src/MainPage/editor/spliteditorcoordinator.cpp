@@ -177,6 +177,14 @@ void SplitEditorCoordinator::applyFontPreferencesToEditors()
     }
 }
 
+void SplitEditorCoordinator::applyCodeFeaturePreferencesToEditors()
+{
+    for (DocumentController *controller : controllers())
+    {
+        controller->editorManager()->applyCodeFeaturePreferences();
+    }
+}
+
 void SplitEditorCoordinator::refreshVisibleMarkdownPreviews()
 {
     for (DocumentController *controller : controllers())
