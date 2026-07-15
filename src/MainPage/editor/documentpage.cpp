@@ -602,9 +602,10 @@ void MarkdownDocumentPage::updatePreviewLineMarker()
     // One preview text line is a good approximation of the marked block height.
     const int markerHeight = qMax(18, m_preview->fontMetrics().height() + 6);
     const int markerWidth = 3;
-    // Keep the marker inside the document's left margin, with its right edge
-    // aligned to the start of the rendered Markdown content.
-    const int markerX = qMax(0, MarkdownPreviewLayout::ScreenHorizontalMargin - markerWidth);
+    // Keep a small visual gap between the marker and the rendered Markdown.
+    constexpr int markerContentGap = 5;
+    const int markerX = qMax(0, MarkdownPreviewLayout::ScreenHorizontalMargin
+                                   - markerWidth - markerContentGap);
 
     if (viewportY + markerHeight < 0 || viewportY > viewport->height())
     {
