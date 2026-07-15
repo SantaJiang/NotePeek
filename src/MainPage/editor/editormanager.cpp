@@ -515,7 +515,7 @@ void EditorManager::updateEditorSyntax(CustomEditor *editor, const QString &file
         {
             oldLexer->deleteLater();
         }
-        editor->setAutoIndent(true);
+        editor->setAutoIndent(AppPreferences::instance().smartIndentationEnabled());
     }
     else
     {
@@ -559,6 +559,7 @@ void EditorManager::applyDisplayPolicy(CustomEditor *editor, const QString &file
                                         : CustomEditor::NoFoldStyle,
                        1);
     const bool smartIndentation = codeFeatures && prefs.smartIndentationEnabled();
+    editor->setAutoIndent(smartIndentation);
     editor->setIndentationGuides(smartIndentation);
     editor->setTabIndents(smartIndentation);
     editor->setBackspaceUnindents(smartIndentation);

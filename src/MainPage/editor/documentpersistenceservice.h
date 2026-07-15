@@ -31,6 +31,7 @@ struct DocumentSaveRequest
     quint64 requestId = 0;
     QString filePath;
     QByteArray utf8Content;
+    quintptr documentId = 0;
 };
 
 struct DocumentSaveResult
@@ -39,6 +40,7 @@ struct DocumentSaveResult
     QString filePath;
     QString errorMessage;
     bool success = false;
+    bool superseded = false;
 };
 
 class DocumentPersistenceService : public QObject
@@ -53,6 +55,7 @@ public:
     bool saveEditorSnapshot(CustomEditor *editor, const QString &filePath, QByteArray *utf8Content, QString *errorMessage) const;
     void loadFileAsync(const DocumentLoadRequest &request);
     void saveFileAsync(const DocumentSaveRequest &request);
+    void waitForPendingSavePath(const QString &filePath);
     QString promptSaveFileName(QWidget *parent) const;
     QString displayNameForSavePrompt(CustomEditor *editor) const;
 

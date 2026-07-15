@@ -29,6 +29,48 @@ bool isMarkdownPath(const QString &filePath)
     return LexerFactory::languageFromFilePath(filePath) == LexerFactory::MARKDOWN;
 }
 
+QHash<void *, quint64> &latestDocumentSaveGenerations()
+{
+    static QHash<void *, quint64> generations;
+    return generations;
+}
+
+quint64 nextDocumentSaveGeneration(void *documentKey)
+{
+    static quint64 nextGeneration = 1;
+    const quint64 generation = nextGeneration++;
+    latestDocumentSaveGenerations().insert(documentKey, generation);
+    return generation;
+}
+
+bool isLatestDocumentSave(void *documentKey, quint64 generation)
+{
+    return documentKey
+           && latestDocumentSaveGenerations().value(documentKey) == generation;
+}
+
+bool hasOutstandingDocumentSave(CustomEditor *editor)
+{
+    if (!editor)
+    {
+        return false;
+    }
+    void *documentKey = editor->SendScintillaPtrResult(QsciScintillaBase::SCI_GETDOCPOINTER);
+    if (!documentKey)
+    {
+        documentKey = editor;
+    }
+    return latestDocumentSaveGenerations().contains(documentKey);
+}
+
+void finishDocumentSave(void *documentKey, quint64 generation)
+{
+    if (isLatestDocumentSave(documentKey, generation))
+    {
+        latestDocumentSaveGenerations().remove(documentKey);
+    }
+}
+
 } // namespace
 
 DocumentController::DocumentController(EditorPane *pane,
@@ -59,6 +101,13 @@ DocumentController::DocumentController(EditorPane *pane,
     {
         createDefaultDocument();
     }
+}
+
+DocumentController::~DocumentController()
+{
+    // Keep the receiver and document-generation bookkeeping alive until every
+    // snapshot submitted by this controller has produced a terminal result.
+    waitForPendingSaves();
 }
 
 CustomEditor *DocumentController::currentEditor() const
@@ -236,17 +285,9 @@ bool DocumentController::saveFile(CustomEditor *editor, const QString &filePath)
         return false;
     }
 
-    if (m_inFlightSavePaths.contains(newFilePath))
-    {
-        // A write to this file is already running; keep only the newest snapshot
-        // and dispatch it when the in-flight save completes, so the two writes
-        // never race on the same file.
-        m_queuedSaves.insert(newFilePath, { editor, filePath, utf8Content, oldFilePath, newFilePath });
-    }
-    else
-    {
-        dispatchAsyncSave(editor, filePath, utf8Content, oldFilePath, newFilePath);
-    }
+    // DocumentPersistenceService owns a process-wide FIFO per destination path,
+    // so saves from either split pane are serialized as well.
+    dispatchAsyncSave(editor, filePath, utf8Content, oldFilePath, newFilePath);
 
     editor->setModified(false);
     emit editorModificationChanged(editor, false);
@@ -266,9 +307,22 @@ void DocumentController::dispatchAsyncSave(CustomEditor *editor,
                                            const QString &newFilePath)
 {
     const quint64 requestId = m_nextAsyncRequestId++;
-    m_pendingSaves.insert(requestId, { editor, oldFilePath, newFilePath });
-    m_inFlightSavePaths.insert(newFilePath);
-    m_persistence->saveFileAsync({ requestId, filePath, utf8Content });
+    void *documentKey = editor->SendScintillaPtrResult(QsciScintillaBase::SCI_GETDOCPOINTER);
+    if (!documentKey)
+    {
+        documentKey = editor;
+    }
+    const quint64 documentGeneration = nextDocumentSaveGeneration(documentKey);
+    m_pendingSaves.insert(requestId, { editor,
+                                       oldFilePath,
+                                       newFilePath,
+                                       utf8Content,
+                                       documentKey,
+                                       documentGeneration });
+    m_persistence->saveFileAsync({ requestId,
+                                   filePath,
+                                   utf8Content,
+                                   reinterpret_cast<quintptr>(documentKey) });
 }
 
 void DocumentController::setSavingTitle(CustomEditor *editor, const QString &filePath)
@@ -357,12 +411,24 @@ void DocumentController::onFileSaved(const DocumentSaveResult &result)
         return;
     }
 
-    m_inFlightSavePaths.remove(pending.newFilePath);
-
     CustomEditor *editor = pending.editor.data();
+    const bool latestForEditor = editor
+                                 && isLatestDocumentSave(pending.documentKey,
+                                                         pending.documentGeneration);
+    finishDocumentSave(pending.documentKey, pending.documentGeneration);
+
+    if (result.superseded)
+    {
+        // A newer snapshot for this shared document/path remains queued. This
+        // request never touched disk and must not affect editor or tab state.
+        return;
+    }
+
     if (!result.success)
     {
-        if (editor && !editor->isModified())
+        // An obsolete failure must not dirty a document after a newer request
+        // has already superseded it.
+        if (latestForEditor && !editor->isModified())
         {
             editor->setModified(true);
             emit editorModificationChanged(editor, true);
@@ -374,7 +440,7 @@ void DocumentController::onFileSaved(const DocumentSaveResult &result)
 
         // Restore the tab title from the transient "(saving)" state so the tab
         // does not stay stuck showing that a save is in progress.
-        if (editor)
+        if (latestForEditor)
         {
             const int index = m_pane->indexOfEditor(editor);
             if (index != -1)
@@ -385,44 +451,30 @@ void DocumentController::onFileSaved(const DocumentSaveResult &result)
             }
         }
 
-        QMessageBox::warning(m_pane, tr("NotePeek"),
-                             tr("Cannot write file %1:\n%2.")
-                             .arg(result.filePath)
-                             .arg(result.errorMessage));
-        dispatchQueuedSave(pending.newFilePath);
+        if (latestForEditor)
+        {
+            QMessageBox::warning(m_pane, tr("NotePeek"),
+                                 tr("Cannot write file %1:\n%2.")
+                                 .arg(result.filePath)
+                                 .arg(result.errorMessage));
+        }
         return;
     }
 
-    if (editor)
+    if (latestForEditor)
     {
+        QByteArray currentContent;
+        QString snapshotError;
+        if (m_persistence->saveEditorSnapshot(editor,
+                                              result.filePath,
+                                              &currentContent,
+                                              &snapshotError)
+            && currentContent == pending.utf8Content)
+        {
+            editor->setModified(false);
+        }
         applySavedFileState(editor, result.filePath, pending.oldFilePath, pending.newFilePath);
     }
-
-    dispatchQueuedSave(pending.newFilePath);
-}
-
-void DocumentController::dispatchQueuedSave(const QString &newFilePath)
-{
-    const auto it = m_queuedSaves.find(newFilePath);
-    if (it == m_queuedSaves.end())
-    {
-        return;
-    }
-
-    const QueuedSave queued = it.value();
-    m_queuedSaves.erase(it);
-
-    CustomEditor *editor = queued.editor.data();
-    if (!editor)
-    {
-        // The document was closed before its coalesced save could run. The
-        // close path (maybeSave/saveEditorForClose) already persisted or
-        // discarded the content synchronously, so there is nothing to write.
-        return;
-    }
-
-    dispatchAsyncSave(editor, queued.filePath, queued.utf8Content, queued.oldFilePath, queued.newFilePath);
-    setSavingTitle(editor, queued.filePath);
 }
 
 bool DocumentController::saveFileSynchronously(CustomEditor *editor, const QString &filePath)
@@ -437,17 +489,30 @@ bool DocumentController::saveFileSynchronously(CustomEditor *editor, const QStri
                                     : QFileInfo(editor->filePath()).absoluteFilePath();
     const QString newFilePath = QFileInfo(filePath).absoluteFilePath();
 
-    // A synchronous write must not race an async write to the same file. Drain
-    // any in-flight/queued async save first so this write is the last one.
-    if (m_inFlightSavePaths.contains(newFilePath) || m_queuedSaves.contains(newFilePath))
+    // Supersede every older async result for this shared Scintilla document,
+    // including requests submitted by the other split pane to another path.
+    void *documentKey = editor->SendScintillaPtrResult(QsciScintillaBase::SCI_GETDOCPOINTER);
+    if (!documentKey)
     {
-        waitForPendingSaves();
+        documentKey = editor;
+    }
+    quint64 documentGeneration = nextDocumentSaveGeneration(documentKey);
+
+    // A synchronous save is the final authority for this document. Drain older
+    // requests for the editor (including Save As to another path), then drain
+    // requests from other panes/windows that target this destination.
+    waitForPendingSaves(editor);
+    m_persistence->waitForPendingSavePath(newFilePath);
+    if (!isLatestDocumentSave(documentKey, documentGeneration))
+    {
+        documentGeneration = nextDocumentSaveGeneration(documentKey);
     }
 
     QString errorMessage;
     QByteArray utf8Content;
     if (!m_persistence->saveEditorSnapshot(editor, filePath, &utf8Content, &errorMessage))
     {
+        finishDocumentSave(documentKey, documentGeneration);
         QMessageBox::warning(m_pane, tr("NotePeek"),
                              tr("Cannot prepare file %1 for saving:\n%2.")
                              .arg(filePath)
@@ -457,6 +522,7 @@ bool DocumentController::saveFileSynchronously(CustomEditor *editor, const QStri
 
     if (!DocumentIO::saveUtf8File(filePath, utf8Content, &errorMessage))
     {
+        finishDocumentSave(documentKey, documentGeneration);
         QMessageBox::warning(m_pane, tr("NotePeek"),
                              tr("Cannot write file %1:\n%2.")
                              .arg(filePath)
@@ -466,6 +532,7 @@ bool DocumentController::saveFileSynchronously(CustomEditor *editor, const QStri
 
     editor->setModified(false);
     applySavedFileState(editor, filePath, oldFilePath, newFilePath);
+    finishDocumentSave(documentKey, documentGeneration);
     return true;
 }
 
@@ -513,7 +580,35 @@ void DocumentController::waitForPendingSaves()
         QEventLoop loop;
         connect(m_persistence, &DocumentPersistenceService::fileSaved,
                 &loop, &QEventLoop::quit);
-        loop.exec();
+        loop.exec(QEventLoop::ExcludeUserInputEvents);
+    }
+}
+
+bool DocumentController::hasPendingSave(CustomEditor *editor) const
+{
+    if (!editor)
+    {
+        return false;
+    }
+
+    for (auto it = m_pendingSaves.cbegin(); it != m_pendingSaves.cend(); ++it)
+    {
+        if (it.value().editor == editor)
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
+void DocumentController::waitForPendingSaves(CustomEditor *editor)
+{
+    while (hasPendingSave(editor))
+    {
+        QEventLoop loop;
+        connect(m_persistence, &DocumentPersistenceService::fileSaved,
+                &loop, &QEventLoop::quit);
+        loop.exec(QEventLoop::ExcludeUserInputEvents);
     }
 }
 
@@ -524,13 +619,17 @@ void DocumentController::requestClose(int index)
     if (!editor)
         return;
 
-    if (editor == m_defaultEditor)
-    {
-        m_defaultEditor = nullptr;
-    }
+    // saveFile() clears the modified flag while its snapshot is in flight.
+    // Wait before deciding whether the document can be closed so failures can
+    // restore the dirty state and be handled by maybeSave().
+    waitForPendingSaves(editor);
 
     if (maybeSave(editor))
     {
+        if (editor == m_defaultEditor)
+        {
+            m_defaultEditor = nullptr;
+        }
         m_pane->removePage(index);
         emit editorClosed(editor);
 
@@ -555,7 +654,13 @@ bool DocumentController::closeFileIfUnmodified(const QString &filePath)
 
     DocumentPage *page = m_pane->pageAt(index);
     CustomEditor *editor = page ? page->editor() : nullptr;
-    if (!editor || editor->isModified())
+    if (!editor)
+    {
+        return false;
+    }
+
+    waitForPendingSaves(editor);
+    if (editor->isModified())
     {
         return false;
     }
@@ -832,7 +937,9 @@ void DocumentController::onEditorModificationChanged()
 
     emit editorModificationChanged(editor, editor->isModified());
 
-    if (!editor->isModified() && !editor->filePath().isEmpty())
+    if (!editor->isModified()
+        && !editor->filePath().isEmpty()
+        && !hasOutstandingDocumentSave(editor))
     {
         m_externalFileWatcher->requestExternalChangeCheck(editor->filePath());
     }
