@@ -31,8 +31,9 @@ public:
     explicit DocumentController(EditorPane *pane,
                                 bool createDefaultWhenEmpty = true,
                                 QObject *parent = nullptr);
+    ~DocumentController() override;
 
-    EditorPane *pane() const { return m_pane; }
+    EditorPane *pane() const { return m_pane.data(); }
     EditorManager *editorManager() const { return m_editorManager; }
     CustomEditor *currentEditor() const;
     void setCreateDefaultWhenEmpty(bool createDefault);
@@ -99,15 +100,9 @@ private:
         QPointer<CustomEditor> editor;
         QString oldFilePath;
         QString newFilePath;
-    };
-
-    struct QueuedSave
-    {
-        QPointer<CustomEditor> editor;
-        QString filePath;
         QByteArray utf8Content;
-        QString oldFilePath;
-        QString newFilePath;
+        void *documentKey = nullptr;
+        quint64 documentGeneration = 0;
     };
 
     void connectEditorSignals(CustomEditor *editor);
@@ -117,8 +112,9 @@ private:
                            const QByteArray &utf8Content,
                            const QString &oldFilePath,
                            const QString &newFilePath);
-    void dispatchQueuedSave(const QString &newFilePath);
     void setSavingTitle(CustomEditor *editor, const QString &filePath);
+    void waitForPendingSaves(CustomEditor *editor);
+    bool hasPendingSave(CustomEditor *editor) const;
     bool saveFileSynchronously(CustomEditor *editor, const QString &filePath);
     void applySavedFileState(CustomEditor *editor,
                              const QString &filePath,
@@ -131,7 +127,7 @@ private:
     void refreshWatchedFiles();
     void recordFileState(const QString &filePath);
 
-    EditorPane *m_pane;
+    QPointer<EditorPane> m_pane;
     EditorManager *m_editorManager;
     DocumentPersistenceService *m_persistence;
     ExternalFileWatcher *m_externalFileWatcher;
@@ -141,12 +137,6 @@ private:
     quint64 m_nextAsyncRequestId = 1;
     QHash<quint64, PendingLoad> m_pendingLoads;
     QHash<quint64, PendingSave> m_pendingSaves;
-    // Writes are coalesced per destination path: at most one async write to a
-    // given file is in flight, and the newest queued snapshot for that path is
-    // dispatched once it completes. This prevents two concurrent writes (rapid
-    // re-saves, or both split panes saving a shared document) from racing.
-    QSet<QString> m_inFlightSavePaths;
-    QHash<QString, QueuedSave> m_queuedSaves;
 };
 
 #endif // DOCUMENTCONTROLLER_H

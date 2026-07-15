@@ -1,10 +1,30 @@
 #include "editor/documentio.h"
 
 #include <QFile>
+#include <QFileInfo>
+#include <QSaveFile>
 #include <QTextStream>
 #if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
 #include <QStringConverter>
 #endif
+
+namespace {
+
+QString resolvedWritePath(const QString &filePath)
+{
+    const QFileInfo info(filePath);
+    if (info.isSymLink())
+    {
+        const QString target = info.canonicalFilePath();
+        if (!target.isEmpty())
+        {
+            return target;
+        }
+    }
+    return filePath;
+}
+
+} // namespace
 
 bool DocumentIO::loadTextFile(const QString &filePath, QString *content, QString *errorMessage)
 {
@@ -34,7 +54,7 @@ bool DocumentIO::loadTextFile(const QString &filePath, QString *content, QString
 
 bool DocumentIO::saveTextFile(const QString &filePath, const QString &content, QString *errorMessage)
 {
-    QFile file(filePath);
+    QSaveFile file(resolvedWritePath(filePath));
     if (!file.open(QFile::WriteOnly | QFile::Text))
     {
         if (errorMessage)
@@ -52,12 +72,21 @@ bool DocumentIO::saveTextFile(const QString &filePath, const QString &content, Q
 #endif
 
     out << content;
+    out.flush();
+    if (out.status() != QTextStream::Ok || !file.commit())
+    {
+        if (errorMessage)
+        {
+            *errorMessage = file.errorString();
+        }
+        return false;
+    }
     return true;
 }
 
 bool DocumentIO::saveUtf8File(const QString &filePath, const QByteArray &content, QString *errorMessage)
 {
-    QFile file(filePath);
+    QSaveFile file(resolvedWritePath(filePath));
     if (!file.open(QFile::WriteOnly))
     {
         if (errorMessage)
@@ -84,5 +113,13 @@ bool DocumentIO::saveUtf8File(const QString &filePath, const QByteArray &content
         remaining -= written;
     }
 
+    if (!file.commit())
+    {
+        if (errorMessage)
+        {
+            *errorMessage = file.errorString();
+        }
+        return false;
+    }
     return true;
 }

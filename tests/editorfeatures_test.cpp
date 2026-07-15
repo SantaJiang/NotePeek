@@ -1,7 +1,11 @@
 #include "editor/customeditor.h"
+#include "editor/documentcontroller.h"
+#include "editor/editorpane.h"
 #include "editor/editormanager.h"
 #include "apppreferences.h"
 
+#include <QFile>
+#include <QTemporaryDir>
 #include <QtTest>
 
 class EditorFeaturesTest : public QObject
@@ -148,6 +152,7 @@ private slots:
         QVERIFY(!editor->indentationGuides());
         QVERIFY(!editor->tabIndents());
         QVERIFY(!editor->backspaceUnindents());
+        QVERIFY(!editor->autoIndent());
         QVERIFY(!editor->documentCompletionEnabled());
         QCOMPARE(editor->autoCompletionSource(), CustomEditor::AcsNone);
     }
@@ -165,6 +170,28 @@ private slots:
 
         editor->toggleCurrentFold();
         QVERIFY(editor->SendScintilla(QsciScintillaBase::SCI_GETFOLDEXPANDED, 0));
+    }
+
+    void closingImmediatelyAfterSaveWaitsForSnapshot()
+    {
+        QTemporaryDir tempDir;
+        QVERIFY(tempDir.isValid());
+        const QString path = tempDir.filePath(QStringLiteral("close-after-save.txt"));
+
+        EditorPane pane;
+        DocumentController controller(&pane, false);
+        controller.createDefaultDocument();
+        CustomEditor *editor = controller.currentEditor();
+        QVERIFY(editor);
+        editor->setText(QStringLiteral("content that must survive closing"));
+
+        QVERIFY(controller.saveFile(editor, path));
+        controller.requestClose(0);
+
+        QCOMPARE(pane.count(), 0);
+        QFile file(path);
+        QVERIFY(file.open(QIODevice::ReadOnly));
+        QCOMPARE(file.readAll(), QByteArray("content that must survive closing"));
     }
 };
 
