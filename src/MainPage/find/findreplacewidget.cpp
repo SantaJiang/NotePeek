@@ -5,6 +5,7 @@
 #include <QEvent>
 #include <QKeyEvent>
 #include <QLineEdit>
+#include <QToolButton>
 #include <QFontDatabase>
 
 FindReplaceWidget::FindReplaceWidget(QWidget *parent)
@@ -26,10 +27,10 @@ FindReplaceWidget::FindReplaceWidget(QWidget *parent)
     }
     ui->buttonClose->setText(QChar(0xf00d));
 
-    connect(ui->buttonFind, &QPushButton::clicked, this, &FindReplaceWidget::onFindClicked);
-    connect(ui->buttonReplace, &QPushButton::clicked, this, &FindReplaceWidget::onReplaceClicked);
-    connect(ui->buttonReplaceAll, &QPushButton::clicked, this, &FindReplaceWidget::onReplaceAllClicked);
-    connect(ui->buttonClose, &QPushButton::clicked, this, &FindReplaceWidget::onCloseClicked);
+    connect(ui->buttonFind, &QToolButton::clicked, this, &FindReplaceWidget::onFindClicked);
+    connect(ui->buttonReplace, &QToolButton::clicked, this, &FindReplaceWidget::onReplaceClicked);
+    connect(ui->buttonReplaceAll, &QToolButton::clicked, this, &FindReplaceWidget::onReplaceAllClicked);
+    connect(ui->buttonClose, &QToolButton::clicked, this, &FindReplaceWidget::onCloseClicked);
 
     connect(ui->comboFind->lineEdit(), &QLineEdit::textChanged, this, &FindReplaceWidget::onFindTextChanged);
     connect(ui->comboReplace->lineEdit(), &QLineEdit::textChanged, this, &FindReplaceWidget::onReplaceTextChanged);
@@ -51,11 +52,46 @@ FindReplaceWidget::~FindReplaceWidget()
 
 void FindReplaceWidget::applyChromeTheme()
 {
-    setStyleSheet(QStringLiteral(
-                      "FindReplaceWidget {"
-                      "  border-top: 1px solid %1;"
-                      "}")
-                      .arg(ThemeColors::EditorTopBar::border().name(QColor::HexRgb)));
+    using namespace ThemeColors::EditorTopBar;
+
+    const QString style = QStringLiteral(
+        "FindReplaceWidget {"
+        "  border-top: 1px solid %1;"
+        "}"
+        "QToolButton#buttonFind,"
+        "QToolButton#buttonReplace,"
+        "QToolButton#buttonReplaceAll,"
+        "QToolButton#buttonClose {"
+        "  background-color: transparent;"
+        "  color: %2;"
+        "  border: 0;"
+        "  padding: 0;"
+        "  margin: 0;"
+        "  border-radius: 4px;"
+        "}"
+        "QToolButton#buttonFind,"
+        "QToolButton#buttonReplace,"
+        "QToolButton#buttonReplaceAll {"
+        "  padding: 0 8px;"
+        "}"
+        "QToolButton#buttonFind:hover,"
+        "QToolButton#buttonReplace:hover,"
+        "QToolButton#buttonReplaceAll:hover,"
+        "QToolButton#buttonClose:hover {"
+        "  background-color: %3;"
+        "}"
+        "QToolButton#buttonFind:pressed,"
+        "QToolButton#buttonReplace:pressed,"
+        "QToolButton#buttonReplaceAll:pressed,"
+        "QToolButton#buttonClose:pressed {"
+        "  background-color: %4;"
+        "}"
+    ).arg(border().name(QColor::HexRgb),
+          ThemeColors::Editor::foreground().name(QColor::HexRgb),
+          hoverBg().name(QColor::HexRgb),
+          pressedBg().name(QColor::HexRgb));
+
+    setStyleSheet(style);
 }
 
 void FindReplaceWidget::changeEvent(QEvent *event)
@@ -132,6 +168,9 @@ void FindReplaceWidget::keyPressEvent(QKeyEvent *event)
             return;
         } else if (ui->comboReplace->hasFocus()) {
             onReplaceClicked();
+            return;
+        } else {
+            onFindClicked();
             return;
         }
     }

@@ -17,7 +17,9 @@
  */
 
 #include "widgets/qscieditorinfostatusbar.h"
+#include "themecolors.h"
 #include <QMainWindow>
+#include <QFrame>
 #include <Qsci/qsciscintilla.h>
 #include <Qsci/qsciscintillabase.h>
 #include <Qsci/qscilexer.h>
@@ -25,17 +27,40 @@
 QsciEditorInfoStatusBar::QsciEditorInfoStatusBar(QMainWindow *window)
     : QStatusBar(window), currentEditor(nullptr)
 {
-    // Set up the status bar
-    docType = new StatusLabel();
+    setAttribute(Qt::WA_StyledBackground, true);
+
+    auto createSeparator = [this]() -> QFrame* {
+        auto *sep = new QFrame(this);
+        sep->setObjectName(QStringLiteral("statusBarSeparator"));
+        sep->setFixedWidth(1);
+        sep->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Expanding);
+        sep->setAttribute(Qt::WA_StyledBackground, true);
+        return sep;
+    };
+
+    auto *leftPadding = new QWidget(this);
+    leftPadding->setFixedWidth(12);
+    addWidget(leftPadding, 0);
+
+    docType = new StatusLabel(120);
     addWidget(docType, 1);
 
-    docSize = new StatusLabel(250);
-    addPermanentWidget(docSize, 0);
+    addPermanentWidget(createSeparator(), 0);
 
-    docPos = new StatusLabel(250);
+    docPos = new StatusLabel(270);
+    docPos->setContentsMargins(6, 0, 6, 0);
     addPermanentWidget(docPos, 0);
 
-    eolFormat = new StatusLabel(150);
+    addPermanentWidget(createSeparator(), 0);
+
+    docSize = new StatusLabel(215);
+    docSize->setContentsMargins(6, 0, 6, 0);
+    addPermanentWidget(docSize, 0);
+
+    addPermanentWidget(createSeparator(), 0);
+
+    eolFormat = new StatusLabel(165);
+    eolFormat->setContentsMargins(6, 0, 6, 0);
     addPermanentWidget(eolFormat, 0);
     eolFormat->setContextMenuPolicy(Qt::CustomContextMenu);
     connect(eolFormat, &StatusLabel::customContextMenuRequested, this, [=](const QPoint &pos)
@@ -43,14 +68,22 @@ QsciEditorInfoStatusBar::QsciEditorInfoStatusBar(QMainWindow *window)
         emit customContextMenuRequestedForEOLLabel(eolFormat->mapToGlobal(pos));
     });
 
-    unicodeType = new StatusLabel(125);
+    addPermanentWidget(createSeparator(), 0);
+
+    unicodeType = new StatusLabel(60);
+    unicodeType->setContentsMargins(6, 0, 6, 0);
     addPermanentWidget(unicodeType, 0);
 
-    overType = new StatusLabel(35);
-    addPermanentWidget(overType, 0);
+    addPermanentWidget(createSeparator(), 0);
 
-    // Connect overType click to toggle overtype mode
+    overType = new StatusLabel(45);
+    overType->setContentsMargins(6, 0, 6, 0);
+    addPermanentWidget(overType, 0);
+    overType->setAlignment(Qt::AlignCenter);
+
     connect(qobject_cast<StatusLabel*>(overType), &StatusLabel::clicked, this, &QsciEditorInfoStatusBar::toggleOvertypeMode);
+
+    applyChromeTheme();
 }
 
 void QsciEditorInfoStatusBar::refresh(QsciScintilla *editor)
@@ -117,6 +150,34 @@ void QsciEditorInfoStatusBar::toggleOvertypeMode()
     {
         currentEditor->setOverwriteMode(!currentEditor->overwriteMode());
         updateOverType(currentEditor);
+    }
+}
+
+void QsciEditorInfoStatusBar::applyChromeTheme()
+{
+    using namespace ThemeColors::EditorTopBar;
+
+    setStyleSheet(QStringLiteral(
+        "QStatusBar {"
+        "  background-color: %1;"
+        "  border-top: 1px solid %2;"
+        "}"
+        "QStatusBar::item { border: none; }"
+        "QFrame#statusBarSeparator {"
+        "  background-color: %2;"
+        "  border: none;"
+        "}"
+    ).arg(background().name(QColor::HexRgb),
+          border().name(QColor::HexRgb)));
+}
+
+void QsciEditorInfoStatusBar::changeEvent(QEvent *event)
+{
+    QStatusBar::changeEvent(event);
+
+    if (event->type() == QEvent::PaletteChange)
+    {
+        applyChromeTheme();
     }
 }
 
