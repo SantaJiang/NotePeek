@@ -167,6 +167,26 @@ Searched entire document.</source>
         <translation>侧边预览</translation>
     </message>
     <message>
+        <source>Code Folding</source>
+        <translation>代码折叠</translation>
+    </message>
+    <message>
+        <source>Fold/Unfold Current Block</source>
+        <translation>折叠/展开当前代码块</translation>
+    </message>
+    <message>
+        <source>Fold/Unfold All</source>
+        <translation>折叠/展开全部</translation>
+    </message>
+    <message>
+        <source>Go to Matching Bracket</source>
+        <translation>跳转到匹配括号</translation>
+    </message>
+    <message>
+        <source>Complete Word</source>
+        <translation>补全单词</translation>
+    </message>
+    <message>
         <location filename="../src/MainPage/mainwindow.ui" line="75"/>
         <source>File</source>
         <translation>文件</translation>
@@ -461,6 +481,42 @@ Do you want to save your changes?</source>
     <message>
         <source>Open with side preview</source>
         <translation>打开时显示侧边预览</translation>
+    </message>
+    <message>
+        <source>Code Editing</source>
+        <translation>代码编辑</translation>
+    </message>
+    <message>
+        <source>Folding</source>
+        <translation>代码折叠</translation>
+    </message>
+    <message>
+        <source>Show folding controls</source>
+        <translation>显示折叠控件</translation>
+    </message>
+    <message>
+        <source>Brackets</source>
+        <translation>括号</translation>
+    </message>
+    <message>
+        <source>Match and auto-close brackets</source>
+        <translation>匹配并自动闭合括号</translation>
+    </message>
+    <message>
+        <source>Indentation</source>
+        <translation>缩进</translation>
+    </message>
+    <message>
+        <source>Indent guides and smart Tab/Backspace</source>
+        <translation>缩进参考线和智能 Tab/退格</translation>
+    </message>
+    <message>
+        <source>Completion</source>
+        <translation>补全</translation>
+    </message>
+    <message>
+        <source>Suggest words from the current document</source>
+        <translation>提示当前文档中的单词</translation>
     </message>
 </context>
 <context>

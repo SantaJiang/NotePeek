@@ -439,13 +439,17 @@ void MainWindow::on_action_preferences_triggered()
 
 void MainWindow::applyPreferences()
 {
-    // Fonts apply live to every open editor in both panes (including editors
-    // hidden behind a Markdown preview), then previews re-render with the new
-    // fonts.  The file-tree preference intentionally only affects the next
-    // launch, and the Markdown default-view preference only affects files
-    // opened afterwards, so neither is touched here.
+    // Fonts and code-editing features apply live to every open editor in both
+    // panes, then visible Markdown previews re-render with the new fonts.  The
+    // file-tree setting applies at next launch and the Markdown default applies
+    // to files opened afterwards, as before.
     m_editorCoordinator->applyFontPreferencesToEditors();
+    m_editorCoordinator->applyCodeFeaturePreferencesToEditors();
     m_editorCoordinator->refreshVisibleMarkdownPreviews();
+    if (CustomEditor *editor = activeController()->currentEditor())
+    {
+        updateEditActions(editor->hasSelectedText());
+    }
 }
 
 void MainWindow::on_action_undo_triggered()
@@ -504,6 +508,38 @@ void MainWindow::on_action_find_triggered()
     else
     {
         ui->widget_findreplace->showWithInitialText(selectedText);
+    }
+}
+
+void MainWindow::on_action_foldCurrentBlock_triggered()
+{
+    if (CustomEditor *editor = activeController()->currentEditor())
+    {
+        editor->toggleCurrentFold();
+    }
+}
+
+void MainWindow::on_action_toggleAllFolds_triggered()
+{
+    if (CustomEditor *editor = activeController()->currentEditor())
+    {
+        editor->toggleAllFolds();
+    }
+}
+
+void MainWindow::on_action_goToMatchingBrace_triggered()
+{
+    if (CustomEditor *editor = activeController()->currentEditor())
+    {
+        editor->goToMatchingBrace();
+    }
+}
+
+void MainWindow::on_action_completeWord_triggered()
+{
+    if (CustomEditor *editor = activeController()->currentEditor())
+    {
+        editor->completeWordFromDocument();
     }
 }
 
@@ -614,18 +650,27 @@ void MainWindow::openFileInNewWindow(const QString &filePath)
 void MainWindow::updateEditActions(bool available)
 {
     DocumentController *controller = activeController();
+    CustomEditor *editor = controller->currentEditor();
     // In Markdown preview-only mode the source editor is hidden; actions that
     // would edit or search it are disabled so they cannot act on unseen text.
     // Copy stays governed by `available`, which already reflects a preview
     // selection, so text can still be copied out of the preview.
-    const bool sourceEditable = controller->currentEditor() != nullptr
+    const bool sourceEditable = editor != nullptr
                                 && !controller->pane()->isCurrentEditorHidden();
+    const bool codeEditable = sourceEditable && editor->codeEditingFeaturesEnabled();
+    const bool foldingAvailable = codeEditable
+                                  && editor->folding() != CustomEditor::NoFoldStyle;
     ui->action_cut->setEnabled(sourceEditable && available);
     ui->action_copy->setEnabled(available);
     ui->action_paste->setEnabled(sourceEditable);
     ui->action_undo->setEnabled(sourceEditable);
     ui->action_redo->setEnabled(sourceEditable);
     ui->action_find->setEnabled(sourceEditable);
+    ui->action_foldCurrentBlock->setEnabled(foldingAvailable);
+    ui->action_toggleAllFolds->setEnabled(foldingAvailable);
+    ui->menuCodeFolding->setEnabled(foldingAvailable);
+    ui->action_goToMatchingBrace->setEnabled(codeEditable && editor->bracketAssistanceEnabled());
+    ui->action_completeWord->setEnabled(codeEditable && editor->documentCompletionEnabled());
 }
 
 void MainWindow::updateWindowTitle(bool modified)

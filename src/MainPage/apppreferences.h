@@ -6,10 +6,9 @@
 
 // Application-wide user preferences, persisted across restarts via QSettings.
 //
-// Exposes two editor fonts (a "text" font used for prose files and a "code"
-// font used for source files), the startup visibility of the file-tree dock,
-// and the default view mode for Markdown files.  A single shared instance is
-// used everywhere; call load() once at startup and save() after mutating.
+// Stores editor fonts, startup/view preferences and code-editing feature
+// switches.  A single shared instance is used everywhere; call load() once at
+// startup and save() after mutating.
 class AppPreferences
 {
 public:
@@ -40,6 +39,15 @@ public:
     bool markdownDefaultPreview() const { return m_markdownDefaultPreview; }
     void setMarkdownDefaultPreview(bool preview) { m_markdownDefaultPreview = preview; }
 
+    bool codeFoldingEnabled() const { return m_codeFoldingEnabled; }
+    void setCodeFoldingEnabled(bool enabled) { m_codeFoldingEnabled = enabled; }
+    bool bracketAssistanceEnabled() const { return m_bracketAssistanceEnabled; }
+    void setBracketAssistanceEnabled(bool enabled) { m_bracketAssistanceEnabled = enabled; }
+    bool smartIndentationEnabled() const { return m_smartIndentationEnabled; }
+    void setSmartIndentationEnabled(bool enabled) { m_smartIndentationEnabled = enabled; }
+    bool documentCompletionEnabled() const { return m_documentCompletionEnabled; }
+    void setDocumentCompletionEnabled(bool enabled) { m_documentCompletionEnabled = enabled; }
+
     // Sensible cross-platform defaults, honouring the fonts bundled with the
     // application (Source Code Pro, Fira Code) before falling back to a
     // platform monospace family.
@@ -58,6 +66,10 @@ private:
     int m_codeFontSize;
     bool m_showFileTreeOnStartup;
     bool m_markdownDefaultPreview;
+    bool m_codeFoldingEnabled;
+    bool m_bracketAssistanceEnabled;
+    bool m_smartIndentationEnabled;
+    bool m_documentCompletionEnabled;
 };
 
 #endif // APPPREFERENCES_H

@@ -377,16 +377,18 @@ void EditorManager::forgetEditor(CustomEditor *editor)
 void EditorManager::setupEditor(CustomEditor *editor)
 {
     // Basic editor setup
-    editor->setMargins(1);
+    editor->setMargins(2);
     editor->setMarginType(0, CustomEditor::NumberMargin);
     editor->setMarginWidth(0, 0);
+    editor->setFolding(CustomEditor::NoFoldStyle, 1);
     // Start with the minimum scroll width so an empty document shows no horizontal
     // scrollbar; with width tracking enabled it grows as the content widens
     editor->setScrollWidth(1);
     editor->setScrollWidthTracking(true);
     editor->setTabWidth(4);
+    editor->setIndentationWidth(4);
     editor->setCaretLineVisible(true);
-    editor->setBraceMatching(CustomEditor::SloppyBraceMatch);
+    editor->setBraceMatching(CustomEditor::NoBraceMatch);
     editor->setWrapMode(CustomEditor::WrapNone);
 
     // Set UTF-8 encoding
@@ -540,11 +542,55 @@ void EditorManager::applyDisplayPolicy(CustomEditor *editor, const QString &file
 
     const LexerFactory::Language lang = LexerFactory::languageFromFilePath(filePath);
     const bool softWrap = shouldUseSoftWrap(filePath, lang);
+    const bool codeFeatures = editor->lexer() && !softWrap;
+    const AppPreferences &prefs = AppPreferences::instance();
+    // QsciLexerCustom subclasses style their text themselves and do not
+    // produce Scintilla fold levels unless they implement that explicitly.
+    const bool foldingAvailable = codeFeatures && editor->lexer()->lexer()
+                                  && prefs.codeFoldingEnabled();
+    editor->setCodeEditingFeaturesEnabled(codeFeatures);
+    editor->setBracketAssistanceEnabled(codeFeatures && prefs.bracketAssistanceEnabled());
+    editor->setDocumentCompletionEnabled(codeFeatures && prefs.documentCompletionEnabled());
+    editor->setBraceMatching(codeFeatures && prefs.bracketAssistanceEnabled()
+                                 ? CustomEditor::SloppyBraceMatch
+                                 : CustomEditor::NoBraceMatch);
     editor->setWrapMode(softWrap ? CustomEditor::WrapWord : CustomEditor::WrapNone);
+    editor->setFolding(foldingAvailable ? CustomEditor::BoxedTreeFoldStyle
+                                        : CustomEditor::NoFoldStyle,
+                       1);
+    const bool smartIndentation = codeFeatures && prefs.smartIndentationEnabled();
+    editor->setIndentationGuides(smartIndentation);
+    editor->setTabIndents(smartIndentation);
+    editor->setBackspaceUnindents(smartIndentation);
+    const bool documentCompletion = codeFeatures && prefs.documentCompletionEnabled();
+    if (!documentCompletion && editor->isListActive())
+        editor->cancelList();
+    editor->setAutoCompletionSource(documentCompletion ? CustomEditor::AcsDocument
+                                                        : CustomEditor::AcsNone);
+    editor->setAutoCompletionThreshold(documentCompletion ? 3 : -1);
+    editor->setAutoCompletionUseSingle(CustomEditor::AcusNever);
     editor->setMarginWidth(0, softWrap ? 0 : 30);
     if (!softWrap)
     {
         updateLineNumberMarginWidth(editor);
+    }
+}
+
+void EditorManager::applyCodeFeaturePreferences()
+{
+    for (auto &editorPtr : m_editors)
+    {
+        if (!editorPtr)
+            continue;
+
+        CustomEditor *editor = editorPtr;
+        if (!AppPreferences::instance().codeFoldingEnabled()
+            && editor->folding() != CustomEditor::NoFoldStyle)
+        {
+            editor->clearFolds();
+        }
+        applyDisplayPolicy(editor, editor->filePath());
+        applyEditorColors(editor);
     }
 }
 
@@ -656,6 +702,16 @@ void EditorManager::applyEditorColors(CustomEditor *editor)
     // works for SC_MARGIN_COLOUR type margins.
     editor->setMarginsBackgroundColor(marginBg());
     editor->setMarginsForegroundColor(marginFg());
+    editor->setFoldMarginColors(marginBg(), marginBg());
+    editor->setIndentationGuidesBackgroundColor(background());
+    editor->setIndentationGuidesForegroundColor(indentGuide());
+    for (int marker = QsciScintillaBase::SC_MARKNUM_FOLDEREND;
+         marker <= QsciScintillaBase::SC_MARKNUM_FOLDEROPEN;
+         ++marker)
+    {
+        editor->setMarkerForegroundColor(marginBg(), marker);
+        editor->setMarkerBackgroundColor(foldMarker(), marker);
+    }
     editor->setCaretForegroundColor(caretFg());
     editor->SendScintilla(QsciScintillaBase::SCI_SETADDITIONALCARETFORE,
                           toScintillaColor(caretFg()));
