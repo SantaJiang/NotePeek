@@ -7,6 +7,8 @@
 #include <QFontDatabase>
 #include <QEvent>
 #include <QFileOpenEvent>
+#include <QCommandLineOption>
+#include <QCommandLineParser>
 
 class MacFileOpenEventFilter : public QObject
 {
@@ -51,6 +53,19 @@ int main(int argc, char *argv[])
     QCoreApplication::setOrganizationName("NotePeek");
     QCoreApplication::setApplicationName("NotePeek");
     QCoreApplication::setApplicationVersion(APP_VERSION);
+
+    QCommandLineParser commandLine;
+    commandLine.setApplicationDescription(QStringLiteral("A modern code and text editor"));
+    commandLine.addHelpOption();
+    commandLine.addVersionOption();
+    const QCommandLineOption singleFileWindowOption(
+        QStringLiteral("single-file-window"),
+        QStringLiteral("Open the requested files in a window without split controls."));
+    commandLine.addOption(singleFileWindowOption);
+    commandLine.addPositionalArgument(QStringLiteral("files"),
+                                      QStringLiteral("Files to open."),
+                                      QStringLiteral("[files...]"));
+    commandLine.process(a);
 
     //style
 #ifdef Q_OS_WIN
@@ -101,7 +116,9 @@ int main(int argc, char *argv[])
     // validation sees the bundled families.
     AppPreferences::instance().load();
 
-    MainWindow w;
+    MainWindow w(nullptr,
+                 commandLine.positionalArguments(),
+                 commandLine.isSet(singleFileWindowOption));
     MacFileOpenEventFilter fileOpenEventFilter(&w, &a);
     a.installEventFilter(&fileOpenEventFilter);
     w.show();

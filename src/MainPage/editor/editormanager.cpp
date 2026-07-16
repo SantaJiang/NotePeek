@@ -290,6 +290,7 @@ CustomEditor *EditorManager::createEditorSharingDocument(CustomEditor *sourceEdi
 
     CustomEditor *editor = createEditor(name.isEmpty() ? sourceEditor->windowTitle() : name);
     editor->setDocument(sourceEditor->document());
+    editor->shareDocumentSessionFrom(sourceEditor);
     editor->setFilePath(sourceEditor->filePath());
     updateEditorSyntax(editor, sourceEditor->filePath());
     updateLineNumberMarginWidth(editor);
@@ -319,16 +320,17 @@ CustomEditor *EditorManager::createEditorForFile(const QString &filePath, bool t
     if (isLargeFile)
     {
         editor->setLexer(nullptr);
-        editor->setEolMode(CustomEditor::EolWindows);
         editor->setWrapMode(CustomEditor::WrapNone);
         editor->setMarginWidth(1, 0);
         editor->setUpdatesEnabled(false);
 
-        qint64 fileSize = fileInfo.size();
-        if (fileSize > 0 && fileSize < std::numeric_limits<unsigned long>::max() - 1000)
+        const qint64 fileSize = fileInfo.size();
+        const quint64 allocationSize = static_cast<quint64>(fileSize) + 1000U;
+        if (fileSize > 0
+            && allocationSize <= std::numeric_limits<unsigned long>::max())
         {
             editor->SendScintilla(QsciScintillaBase::SCI_ALLOCATE,
-                                  static_cast<unsigned long>(fileSize + 1000));
+                                  static_cast<unsigned long>(allocationSize));
         }
 
         editor->setUpdatesEnabled(true);
@@ -707,7 +709,7 @@ void EditorManager::applyEditorColors(CustomEditor *editor)
     editor->setIndentationGuidesBackgroundColor(background());
     editor->setIndentationGuidesForegroundColor(indentGuide());
     for (int marker = QsciScintillaBase::SC_MARKNUM_FOLDEREND;
-         marker <= QsciScintillaBase::SC_MARKNUM_FOLDEROPEN;
+         marker <= static_cast<int>(QsciScintillaBase::SC_MARKNUM_FOLDEROPEN);
          ++marker)
     {
         editor->setMarkerForegroundColor(marginBg(), marker);

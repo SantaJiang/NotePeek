@@ -1,5 +1,6 @@
 #include "tool/markdown/markdownpreviewer.h"
 #include "apppreferences.h"
+#include "editor/documentpath.h"
 #include "themecolors.h"
 
 #include <QByteArray>
@@ -13,6 +14,7 @@
 #include <QRegularExpression>
 #include <QSet>
 #include <QFutureWatcher>
+#include <QThreadPool>
 #include <QUuid>
 #include <QUrl>
 #include <QtConcurrent>
@@ -28,6 +30,8 @@ extern "C" {
 }
 
 namespace {
+
+constexpr qsizetype MaximumPreviewResourceSize = 8 * 1024 * 1024;
 
 enum class MarkdownRenderMode
 {
@@ -231,7 +235,6 @@ QString markdownToHtmlBody(const QString &markdown, QVector<int> *sourceLines)
     ensureCmarkExtensionsRegistered();
 
     const int options = CMARK_OPT_SOURCEPOS
-                        | CMARK_OPT_UNSAFE
                         | CMARK_OPT_TABLE_PREFER_STYLE_ATTRIBUTES
                         | CMARK_OPT_STRIKETHROUGH_DOUBLE_TILDE;
     cmark_parser *parser = cmark_parser_new(options);
@@ -296,30 +299,21 @@ QByteArray loadDataUrl(const QUrl &url)
 
     const QString meta = data.left(comma);
     const QByteArray payload = data.mid(comma + 1).toUtf8();
+    if (payload.size() > MaximumPreviewResourceSize * 2)
+        return {};
     if (meta.contains(QStringLiteral(";base64"), Qt::CaseInsensitive))
     {
-        return QByteArray::fromBase64(payload);
+        const QByteArray decoded = QByteArray::fromBase64(payload);
+        return decoded.size() <= MaximumPreviewResourceSize ? decoded : QByteArray();
     }
 
-    return QUrl::fromPercentEncoding(payload).toUtf8();
+    const QByteArray decoded = QByteArray::fromPercentEncoding(payload);
+    return decoded.size() <= MaximumPreviewResourceSize ? decoded : QByteArray();
 }
 
 bool isInsideDirectory(const QString &filePath, const QString &rootPath)
 {
-    if (rootPath.isEmpty())
-    {
-        return false;
-    }
-
-    const QString canonicalFile = QFileInfo(filePath).canonicalFilePath();
-    const QString canonicalRoot = QDir(rootPath).canonicalPath();
-    if (canonicalFile.isEmpty() || canonicalRoot.isEmpty())
-    {
-        return false;
-    }
-
-    return canonicalFile == canonicalRoot
-           || canonicalFile.startsWith(canonicalRoot + QLatin1Char('/'));
+    return DocumentPath::isInsideDirectory(filePath, rootPath);
 }
 
 QByteArray loadPreviewResource(const QUrl &url, const QString &rootPath)
@@ -345,15 +339,21 @@ QByteArray loadPreviewResource(const QUrl &url, const QString &rootPath)
     {
         return {};
     }
+    if (file.size() < 0 || file.size() > MaximumPreviewResourceSize)
+        return {};
 
-    return file.readAll();
+    const QByteArray content = file.read(MaximumPreviewResourceSize + 1);
+    return content.size() <= MaximumPreviewResourceSize ? content : QByteArray();
 }
 
 } // namespace
 
 MarkdownPreviewer::MarkdownPreviewer(QObject *parent)
     : QObject(parent)
+    , m_renderPool(new QThreadPool(this))
 {
+    m_renderPool->setMaxThreadCount(1);
+    m_renderPool->setExpiryTimeout(30000);
 }
 
 bool MarkdownPreviewer::isMarkdownFile(const QString &filePath) const
@@ -401,7 +401,14 @@ QLiteHtmlWidget *MarkdownPreviewer::createPreviewWidget(const QString &markdown,
             return;
         }
 
-        QDesktopServices::openUrl(url);
+        const QString scheme = url.scheme().toLower();
+        if (url.isLocalFile()
+            || scheme == QLatin1String("http")
+            || scheme == QLatin1String("https")
+            || scheme == QLatin1String("mailto"))
+        {
+            QDesktopServices::openUrl(url);
+        }
     });
     updatePreview(preview, markdown, filePath);
     return preview;
@@ -443,20 +450,64 @@ void MarkdownPreviewer::applyRenderedPreview(QLiteHtmlWidget *preview, const Mar
     preview->viewport()->setAutoFillBackground(true);
 }
 
-quint64 MarkdownPreviewer::renderPreviewAsync(const QString &markdown, const QString &filePath)
+quint64 MarkdownPreviewer::renderPreviewAsync(const QString &markdown,
+                                               const QString &filePath,
+                                               QObject *requestOwner)
 {
     const quint64 requestId = m_nextRequestId++;
+    QObject *owner = requestOwner ? requestOwner : this;
+    const quintptr ownerKey = reinterpret_cast<quintptr>(owner);
+    const PendingRender render{owner, requestId, markdown, filePath};
+    if (m_renderActive)
+    {
+        if (!m_pendingRenders.contains(ownerKey))
+            m_pendingOrder.enqueue(ownerKey);
+        m_pendingRenders.insert(ownerKey, render);
+        return requestId;
+    }
+
+    startAsyncRender(render);
+    return requestId;
+}
+
+void MarkdownPreviewer::startAsyncRender(const PendingRender &render)
+{
+    m_renderActive = true;
     const MarkdownRenderStyle style = captureMarkdownRenderStyle(MarkdownRenderMode::Screen);
+    const quint64 requestId = render.requestId;
+    const QString markdown = render.markdown;
+    const QString filePath = render.filePath;
     auto *watcher = new QFutureWatcher<MarkdownRenderResult>(this);
     connect(watcher, &QFutureWatcher<MarkdownRenderResult>::finished, this, [this, watcher]() {
         const MarkdownRenderResult result = watcher->result();
         watcher->deleteLater();
+        // Keep the active flag set while notifying consumers. A consumer may
+        // request another render from its slot; that request must join the
+        // coalescing queue instead of starting a second concurrent worker.
         emit previewRendered(result);
+        m_renderActive = false;
+        startNextPendingRender();
     });
-    watcher->setFuture(QtConcurrent::run([requestId, markdown, filePath, style]() {
-        return renderMarkdownDocumentWithStyle(requestId, markdown, filePath, style);
+    watcher->setFuture(QtConcurrent::run(m_renderPool, [requestId, markdown, filePath, style]() {
+        return renderMarkdownDocumentWithStyle(requestId,
+                                               markdown,
+                                               filePath,
+                                               style);
     }));
-    return requestId;
+}
+
+void MarkdownPreviewer::startNextPendingRender()
+{
+    while (!m_pendingOrder.isEmpty())
+    {
+        const quintptr ownerKey = m_pendingOrder.dequeue();
+        const PendingRender render = m_pendingRenders.take(ownerKey);
+        if (render.owner)
+        {
+            startAsyncRender(render);
+            return;
+        }
+    }
 }
 
 bool MarkdownPreviewer::exportToPdf(const QString &markdown, const QString &filePath, const QString &outputPath)

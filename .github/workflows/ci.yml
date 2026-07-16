@@ -1,0 +1,55 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  build-and-test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-2022, macos-14]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: jurplel/install-qt-action@v4
+        with:
+          version: '6.8.3'
+          cache: true
+      - uses: seanmiddleditch/gha-setup-ninja@v5
+      - name: Configure
+        run: >-
+          cmake -S . -B build-ci -G Ninja
+          -DCMAKE_BUILD_TYPE=Release
+          -DNOTEPEEK_WARNINGS_AS_ERRORS=ON
+      - name: Build
+        run: cmake --build build-ci --parallel 2
+      - name: Test
+        run: ctest --test-dir build-ci --output-on-failure
+      - name: Install smoke test
+        run: cmake --install build-ci --prefix "${{ runner.temp }}/notepeek-install"
+      - name: Verify installed artifacts
+        run: python scripts/verify_install.py "${{ runner.temp }}/notepeek-install"
+
+  sanitizers:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: jurplel/install-qt-action@v4
+        with:
+          version: '6.8.3'
+          cache: true
+      - uses: seanmiddleditch/gha-setup-ninja@v5
+      - name: Configure sanitizers
+        run: >-
+          cmake -S . -B build-sanitizers -G Ninja
+          -DCMAKE_BUILD_TYPE=Debug
+          -DNOTEPEEK_ENABLE_SANITIZERS=ON
+      - name: Build
+        run: cmake --build build-sanitizers --parallel 2
+      - name: Test
+        env:
+          ASAN_OPTIONS: detect_leaks=1
+          QT_QPA_PLATFORM: offscreen
+        run: ctest --test-dir build-sanitizers --output-on-failure -LE performance

@@ -16,18 +16,18 @@
 - **File‑system browser** – Integrated directory tree (dock) for quick file opening
 
 ### 🎨 Markdown & Preview
-- **Live Markdown preview** – Real‑time rendering of `.md` files using the embedded md4c parser
+- **Live Markdown preview** – Real‑time rendering of `.md` files using the embedded cmark-gfm parser
 - **Side‑by‑side view** – Edit Markdown on the left, see formatted output on the right
 
 ### 🌍 Cross‑Platform
-- **Native look & feel** – Fusion style on macOS/Linux, Windows Vista style on Windows
+- **Consistent look & feel** – Fusion style on macOS, Windows, and Linux
 - **High‑DPI support** – Automatically adapts to Retina and Hi‑DPI displays
 - **System integration** – macOS: double‑click files in Finder; Windows: Start‑menu shortcut; Linux: desktop entry & AppStream metadata
 - **Internationalization** – Built‑in translation system (Chinese included)
 
 ### 📦 Packaging & Deployment
 - **Single‑click installers** – DMG for macOS, NSIS for Windows, DEB/RPM for Linux
-- **Bundled dependencies** – QScintilla and md4c are embedded, no external runtime required
+- **Bundled dependencies** – QScintilla, cmark-gfm, and qlitehtml are embedded
 - **Direct‑install script** – Quick `/usr/local` installation on Linux without a package manager
 
 ## 📋 Supported Languages
@@ -54,7 +54,7 @@ NotePeek’s syntax highlighting covers **50+ languages and file formats** via i
 
 ### Prerequisites
 
-- **Qt** 5.15+ or Qt 6.2+ (with components: Widgets, PrintSupport, Svg, LinguistTools)
+- **Qt** 5.15+ or Qt 6.2+ (with components: Widgets, PrintSupport, Svg, Concurrent, LinguistTools)
 - **CMake** 3.16+
 - **C++17** compiler (GCC/Clang/MSVC)
 - **Optional for packaging**:
@@ -103,6 +103,7 @@ sudo env PREFIX=/usr/local ./deploy/linux/uninstall.sh
 NotePeek/
 ├── CMakeLists.txt              # Root CMake + CPack configuration
 ├── LICENSE                     # GPL‑3.0‑or‑later
+├── THIRD_PARTY_NOTICES.md      # Bundled dependency versions and licenses
 ├── README.md                   # This file
 ├── i18n/                       # Translation files (notepeek_zh_CN.ts)
 ├── deploy/                     # Platform‑specific deployment assets
@@ -117,7 +118,8 @@ NotePeek/
 └── src/                        # Source code
     ├── CMakeLists.txt          # Sub‑directory aggregation
     ├── QScintilla/             # Embedded QScintilla library
-    ├── third_party/md4c/       # Embedded md4c Markdown parser
+    ├── third_party/cmark-gfm/  # Embedded GitHub-Flavored Markdown parser
+    ├── third_party/qlitehtml/  # Embedded HTML preview widget
     └── MainPage/               # Main application
         ├── CMakeLists.txt      # Build, link, package, deploy
         ├── main.cpp            # Entry point (high‑DPI, style, translation, font)

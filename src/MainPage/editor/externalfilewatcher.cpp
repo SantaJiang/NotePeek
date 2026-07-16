@@ -1,13 +1,17 @@
 #include "editor/externalfilewatcher.h"
 
 #include "editor/performanceconstants.h"
+#include "editor/documentpath.h"
 
 #include <QCryptographicHash>
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
 #include <QFileSystemWatcher>
+#include <QFutureWatcher>
 #include <QTimer>
+#include <QThreadPool>
+#include <QtConcurrent>
 
 namespace {
 
@@ -33,7 +37,9 @@ ExternalFileWatcher::ExternalFileWatcher(QObject *parent)
     : QObject(parent)
     , m_fileWatcher(new QFileSystemWatcher(this))
     , m_changeCheckTimer(new QTimer(this))
+    , m_hashPool(new QThreadPool(this))
 {
+    m_hashPool->setMaxThreadCount(1);
     m_changeCheckTimer->setSingleShot(true);
     connect(m_fileWatcher, &QFileSystemWatcher::fileChanged,
             this, &ExternalFileWatcher::watchedFileChanged);
@@ -43,18 +49,15 @@ ExternalFileWatcher::ExternalFileWatcher(QObject *parent)
         const QSet<QString> pending = m_pendingChangeChecks;
         m_pendingChangeChecks.clear();
         for (const QString &normalizedPath : pending)
-        {
-            if (hasFileStateChanged(normalizedPath))
-            {
-                emit externalFileChanged(normalizedPath);
-            }
-        }
+            checkFileStateAsync(normalizedPath);
         refreshWatchedFiles();
     });
 }
 
-void ExternalFileWatcher::setTrackedFilePaths(const QSet<QString> &filePaths)
+void ExternalFileWatcher::setTrackedFilePaths(QObject *owner, const QSet<QString> &filePaths)
 {
+    if (!owner)
+        return;
     QSet<QString> normalizedPaths;
     for (const QString &filePath : filePaths)
     {
@@ -65,8 +68,25 @@ void ExternalFileWatcher::setTrackedFilePaths(const QSet<QString> &filePaths)
         }
     }
 
-    m_trackedFilePaths = normalizedPaths;
+    const bool firstRegistration = !m_pathsByOwner.contains(owner);
+    m_pathsByOwner.insert(owner, normalizedPaths);
+    if (firstRegistration)
+    {
+        connect(owner, &QObject::destroyed, this, [this, owner]() {
+            m_pathsByOwner.remove(owner);
+            rebuildTrackedFilePaths();
+            refreshWatchedFiles();
+        });
+    }
+    rebuildTrackedFilePaths();
     refreshWatchedFiles();
+}
+
+void ExternalFileWatcher::rebuildTrackedFilePaths()
+{
+    m_trackedFilePaths.clear();
+    for (auto it = m_pathsByOwner.cbegin(); it != m_pathsByOwner.cend(); ++it)
+        m_trackedFilePaths.unite(it.value());
 }
 
 void ExternalFileWatcher::recordFileState(const QString &filePath)
@@ -84,12 +104,10 @@ void ExternalFileWatcher::recordFileState(const QString &filePath)
     {
         state.lastModified = fileInfo.lastModified();
         state.size = fileInfo.size();
-        if (state.size <= PerformanceConstants::LargeFileSize)
-        {
-            state.contentHash = fileContentHash(normalizedPath);
-        }
     }
     m_fileStates.insert(normalizedPath, state);
+    if (state.exists && state.size <= PerformanceConstants::LargeFileSize)
+        startBaselineHash(normalizedPath, state);
 }
 
 void ExternalFileWatcher::refreshWatchedFiles()
@@ -182,21 +200,34 @@ void ExternalFileWatcher::watchedDirectoryChanged(const QString &directoryPath)
 
 QString ExternalFileWatcher::normalizedFilePath(const QString &filePath) const
 {
-    if (filePath.isEmpty())
-    {
-        return QString();
-    }
-
-    return QDir::cleanPath(QFileInfo(filePath).absoluteFilePath());
+    return DocumentPath::normalized(filePath);
 }
 
-bool ExternalFileWatcher::hasFileStateChanged(const QString &filePath) const
+void ExternalFileWatcher::startBaselineHash(const QString &filePath,
+                                            const WatchedFileState &expectedState)
+{
+    auto *watcher = new QFutureWatcher<QByteArray>(this);
+    connect(watcher, &QFutureWatcher<QByteArray>::finished, this,
+            [this, watcher, filePath, expectedState]() {
+        const QByteArray hash = watcher->result();
+        watcher->deleteLater();
+        auto it = m_fileStates.find(filePath);
+        if (it != m_fileStates.end()
+            && it->exists == expectedState.exists
+            && it->size == expectedState.size
+            && it->lastModified == expectedState.lastModified)
+        {
+            it->contentHash = hash;
+        }
+    });
+    watcher->setFuture(QtConcurrent::run(m_hashPool, [filePath]() { return fileContentHash(filePath); }));
+}
+
+void ExternalFileWatcher::checkFileStateAsync(const QString &filePath)
 {
     const QString normalizedPath = normalizedFilePath(filePath);
     if (normalizedPath.isEmpty() || !m_trackedFilePaths.contains(normalizedPath))
-    {
-        return false;
-    }
+        return;
 
     const QFileInfo fileInfo(normalizedPath);
     WatchedFileState newState;
@@ -212,13 +243,39 @@ bool ExternalFileWatcher::hasFileStateChanged(const QString &filePath) const
         || oldState.lastModified != newState.lastModified
         || oldState.size != newState.size)
     {
-        return true;
+        emit externalFileChanged(normalizedPath);
+        return;
     }
 
     if (!newState.exists || oldState.contentHash.isEmpty() || newState.size > PerformanceConstants::LargeFileSize)
+        return;
+    if (m_hashChecksInFlight.contains(normalizedPath))
     {
-        return false;
+        m_hashRecheckRequested.insert(normalizedPath);
+        return;
     }
 
-    return oldState.contentHash != fileContentHash(normalizedPath);
+    m_hashChecksInFlight.insert(normalizedPath);
+    auto *watcher = new QFutureWatcher<QByteArray>(this);
+    connect(watcher, &QFutureWatcher<QByteArray>::finished, this,
+            [this, watcher, normalizedPath, expectedHash = oldState.contentHash]() {
+        const QByteArray currentHash = watcher->result();
+        watcher->deleteLater();
+        m_hashChecksInFlight.remove(normalizedPath);
+        const bool recheckRequested = m_hashRecheckRequested.remove(normalizedPath);
+        const WatchedFileState currentBaseline = m_fileStates.value(normalizedPath);
+        if (!currentHash.isEmpty() && currentHash != expectedHash
+            && currentBaseline.contentHash == expectedHash
+            && m_trackedFilePaths.contains(normalizedPath))
+        {
+            emit externalFileChanged(normalizedPath);
+        }
+        else if (recheckRequested && m_trackedFilePaths.contains(normalizedPath))
+        {
+            checkFileStateAsync(normalizedPath);
+        }
+    });
+    watcher->setFuture(QtConcurrent::run(m_hashPool, [normalizedPath]() {
+        return fileContentHash(normalizedPath);
+    }));
 }

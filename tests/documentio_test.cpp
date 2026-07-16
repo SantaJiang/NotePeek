@@ -1,5 +1,7 @@
 #include "editor/documentio.h"
 #include "editor/documentpersistenceservice.h"
+#include "editor/documentpath.h"
+#include "editor/documentsavecoordinator.h"
 
 #include <QDir>
 #include <QFileInfo>
@@ -41,14 +43,128 @@ private slots:
         QCOMPARE(file.readAll(), bytes);
     }
 
+    void preservesEncodingAndLineEndings()
+    {
+        QTemporaryDir tempDir;
+        QVERIFY(tempDir.isValid());
+
+        const QList<DocumentEncoding> encodings = {
+            DocumentEncoding::Utf8,
+            DocumentEncoding::Utf8Bom,
+            DocumentEncoding::Utf16LittleEndian,
+            DocumentEncoding::Utf16BigEndian
+        };
+        for (DocumentEncoding encoding : encodings)
+        {
+            const QString path = tempDir.filePath(QStringLiteral("format-%1.txt").arg(int(encoding)));
+            const DocumentFormat expected{encoding, DocumentLineEnding::CrLf};
+            QString error;
+            QVERIFY2(DocumentIO::saveTextFile(path,
+                                              QStringLiteral("alpha\n中文😀\n"),
+                                              expected,
+                                              &error),
+                     qPrintable(error));
+
+            QString content;
+            DocumentFormat actual;
+            QVERIFY2(DocumentIO::loadTextFile(path, &content, &actual, &error), qPrintable(error));
+            QCOMPARE(content, QStringLiteral("alpha\n中文😀\n"));
+            QCOMPARE(actual.encoding, expected.encoding);
+            QCOMPARE(actual.lineEnding, expected.lineEnding);
+        }
+    }
+
+    void rejectsInvalidTextInsteadOfReplacingBytes()
+    {
+        QTemporaryDir tempDir;
+        QVERIFY(tempDir.isValid());
+        const QString path = tempDir.filePath(QStringLiteral("invalid.txt"));
+        QFile file(path);
+        QVERIFY(file.open(QIODevice::WriteOnly));
+        QCOMPARE(file.write(QByteArray("valid\xffinvalid", 13)), qint64(13));
+        file.close();
+
+        QString content;
+        QString error;
+        QVERIFY(!DocumentIO::loadTextFile(path, &content, &error));
+        QVERIFY(!error.isEmpty());
+    }
+
+    void rejectsMalformedUtf16Surrogates()
+    {
+        QString content;
+        DocumentFormat format;
+        QString error;
+        const QByteArray loneHighSurrogate("\xff\xfe\x00\xd8\x41\x00", 6);
+        QVERIFY(!DocumentFormatCodec::decode(loneHighSurrogate,
+                                             &content,
+                                             &format,
+                                             &error));
+        QVERIFY(!error.isEmpty());
+
+        error.clear();
+        const QByteArray loneLowSurrogate("\xfe\xff\xdc\x00", 4);
+        QVERIFY(!DocumentFormatCodec::decode(loneLowSurrogate,
+                                             &content,
+                                             &format,
+                                             &error));
+        QVERIFY(!error.isEmpty());
+    }
+
+    void usesNativeLineEndingWhenTheFileHasNoNewline()
+    {
+        QString content;
+        DocumentFormat format;
+        QString error;
+        QVERIFY2(DocumentFormatCodec::decode(QByteArray("one line"),
+                                             &content,
+                                             &format,
+                                             &error),
+                 qPrintable(error));
+        QCOMPARE(format.lineEnding, DocumentFormatCodec::defaultFormat().lineEnding);
+    }
+
+    void normalizesEquivalentPaths()
+    {
+        QTemporaryDir tempDir;
+        QVERIFY(tempDir.isValid());
+        const QString path = tempDir.filePath(QStringLiteral("note.txt"));
+        QFile file(path);
+        QVERIFY(file.open(QIODevice::WriteOnly));
+        file.close();
+
+        QVERIFY(DocumentPath::equivalent(path,
+                                         tempDir.path() + QStringLiteral("/folder/../note.txt")));
+        QVERIFY(DocumentPath::isInsideDirectory(path, tempDir.path()));
+    }
+
+    void loadsNormalizedUtf8ForTheEditor()
+    {
+        QTemporaryDir tempDir;
+        QVERIFY(tempDir.isValid());
+        const QString path = tempDir.filePath(QStringLiteral("editor.txt"));
+        QFile file(path);
+        QVERIFY(file.open(QIODevice::WriteOnly));
+        QCOMPARE(file.write("alpha\r\nbeta\r\n"), qint64(13));
+        file.close();
+
+        QByteArray content;
+        DocumentFormat format;
+        QString error;
+        QVERIFY2(DocumentIO::loadEditorFile(path, &content, &format, &error), qPrintable(error));
+        QCOMPARE(content, QByteArray("alpha\nbeta\n"));
+        QCOMPARE(format.lineEnding, DocumentLineEnding::CrLf);
+    }
+
     void asyncSavesAreFifoAcrossServices()
     {
         QTemporaryDir tempDir;
         QVERIFY(tempDir.isValid());
 
         const QString path = tempDir.filePath(QStringLiteral("shared.txt"));
-        DocumentPersistenceService leftService;
-        DocumentPersistenceService rightService;
+        DocumentSaveCoordinator coordinator;
+        DocumentPersistenceService leftService(&coordinator);
+        DocumentPersistenceService rightService(&coordinator);
         QVector<quint64> completionOrder;
 
         connect(&leftService, &DocumentPersistenceService::fileSaved,
@@ -106,7 +222,8 @@ private slots:
         QVERIFY(tempDir.isValid());
         const QString path = tempDir.filePath(QStringLiteral("coalesced.txt"));
 
-        DocumentPersistenceService service;
+        DocumentSaveCoordinator coordinator;
+        DocumentPersistenceService service(&coordinator);
         QHash<quint64, bool> completions;
         connect(&service, &DocumentPersistenceService::fileSaved,
                 this, [&completions](const DocumentSaveResult &result) {

@@ -1,23 +1,19 @@
 #include "editor/documentregistry.h"
 
 #include "editor/customeditor.h"
+#include "editor/documentpath.h"
 
 #include <QDir>
 #include <QFileInfo>
 
 QString DocumentRegistry::normalizedFilePath(const QString &filePath)
 {
-    if (filePath.isEmpty())
-    {
-        return QString();
-    }
-
-    return QDir::cleanPath(QFileInfo(filePath).absoluteFilePath());
+    return DocumentPath::normalized(filePath);
 }
 
 CustomEditor *DocumentRegistry::findEditorByFilePath(const QList<CustomEditor *> &editors, const QString &filePath)
 {
-    const QString normalizedPath = normalizedFilePath(filePath);
+    const QString normalizedPath = DocumentPath::identityKey(filePath);
     if (normalizedPath.isEmpty())
     {
         return nullptr;
@@ -25,7 +21,7 @@ CustomEditor *DocumentRegistry::findEditorByFilePath(const QList<CustomEditor *>
 
     for (CustomEditor *editor : editors)
     {
-        if (editor && normalizedFilePath(editor->filePath()) == normalizedPath)
+        if (editor && DocumentPath::identityKey(editor->filePath()) == normalizedPath)
         {
             return editor;
         }
@@ -50,7 +46,7 @@ QSet<QString> DocumentRegistry::trackedFilePaths(const QList<CustomEditor *> &ed
 
 bool DocumentRegistry::hasModifiedEditorForFile(const QList<CustomEditor *> &editors, const QString &filePath)
 {
-    const QString normalizedPath = normalizedFilePath(filePath);
+    const QString normalizedPath = DocumentPath::identityKey(filePath);
     if (normalizedPath.isEmpty())
     {
         return false;
@@ -58,7 +54,7 @@ bool DocumentRegistry::hasModifiedEditorForFile(const QList<CustomEditor *> &edi
 
     for (CustomEditor *editor : editors)
     {
-        if (editor && normalizedFilePath(editor->filePath()) == normalizedPath && editor->isModified())
+        if (editor && DocumentPath::identityKey(editor->filePath()) == normalizedPath && editor->isModified())
         {
             return true;
         }

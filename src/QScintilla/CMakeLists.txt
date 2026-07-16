@@ -1,6 +1,10 @@
 file(GLOB QSCINTILLA_SOURCES_TOP CONFIGURE_DEPENDS
     ${CMAKE_CURRENT_SOURCE_DIR}/*.cpp
 )
+
+# Keep the bundled library's own version independent from the NotePeek release
+# version. The public ABI number remains QScintilla's SOVERSION 15.
+set(NOTEPEEK_QSCINTILLA_VERSION 2.14.1)
 file(GLOB QSCINTILLA_LEXERS CONFIGURE_DEPENDS
     ${CMAKE_CURRENT_SOURCE_DIR}/scintilla/lexers/*.cpp
 )
@@ -88,7 +92,7 @@ endif()
 set_target_properties(qscintilla2 PROPERTIES
     CXX_VISIBILITY_PRESET hidden
     VISIBILITY_INLINES_HIDDEN ON
-    VERSION ${PROJECT_VERSION}
+    VERSION ${NOTEPEEK_QSCINTILLA_VERSION}
     SOVERSION 15
     MACOSX_RPATH ON
     INSTALL_NAME_DIR "@rpath"
@@ -104,6 +108,13 @@ if(APPLE)
         LIBRARY DESTINATION notepeek.app/Contents/Frameworks
         RUNTIME DESTINATION notepeek.app/Contents/MacOS
         ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    )
+elseif(UNIX)
+    install(TARGETS qscintilla2
+        EXPORT NotePeekTargets
+        LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}/notepeek
+        RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+        ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}/notepeek
     )
 else()
     install(TARGETS qscintilla2

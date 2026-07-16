@@ -6,6 +6,7 @@
 namespace PerformanceConstants {
 
 constexpr qint64 LargeFileSize = 10 * 1024 * 1024;
+constexpr qint64 MaximumEditableFileSize = 256LL * 1024 * 1024;
 constexpr int MarkdownPreviewDelayMs = 220;
 constexpr int MarkdownLargePreviewLimit = 2 * 1024 * 1024;
 constexpr int WatcherDirectoryDebounceMs = 250;

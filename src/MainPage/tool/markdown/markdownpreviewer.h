@@ -2,11 +2,15 @@
 #define MARKDOWNPREVIEWER_H
 
 #include <QObject>
+#include <QHash>
+#include <QPointer>
+#include <QQueue>
 #include <QString>
 #include <QVector>
 
 class QWidget;
 class QLiteHtmlWidget;
+class QThreadPool;
 
 namespace MarkdownPreviewLayout {
 inline constexpr int ScreenHorizontalMargin = 34;
@@ -35,7 +39,9 @@ public:
     // must match it against the id carried by previewRendered() so that stale
     // results, and results belonging to other pages sharing this previewer, are
     // discarded.
-    quint64 renderPreviewAsync(const QString &markdown, const QString &filePath);
+    quint64 renderPreviewAsync(const QString &markdown,
+                               const QString &filePath,
+                               QObject *requestOwner = nullptr);
     void showPreview(const QString &markdown, const QString &filePath, QWidget *parent);
     bool exportToPdf(const QString &markdown, const QString &filePath, const QString &outputPath);
 
@@ -51,10 +57,24 @@ private:
 
     MarkdownRenderResult renderMarkdownDocument(quint64 requestId, const QString &markdown, const QString &filePath, RenderMode mode) const;
     QString buildHtmlDocument(const QString &bodyHtml, RenderMode mode) const;
+    struct PendingRender
+    {
+        QPointer<QObject> owner;
+        quint64 requestId = 0;
+        QString markdown;
+        QString filePath;
+    };
+
+    void startAsyncRender(const PendingRender &render);
+    void startNextPendingRender();
 
     // Request ids are handed out from this single shared previewer so they are
     // unique across every page/pane; per-page counters would collide.
     quint64 m_nextRequestId = 1;
+    QThreadPool *m_renderPool;
+    bool m_renderActive = false;
+    QHash<quintptr, PendingRender> m_pendingRenders;
+    QQueue<quintptr> m_pendingOrder;
 };
 
 #endif // MARKDOWNPREVIEWER_H

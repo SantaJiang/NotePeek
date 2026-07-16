@@ -1,5 +1,6 @@
 #include "widgets/fileexplorerdock.h"
 
+#include "editor/documentpath.h"
 #include "themecolors.h"
 #include "widgets/filetreeview.h"
 #include "widgets/filetypefilterproxymodel.h"
@@ -20,15 +21,7 @@ namespace {
 
 QString normalizedAbsolutePath(const QString &path)
 {
-    if (path.isEmpty())
-    {
-        return QString();
-    }
-
-    const QFileInfo info(path);
-    const QString canonicalPath = info.canonicalFilePath();
-    const QString absolutePath = canonicalPath.isEmpty() ? info.absoluteFilePath() : canonicalPath;
-    return QDir::cleanPath(absolutePath);
+    return DocumentPath::normalized(path);
 }
 
 QFont compactTreeFont()
