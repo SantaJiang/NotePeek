@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.16)
 
 project(NotePeek
-    VERSION 1.3.1
+    VERSION 1.3.2
     DESCRIPTION "A modern code/text editor"
     HOMEPAGE_URL "https://github.com/SantaSpeeds/NotePeek"
     LANGUAGES C CXX
@@ -12,6 +12,28 @@ set(NOTEPEEK_APP_ID "com.santa.notepeek" CACHE STRING "Reverse-DNS application i
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
+option(NOTEPEEK_WARNINGS_AS_ERRORS "Treat NotePeek source warnings as errors" OFF)
+option(NOTEPEEK_ENABLE_SANITIZERS "Enable AddressSanitizer and UndefinedBehaviorSanitizer" OFF)
+
+function(notepeek_configure_project_target target)
+    if(MSVC)
+        target_compile_options(${target} PRIVATE /W4 /permissive-)
+        if(NOTEPEEK_WARNINGS_AS_ERRORS)
+            target_compile_options(${target} PRIVATE /WX)
+        endif()
+    elseif(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
+        target_compile_options(${target} PRIVATE -Wall -Wextra -Wpedantic)
+        if(NOTEPEEK_WARNINGS_AS_ERRORS)
+            target_compile_options(${target} PRIVATE -Werror)
+        endif()
+        if(NOTEPEEK_ENABLE_SANITIZERS)
+            target_compile_options(${target} PRIVATE -fsanitize=address,undefined -fno-omit-frame-pointer)
+            target_link_options(${target} PRIVATE -fsanitize=address,undefined)
+        endif()
+    endif()
+endfunction()
 
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTOUIC ON)

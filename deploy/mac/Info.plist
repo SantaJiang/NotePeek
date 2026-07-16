@@ -11,13 +11,15 @@
     <key>CFBundleIconFile</key>
     <string>notepeek.icns</string>
     <key>CFBundleIdentifier</key>
-    <string>com.santa.notepeek</string>
+    <string>${NOTEPEEK_APP_ID}</string>
     <key>CFBundleName</key>
-    <string>NotePeek</string>
+    <string>${MACOSX_BUNDLE_BUNDLE_NAME}</string>
+    <key>CFBundleShortVersionString</key>
+    <string>${MACOSX_BUNDLE_SHORT_VERSION_STRING}</string>
+    <key>CFBundleVersion</key>
+    <string>${MACOSX_BUNDLE_BUNDLE_VERSION}</string>
     <key>CFBundlePackageType</key>
     <string>APPL</string>
-    <key>CFBundleSignature</key>
-    <string>????</string>
     <key>LSMinimumSystemVersion</key>
     <string>13.0</string>
     <key>NSPrincipalClass</key>

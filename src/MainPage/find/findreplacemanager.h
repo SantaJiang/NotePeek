@@ -9,6 +9,7 @@
 
 class CustomEditor;
 class HighlightedScrollBarDecorator;
+class QTimer;
 
 class FindReplaceManager : public QObject
 {
@@ -22,7 +23,7 @@ public:
     };
 
     explicit FindReplaceManager(QObject *parent = nullptr);
-    ~FindReplaceManager();
+    ~FindReplaceManager() override = default;
 
     void setCurrentEditor(CustomEditor *editor);
 
@@ -75,6 +76,7 @@ private:
     bool m_backwards;
     int m_highlightIndicator;
     QList<SearchResult> m_searchResults;
+    QTimer *m_highlightTimer;
 };
 
 #endif // FINDREPLACEMANAGER_H

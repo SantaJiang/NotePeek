@@ -1,6 +1,7 @@
 #include "widgets/filetypefilterproxymodel.h"
 
 #include "editor/performanceconstants.h"
+#include "editor/documentpath.h"
 #include "editor/supportedfilepolicy.h"
 
 #include <QDir>
@@ -12,29 +13,12 @@ namespace {
 
 QString normalizedAbsolutePath(const QString &path)
 {
-    if (path.isEmpty())
-    {
-        return QString();
-    }
-
-    const QFileInfo info(path);
-    return QDir::cleanPath(info.absoluteFilePath());
+    return DocumentPath::normalized(path);
 }
 
 bool isPathInsideDirectory(const QString &path, const QString &directory)
 {
-    const QString normalizedPath = normalizedAbsolutePath(path);
-    const QString normalizedDirectory = normalizedAbsolutePath(directory);
-    if (normalizedPath.isEmpty() || normalizedDirectory.isEmpty())
-    {
-        return false;
-    }
-
-    const QString relativePath = QDir(normalizedDirectory).relativeFilePath(normalizedPath);
-    return relativePath == "."
-           || (!relativePath.startsWith("../")
-               && relativePath != ".."
-               && !QDir::isAbsolutePath(relativePath));
+    return DocumentPath::isInsideDirectory(path, directory);
 }
 
 bool isAncestorOfPath(const QString &candidateAncestor, const QString &path)

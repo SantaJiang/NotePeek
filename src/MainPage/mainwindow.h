@@ -3,6 +3,7 @@
 
 #include <QMainWindow>
 #include <QString>
+#include <QStringList>
 #include "find/findreplacemanager.h"
 #include "tool/cpp/headersourcemanager.h"
 #include "tool/markdown/markdownpreviewer.h"
@@ -13,6 +14,8 @@ class MainWindow;
 }
 
 class DocumentController;
+class DocumentSaveCoordinator;
+class ExternalFileWatcher;
 class FileExplorerDock;
 class SplitEditorCoordinator;
 
@@ -21,7 +24,9 @@ class MainWindow : public QMainWindow
     Q_OBJECT
 
 public:
-    explicit MainWindow(QWidget *parent = nullptr);
+    explicit MainWindow(QWidget *parent = nullptr,
+                        const QStringList &initialFiles = {},
+                        bool singleFileWindow = false);
     ~MainWindow();
 
     void openFileByArg(const QString &fileName);
@@ -79,6 +84,8 @@ private:
 
     Ui::MainWindow *ui;
     FileExplorerDock *m_fileExplorerDock;
+    DocumentSaveCoordinator *m_saveCoordinator;
+    ExternalFileWatcher *m_externalFileWatcher;
     DocumentController *m_leftController;
     DocumentController *m_rightController;
     SplitEditorCoordinator *m_editorCoordinator;

@@ -5,12 +5,10 @@ PREFIX="${PREFIX:-/usr/local}"
 
 files=(
     "$PREFIX/bin/notepeek"
-    "$PREFIX/lib/libqscintilla2.so"
-    "$PREFIX/lib/libqscintilla2.so.15"
-    "$PREFIX/lib/libqscintilla2.so.1.0.0"
     "$PREFIX/share/applications/notepeek.desktop"
     "$PREFIX/share/metainfo/notepeek.appdata.xml"
     "$PREFIX/share/icons/hicolor/scalable/apps/notepeek.svg"
+    "$PREFIX/share/notepeek/THIRD_PARTY_NOTICES.md"
 )
 
 for file in "${files[@]}"; do
@@ -19,6 +17,19 @@ for file in "${files[@]}"; do
         echo "Removed $file"
     fi
 done
+
+for library_dir in "$PREFIX/lib/notepeek" "$PREFIX/lib64/notepeek"; do
+    if [ -d "$library_dir" ]; then
+        while IFS= read -r -d '' file; do
+            rm -f "$file"
+            echo "Removed $file"
+        done < <(find "$library_dir" -maxdepth 1 \( -type f -o -type l \) \
+            -name 'libqscintilla2.so*' -print0)
+    fi
+done
+
+rmdir "$PREFIX/lib/notepeek" "$PREFIX/lib64/notepeek" \
+    "$PREFIX/share/notepeek" 2>/dev/null || true
 
 if command -v gtk-update-icon-cache >/dev/null 2>&1; then
     gtk-update-icon-cache -f "$PREFIX/share/icons/hicolor" >/dev/null 2>&1 || true

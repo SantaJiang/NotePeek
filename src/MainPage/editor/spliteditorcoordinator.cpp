@@ -2,9 +2,12 @@
 
 #include "editor/customeditor.h"
 #include "editor/documentcontroller.h"
+#include "editor/documentpath.h"
 #include "editor/editormanager.h"
 #include "editor/filesavedialog.h"
 #include "editor/editorpane.h"
+#include "editor/externalfilewatcher.h"
+#include "editor/performanceconstants.h"
 
 #include <QFileInfo>
 #include <QHash>
@@ -19,6 +22,7 @@ SplitEditorCoordinator::SplitEditorCoordinator(DocumentController *leftControlle
                                                DocumentController *rightController,
                                                QSplitter *splitter,
                                                bool singleFileWindow,
+                                               ExternalFileWatcher *externalFileWatcher,
                                                QObject *parent)
     : QObject(parent)
     , m_leftController(leftController)
@@ -31,6 +35,13 @@ SplitEditorCoordinator::SplitEditorCoordinator(DocumentController *leftControlle
 {
     connectController(m_leftController);
     connectController(m_rightController);
+    if (externalFileWatcher)
+    {
+        connect(externalFileWatcher, &ExternalFileWatcher::externalFileChanged,
+                this, [this](const QString &filePath) {
+            reloadExternallyChangedFile(nullptr, filePath);
+        });
+    }
     setSplitViewEnabled(false);
 }
 
@@ -377,7 +388,8 @@ void SplitEditorCoordinator::syncRenamedFileToOtherPanes(DocumentController *sou
         {
             controller->openFile(newFilePath, false);
         }
-        if (!oldFilePath.isEmpty() && oldFilePath != newFilePath)
+        if (!oldFilePath.isEmpty()
+            && !DocumentPath::equivalent(oldFilePath, newFilePath))
         {
             controller->closeFileIfUnmodified(oldFilePath);
         }
@@ -389,25 +401,46 @@ void SplitEditorCoordinator::reloadExternallyChangedFile(DocumentController *sou
     if (m_syncingEditorPanes || filePath.isEmpty())
         return;
 
+    const QFileInfo info(filePath);
+    const bool deleted = !info.exists() || !info.isFile();
+    const bool tooLargeToReload = !deleted
+                                  && info.size() > PerformanceConstants::MaximumEditableFileSize;
+    bool modified = false;
     for (DocumentController *controller : controllers())
     {
         if (controller->hasModifiedEditorForFile(filePath))
         {
-            return;
+            modified = true;
+            break;
         }
     }
 
+    if (deleted || modified || tooLargeToReload)
+    {
+        for (DocumentController *controller : controllers())
+            controller->markExternalConflict(filePath, deleted);
+        emit externalFileConflict(filePath, deleted);
+        return;
+    }
+
     QScopedValueRollback<bool> syncing(m_syncingEditorPanes, true);
+    bool reloaded = false;
     if (source)
     {
-        source->reloadFileFromDiskIfUnmodified(filePath);
+        reloaded = source->reloadFileFromDiskIfUnmodified(filePath);
     }
     for (DocumentController *controller : controllers())
     {
         if (controller != source)
         {
-            controller->reloadFileFromDiskIfUnmodified(filePath);
+            reloaded = controller->reloadFileFromDiskIfUnmodified(filePath) || reloaded;
         }
+    }
+    if (!reloaded)
+    {
+        for (DocumentController *controller : controllers())
+            controller->markExternalConflict(filePath, false);
+        emit externalFileConflict(filePath, false);
     }
 }
 

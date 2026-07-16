@@ -19,7 +19,10 @@
 #include <QSplitter>
 #include "editor/customeditor.h"
 #include "editor/documentcontroller.h"
+#include "editor/documentpath.h"
+#include "editor/documentsavecoordinator.h"
 #include "editor/editorpane.h"
+#include "editor/externalfilewatcher.h"
 #include "editor/spliteditorcoordinator.h"
 #include "widgets/fileexplorerdock.h"
 
@@ -27,31 +30,12 @@ namespace {
 
 QString normalizedAbsolutePath(const QString &path)
 {
-    if (path.isEmpty())
-    {
-        return QString();
-    }
-
-    const QFileInfo info(path);
-    const QString canonicalPath = info.canonicalFilePath();
-    const QString absolutePath = canonicalPath.isEmpty() ? info.absoluteFilePath() : canonicalPath;
-    return QDir::cleanPath(absolutePath);
+    return DocumentPath::normalized(path);
 }
 
 bool isPathInsideDirectory(const QString &path, const QString &directory)
 {
-    const QString normalizedPath = normalizedAbsolutePath(path);
-    const QString normalizedDirectory = normalizedAbsolutePath(directory);
-    if (normalizedPath.isEmpty() || normalizedDirectory.isEmpty())
-    {
-        return false;
-    }
-
-    const QString relativePath = QDir(normalizedDirectory).relativeFilePath(normalizedPath);
-    return relativePath == "."
-           || (!relativePath.startsWith("../")
-               && relativePath != ".."
-               && !QDir::isAbsolutePath(relativePath));
+    return DocumentPath::isInsideDirectory(path, directory);
 }
 
 void applyEditorSplitterStyle(QSplitter *splitter)
@@ -97,10 +81,14 @@ void applyMainWindowSeparatorStyle(QMainWindow *window)
 
 } // namespace
 
-MainWindow::MainWindow(QWidget *parent)
+MainWindow::MainWindow(QWidget *parent,
+                       const QStringList &initialFiles,
+                       bool singleFileWindow)
     : QMainWindow(parent)
     , ui(new Ui::MainWindow)
     , m_fileExplorerDock(nullptr)
+    , m_saveCoordinator(new DocumentSaveCoordinator(this))
+    , m_externalFileWatcher(new ExternalFileWatcher(this))
     , m_leftController(nullptr)
     , m_rightController(nullptr)
     , m_editorCoordinator(nullptr)
@@ -113,25 +101,20 @@ MainWindow::MainWindow(QWidget *parent)
     ui->setupUi(this);
     setAcceptDrops(false); // Drag and drop is handled by the editors.
 
-    // Command line: any argument not starting with '-' is a file to open.
-    const QStringList args = QCoreApplication::arguments();
-    bool hasFileArg = false;
-    QString filePath;
-    m_singleFileWindow = args.contains(QStringLiteral("--single-file-window"));
-
-    for (int i = 1; i < args.size(); ++i)
-    {
-        if (!args[i].startsWith("-"))
-        {
-            filePath = args[i];
-            hasFileArg = true;
-            break;
-        }
-    }
+    const bool hasFileArg = !initialFiles.isEmpty();
+    m_singleFileWindow = singleFileWindow;
 
     // A default blank document only makes sense when no file was requested.
-    m_leftController = new DocumentController(ui->editorPane, !hasFileArg, this);
-    m_rightController = new DocumentController(ui->editorPaneRight, false, this);
+    m_leftController = new DocumentController(ui->editorPane,
+                                              !hasFileArg,
+                                              m_saveCoordinator,
+                                              m_externalFileWatcher,
+                                              this);
+    m_rightController = new DocumentController(ui->editorPaneRight,
+                                               false,
+                                               m_saveCoordinator,
+                                               m_externalFileWatcher,
+                                               this);
 
     // Both panes need the previewer so the "open Markdown in preview" preference
     // can render on open.
@@ -172,6 +155,7 @@ MainWindow::MainWindow(QWidget *parent)
                                                      m_rightController,
                                                      ui->editorSplitter,
                                                      m_singleFileWindow,
+                                                     m_externalFileWatcher,
                                                      this);
     connect(m_editorCoordinator, &SplitEditorCoordinator::activeControllerChanged,
             this, &MainWindow::applyActiveController);
@@ -192,6 +176,21 @@ MainWindow::MainWindow(QWidget *parent)
     connect(m_editorCoordinator, &SplitEditorCoordinator::filesDropped,
             this, [this](DocumentController *, const QList<QUrl> &urls) {
                 onFileDraged(urls);
+            });
+    connect(m_editorCoordinator, &SplitEditorCoordinator::externalFileConflict,
+            this, [this](const QString &filePath, bool deleted) {
+                auto *message = new QMessageBox(QMessageBox::Warning,
+                                                tr("External File Conflict"),
+                                                deleted
+                                                    ? tr("%1 was deleted outside NotePeek. The in-memory copy was kept and marked modified.")
+                                                          .arg(filePath)
+                                                    : tr("%1 changed outside NotePeek and could not be reloaded safely. Review the in-memory copy before overwriting it.")
+                                                          .arg(filePath),
+                                                QMessageBox::Ok,
+                                                this);
+                message->setAttribute(Qt::WA_DeleteOnClose);
+                message->setModal(false);
+                message->show();
             });
     applyActiveController(m_leftController);
     if (m_singleFileWindow)
@@ -221,9 +220,10 @@ MainWindow::MainWindow(QWidget *parent)
     updateEditActions(false);
     updateToolActions();
 
-    if (hasFileArg && !filePath.isEmpty())
+    for (const QString &filePath : initialFiles)
     {
-        openFileByArg(filePath);
+        if (!filePath.isEmpty())
+            openFileByArg(filePath);
     }
 
     // Listen for system theme changes (light ↔ dark) at runtime.
@@ -244,6 +244,15 @@ MainWindow::MainWindow(QWidget *parent)
 
 MainWindow::~MainWindow()
 {
+    // Controllers may synchronously drain background saves in their
+    // destructors. Destroy them while their panes and the shared save
+    // coordinator are still alive, independent of QObject child-list order.
+    delete m_editorCoordinator;
+    m_editorCoordinator = nullptr;
+    delete m_leftController;
+    m_leftController = nullptr;
+    delete m_rightController;
+    m_rightController = nullptr;
     delete ui;
 }
 

@@ -20,13 +20,14 @@ NotePeek/
 ```text
 main.cpp
   -> MainWindow
+      -> DocumentSaveCoordinator (application-scoped save ordering/state)
+      -> ExternalFileWatcher (application-scoped watched-path union)
       -> FileExplorerDock
       -> DocumentController (left)  ──┐
       -> DocumentController (right) ──┤ each drives one EditorPane
       -> SplitEditorCoordinator     ──┘ and owns:
           (synchronizes the two        -> EditorManager
            controllers/panes)          -> DocumentPersistenceService
-                                       -> ExternalFileWatcher
       -> FindReplaceManager
       -> HeaderSourceManager
       -> MarkdownPreviewer
@@ -51,7 +52,19 @@ Pure view of one editor pane: the tab stack of document pages, the file combo bo
 
 ### `editor/DocumentController`
 
-Drives the document lifecycle of one pane: open/save/save-as/close workflows with save prompts, the default blank document policy, shared documents for split view, reloading externally changed files, and file-watcher bookkeeping. It owns `EditorManager`, `DocumentPersistenceService`, and `ExternalFileWatcher`, and emits all document-level signals (`fileOpened`, `currentFileChanged`, `modificationChanged`, ...).
+Drives the document lifecycle of one pane: open/save/save-as/close workflows with save prompts, the default blank document policy, shared documents for split view, reloading externally changed files, and file-watcher registration. It owns `EditorManager` and a per-controller `DocumentPersistenceService`; save ordering and file watching are injected application-scoped services.
+
+### `editor/DocumentSession`
+
+Shared metadata for views backed by the same Scintilla document. It carries the detected encoding/EOL format, persistence state, and external-conflict state so split panes cannot disagree about document safety.
+
+### `editor/DocumentSaveCoordinator`
+
+Application-scoped FIFO and generation tracker. It serializes writes per normalized destination, coalesces obsolete snapshots, and replaces process-lifetime static state.
+
+### `editor/DocumentPath` and `editor/DocumentFormat`
+
+`DocumentPath` is the single file-identity policy, including canonical-parent handling for files that do not exist yet and Windows case folding. `DocumentFormat` strictly validates UTF-8/BOM-marked UTF-16 and preserves uniform line endings; mixed endings are normalized to LF on save.
 
 ### `editor/EditorManager`
 
@@ -63,7 +76,7 @@ Wraps document load/save operations and save-file naming policy. UI classes can 
 
 ### `editor/DocumentRegistry`
 
-Provides path normalization and open-document queries used by panes and file watchers.
+Provides open-document queries using the shared `DocumentPath` identity policy.
 
 ### `editor/DocumentPage`
 
@@ -92,7 +105,7 @@ Avoid making low-level editor services depend on `MainWindow` or application men
 Third-party code is intentionally isolated:
 
 - `src/QScintilla`
-- `src/third_party/md4c`
+- `src/third_party/cmark-gfm`
 - `src/third_party/qlitehtml`
 
 Local changes to third-party code should be minimized and documented in the commit or pull request.

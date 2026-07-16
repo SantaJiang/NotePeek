@@ -42,6 +42,50 @@ QString CustomEditor::filePath() const
     return m_filePath;
 }
 
+void CustomEditor::setDocumentFormat(const DocumentFormat &format)
+{
+    m_documentSession->format = format;
+}
+
+DocumentFormat CustomEditor::documentFormat() const
+{
+    return m_documentSession->format;
+}
+
+void CustomEditor::setExternalConflict(bool conflict, bool fileDeleted)
+{
+    m_documentSession->externalConflict = conflict;
+    m_documentSession->deletedExternally = conflict && fileDeleted;
+    if (conflict)
+        m_documentSession->persistenceState = DocumentPersistenceState::ExternalConflict;
+}
+
+bool CustomEditor::hasExternalConflict() const
+{
+    return m_documentSession->externalConflict;
+}
+
+bool CustomEditor::wasDeletedExternally() const
+{
+    return m_documentSession->deletedExternally;
+}
+
+void CustomEditor::shareDocumentSessionFrom(const CustomEditor *source)
+{
+    if (source)
+        m_documentSession = source->m_documentSession;
+}
+
+void CustomEditor::setPersistenceState(DocumentPersistenceState state)
+{
+    m_documentSession->persistenceState = state;
+}
+
+DocumentPersistenceState CustomEditor::persistenceState() const
+{
+    return m_documentSession->persistenceState;
+}
+
 void CustomEditor::setCodeEditingFeaturesEnabled(bool enabled)
 {
     m_codeEditingFeaturesEnabled = enabled;

@@ -362,7 +362,9 @@ void MarkdownDocumentPage::updatePreview()
         return;
     }
 
-    m_latestPreviewRequestId = m_previewer->renderPreviewAsync(m_editor->text(), m_editor->filePath());
+    m_latestPreviewRequestId = m_previewer->renderPreviewAsync(m_editor->text(),
+                                                               m_editor->filePath(),
+                                                               this);
 }
 
 void MarkdownDocumentPage::onPreviewRendered(const MarkdownRenderResult &result)
@@ -653,29 +655,21 @@ int MarkdownDocumentPage::previewYForSourceLine(int line) const
         return -1;
     }
 
-    if (line <= m_previewLineMap.first().first)
-    {
-        return m_previewLineMap.first().second;
-    }
+    const auto nextIt = std::lower_bound(
+        m_previewLineMap.cbegin(), m_previewLineMap.cend(), line,
+        [](const QPair<int, int> &entry, int sourceLine) { return entry.first < sourceLine; });
+    if (nextIt == m_previewLineMap.cbegin())
+        return nextIt->second;
+    if (nextIt == m_previewLineMap.cend())
+        return m_previewLineMap.last().second;
 
-    for (int i = 1; i < m_previewLineMap.size(); ++i)
-    {
-        const auto previous = m_previewLineMap.at(i - 1);
-        const auto next = m_previewLineMap.at(i);
-        if (line <= next.first)
-        {
-            const int lineSpan = next.first - previous.first;
-            if (lineSpan <= 0)
-            {
-                return previous.second;
-            }
-
-            const double t = double(line - previous.first) / double(lineSpan);
-            return previous.second + qRound(t * double(next.second - previous.second));
-        }
-    }
-
-    return m_previewLineMap.last().second;
+    const auto previous = *(nextIt - 1);
+    const auto next = *nextIt;
+    const int lineSpan = next.first - previous.first;
+    if (lineSpan <= 0)
+        return previous.second;
+    const double t = double(line - previous.first) / double(lineSpan);
+    return previous.second + qRound(t * double(next.second - previous.second));
 }
 
 int MarkdownDocumentPage::sourceLineForPreviewY(int y) const
@@ -685,29 +679,21 @@ int MarkdownDocumentPage::sourceLineForPreviewY(int y) const
         return -1;
     }
 
-    if (y <= m_previewLineMap.first().second)
-    {
-        return m_previewLineMap.first().first;
-    }
+    const auto nextIt = std::lower_bound(
+        m_previewLineMap.cbegin(), m_previewLineMap.cend(), y,
+        [](const QPair<int, int> &entry, int previewY) { return entry.second < previewY; });
+    if (nextIt == m_previewLineMap.cbegin())
+        return nextIt->first;
+    if (nextIt == m_previewLineMap.cend())
+        return m_previewLineMap.last().first;
 
-    for (int i = 1; i < m_previewLineMap.size(); ++i)
-    {
-        const auto previous = m_previewLineMap.at(i - 1);
-        const auto next = m_previewLineMap.at(i);
-        if (y <= next.second)
-        {
-            const int ySpan = next.second - previous.second;
-            if (ySpan <= 0)
-            {
-                return previous.first;
-            }
-
-            const double t = double(y - previous.second) / double(ySpan);
-            return previous.first + qRound(t * double(next.first - previous.first));
-        }
-    }
-
-    return m_previewLineMap.last().first;
+    const auto previous = *(nextIt - 1);
+    const auto next = *nextIt;
+    const int ySpan = next.second - previous.second;
+    if (ySpan <= 0)
+        return previous.first;
+    const double t = double(y - previous.second) / double(ySpan);
+    return previous.first + qRound(t * double(next.first - previous.first));
 }
 
 double MarkdownDocumentPage::editorScrollRatio() const

@@ -16,11 +16,16 @@ FindReplaceManager::FindReplaceManager(QObject *parent)
     , m_wrapAround(true)
     , m_backwards(false)
     , m_highlightIndicator(-1)
+    , m_highlightTimer(new QTimer(this))
 {
-}
-
-FindReplaceManager::~FindReplaceManager()
-{
+    m_highlightTimer->setSingleShot(true);
+    m_highlightTimer->setInterval(180);
+    connect(m_highlightTimer, &QTimer::timeout, this, [this]() {
+        if (!m_editor)
+            return;
+        highlightAllMatches();
+        emit highlightsRefreshed();
+    });
 }
 
 void FindReplaceManager::setCurrentEditor(CustomEditor *editor)
@@ -29,6 +34,7 @@ void FindReplaceManager::setCurrentEditor(CustomEditor *editor)
         return;
 
     clearHighlights();
+    m_highlightTimer->stop();
     m_editor = editor;
     initializeEditor();
     if (!m_findText.isEmpty())
@@ -261,14 +267,8 @@ void FindReplaceManager::clearHighlights()
 
 void FindReplaceManager::refreshHighlights()
 {
-    QTimer::singleShot(0, this, [this]() {
-        if (!m_editor)
-            return;
-
-        clearHighlights();
-        highlightAllMatches();
-        emit highlightsRefreshed();
-    });
+    if (m_editor)
+        m_highlightTimer->start();
 }
 
 void FindReplaceManager::setFindText(const QString &text)

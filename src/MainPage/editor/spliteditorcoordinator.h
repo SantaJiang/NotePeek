@@ -8,6 +8,7 @@
 
 class CustomEditor;
 class DocumentController;
+class ExternalFileWatcher;
 class QSplitter;
 class QWidget;
 
@@ -23,6 +24,7 @@ public:
                            DocumentController *rightController,
                            QSplitter *splitter,
                            bool singleFileWindow,
+                           ExternalFileWatcher *externalFileWatcher = nullptr,
                            QObject *parent = nullptr);
 
     DocumentController *activeController() const;
@@ -41,6 +43,7 @@ signals:
     void paneModificationChanged(DocumentController *controller, bool modified);
     void paneCopyAvailableChanged(DocumentController *controller, bool available);
     void filesDropped(DocumentController *controller, const QList<QUrl> &urls);
+    void externalFileConflict(const QString &filePath, bool deleted);
 
 private:
     void connectController(DocumentController *controller);

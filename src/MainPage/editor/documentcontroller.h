@@ -13,6 +13,7 @@
 
 class CustomEditor;
 class DocumentPage;
+class DocumentSaveCoordinator;
 class EditorManager;
 class ExternalFileWatcher;
 class FindReplaceManager;
@@ -30,6 +31,8 @@ class DocumentController : public QObject
 public:
     explicit DocumentController(EditorPane *pane,
                                 bool createDefaultWhenEmpty = true,
+                                DocumentSaveCoordinator *saveCoordinator = nullptr,
+                                ExternalFileWatcher *externalFileWatcher = nullptr,
                                 QObject *parent = nullptr);
     ~DocumentController() override;
 
@@ -65,6 +68,7 @@ public:
     // External change handling
     bool reloadFileFromDiskIfUnmodified(const QString &filePath);
     bool hasModifiedEditorForFile(const QString &filePath) const;
+    void markExternalConflict(const QString &filePath, bool deleted);
 
 signals:
     void currentEditorChanged(CustomEditor *editor);
@@ -126,10 +130,12 @@ private:
     int findSharedDocumentIndex(CustomEditor *sourceEditor) const;
     void refreshWatchedFiles();
     void recordFileState(const QString &filePath);
+    bool confirmExternalOverwrite(CustomEditor *editor, const QString &filePath);
 
     QPointer<EditorPane> m_pane;
     EditorManager *m_editorManager;
     DocumentPersistenceService *m_persistence;
+    DocumentSaveCoordinator *m_saveCoordinator;
     ExternalFileWatcher *m_externalFileWatcher;
     CustomEditor *m_defaultEditor;
     bool m_createDefaultWhenEmpty;

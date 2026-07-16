@@ -17,6 +17,7 @@
  */
 
 #include "widgets/qscieditorinfostatusbar.h"
+#include "editor/customeditor.h"
 #include "themecolors.h"
 #include <QMainWindow>
 #include <QFrame>
@@ -237,6 +238,13 @@ void QsciEditorInfoStatusBar::updateLanguage(QsciScintilla *editor)
 
 void QsciEditorInfoStatusBar::updateEol(QsciScintilla *editor)
 {
+    if (const auto *customEditor = qobject_cast<const CustomEditor *>(editor);
+        customEditor && customEditor->documentFormat().lineEnding == DocumentLineEnding::Mixed)
+    {
+        eolFormat->setText(tr("Mixed line endings"));
+        return;
+    }
+
     switch(editor->eolMode())
     {
     case QsciScintilla::EolWindows:
@@ -256,15 +264,27 @@ void QsciEditorInfoStatusBar::updateEol(QsciScintilla *editor)
 
 void QsciEditorInfoStatusBar::updateEncoding(QsciScintilla *editor)
 {
-    if (editor->isUtf8())
+    if (const auto *customEditor = qobject_cast<const CustomEditor *>(editor))
     {
-        unicodeType->setText(tr("UTF-8"));
+        switch (customEditor->documentFormat().encoding)
+        {
+        case DocumentEncoding::Utf8:
+            unicodeType->setText(tr("UTF-8"));
+            break;
+        case DocumentEncoding::Utf8Bom:
+            unicodeType->setText(tr("UTF-8 BOM"));
+            break;
+        case DocumentEncoding::Utf16LittleEndian:
+            unicodeType->setText(tr("UTF-16 LE"));
+            break;
+        case DocumentEncoding::Utf16BigEndian:
+            unicodeType->setText(tr("UTF-16 BE"));
+            break;
+        }
     }
     else
     {
-        // For QScintilla, if not UTF-8, it's typically using the system encoding
-        // You might want to extend this based on your application's encoding handling
-        unicodeType->setText(tr("ANSI"));
+        unicodeType->setText(editor->isUtf8() ? tr("UTF-8") : tr("Unknown"));
     }
 }
 

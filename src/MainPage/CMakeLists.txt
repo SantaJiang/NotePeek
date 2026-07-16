@@ -9,6 +9,13 @@ add_library(notepeek_core STATIC
     apppreferences.cpp
     apppreferences.h
     editor/performanceconstants.h
+    editor/documentformat.cpp
+    editor/documentformat.h
+    editor/documentpath.cpp
+    editor/documentpath.h
+    editor/documentsavecoordinator.cpp
+    editor/documentsavecoordinator.h
+    editor/documentsession.h
     editor/documentio.cpp
     editor/documentio.h
     editor/documentpersistenceservice.cpp
@@ -57,6 +64,7 @@ target_include_directories(notepeek_core PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/../third_party/cmark-gfm/extensions
     ${CMAKE_CURRENT_BINARY_DIR}/../third_party/cmark-gfm/extensions
 )
+notepeek_configure_project_target(notepeek_core)
 
 add_library(notepeek_widgets STATIC
     mainwindow.cpp
@@ -105,6 +113,7 @@ add_library(notepeek_widgets STATIC
 target_link_libraries(notepeek_widgets PUBLIC
     notepeek_core
 )
+notepeek_configure_project_target(notepeek_widgets)
 
 add_executable(notepeek
     main.cpp
@@ -114,6 +123,7 @@ add_executable(notepeek
 target_link_libraries(notepeek PRIVATE
     notepeek_widgets
 )
+notepeek_configure_project_target(notepeek)
 
 target_compile_definitions(notepeek PRIVATE
     APP_VERSION="${PROJECT_VERSION}"
@@ -168,13 +178,18 @@ elseif(APPLE)
         ${CMAKE_SOURCE_DIR}/src/MainPage/resource/notepeek.icns PROPERTIES
         MACOSX_PACKAGE_LOCATION Resources
     )
+    set_source_files_properties(
+        ${CMAKE_SOURCE_DIR}/THIRD_PARTY_NOTICES.md PROPERTIES
+        MACOSX_PACKAGE_LOCATION Resources
+    )
     target_sources(notepeek PRIVATE
         ${CMAKE_SOURCE_DIR}/src/MainPage/resource/notepeek.icns
+        ${CMAKE_SOURCE_DIR}/THIRD_PARTY_NOTICES.md
     )
 elseif(UNIX)
     set_target_properties(notepeek PROPERTIES
         BUILD_RPATH "${CMAKE_BINARY_DIR}/src/QScintilla"
-        INSTALL_RPATH "$ORIGIN/../${CMAKE_INSTALL_LIBDIR}"
+        INSTALL_RPATH "$ORIGIN/../${CMAKE_INSTALL_LIBDIR}/notepeek"
     )
 endif()
 
@@ -183,6 +198,12 @@ install(TARGETS notepeek
     BUNDLE DESTINATION .
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
 )
+
+if(NOT APPLE)
+    install(FILES ${CMAKE_SOURCE_DIR}/THIRD_PARTY_NOTICES.md
+        DESTINATION ${CMAKE_INSTALL_DATADIR}/notepeek
+    )
+endif()
 
 # ---- Deploy (Qt6 only) ----
 if(Qt6_FOUND)

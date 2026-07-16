@@ -10,6 +10,7 @@
 
 class QFileSystemWatcher;
 class QTimer;
+class QThreadPool;
 
 class ExternalFileWatcher : public QObject
 {
@@ -18,7 +19,7 @@ class ExternalFileWatcher : public QObject
 public:
     explicit ExternalFileWatcher(QObject *parent = nullptr);
 
-    void setTrackedFilePaths(const QSet<QString> &filePaths);
+    void setTrackedFilePaths(QObject *owner, const QSet<QString> &filePaths);
     void recordFileState(const QString &filePath);
     void refreshWatchedFiles();
     void requestExternalChangeCheck(const QString &filePath);
@@ -40,13 +41,19 @@ private:
     };
 
     QString normalizedFilePath(const QString &filePath) const;
-    bool hasFileStateChanged(const QString &filePath) const;
+    void rebuildTrackedFilePaths();
+    void startBaselineHash(const QString &filePath, const WatchedFileState &state);
+    void checkFileStateAsync(const QString &filePath);
 
     QFileSystemWatcher *m_fileWatcher;
     QTimer *m_changeCheckTimer;
     QSet<QString> m_trackedFilePaths;
+    QHash<QObject *, QSet<QString>> m_pathsByOwner;
     QSet<QString> m_pendingChangeChecks;
     QHash<QString, WatchedFileState> m_fileStates;
+    QSet<QString> m_hashChecksInFlight;
+    QSet<QString> m_hashRecheckRequested;
+    QThreadPool *m_hashPool;
 };
 
 #endif // EXTERNALFILEWATCHER_H

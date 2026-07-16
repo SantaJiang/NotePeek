@@ -3,10 +3,6 @@
 #include <QFile>
 #include <QFileInfo>
 #include <QSaveFile>
-#include <QTextStream>
-#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
-#include <QStringConverter>
-#endif
 
 namespace {
 
@@ -28,8 +24,16 @@ QString resolvedWritePath(const QString &filePath)
 
 bool DocumentIO::loadTextFile(const QString &filePath, QString *content, QString *errorMessage)
 {
+    return loadTextFile(filePath, content, nullptr, errorMessage);
+}
+
+bool DocumentIO::loadTextFile(const QString &filePath,
+                              QString *content,
+                              DocumentFormat *format,
+                              QString *errorMessage)
+{
     QFile file(filePath);
-    if (!file.open(QFile::ReadOnly | QFile::Text))
+    if (!file.open(QFile::ReadOnly))
     {
         if (errorMessage)
         {
@@ -38,50 +42,33 @@ bool DocumentIO::loadTextFile(const QString &filePath, QString *content, QString
         return false;
     }
 
-    QTextStream in(&file);
-#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
-    in.setEncoding(QStringConverter::Utf8);
-#else
-    in.setCodec("UTF-8");
-#endif
+    return DocumentFormatCodec::decode(file.readAll(), content, format, errorMessage);
+}
 
-    if (content)
-    {
-        *content = in.readAll();
-    }
+bool DocumentIO::loadEditorFile(const QString &filePath,
+                                QByteArray *utf8Content,
+                                DocumentFormat *format,
+                                QString *errorMessage)
+{
+    QString text;
+    if (!loadTextFile(filePath, &text, format, errorMessage))
+        return false;
+    if (utf8Content)
+        *utf8Content = text.toUtf8();
     return true;
 }
 
 bool DocumentIO::saveTextFile(const QString &filePath, const QString &content, QString *errorMessage)
 {
-    QSaveFile file(resolvedWritePath(filePath));
-    if (!file.open(QFile::WriteOnly | QFile::Text))
-    {
-        if (errorMessage)
-        {
-            *errorMessage = file.errorString();
-        }
-        return false;
-    }
+    return saveTextFile(filePath, content, DocumentFormatCodec::defaultFormat(), errorMessage);
+}
 
-    QTextStream out(&file);
-#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
-    out.setEncoding(QStringConverter::Utf8);
-#else
-    out.setCodec("UTF-8");
-#endif
-
-    out << content;
-    out.flush();
-    if (out.status() != QTextStream::Ok || !file.commit())
-    {
-        if (errorMessage)
-        {
-            *errorMessage = file.errorString();
-        }
-        return false;
-    }
-    return true;
+bool DocumentIO::saveTextFile(const QString &filePath,
+                              const QString &content,
+                              const DocumentFormat &format,
+                              QString *errorMessage)
+{
+    return saveUtf8File(filePath, DocumentFormatCodec::encode(content, format), errorMessage);
 }
 
 bool DocumentIO::saveUtf8File(const QString &filePath, const QByteArray &content, QString *errorMessage)
