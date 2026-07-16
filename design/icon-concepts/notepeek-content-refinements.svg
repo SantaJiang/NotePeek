@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="1200" viewBox="0 0 1200 1200">
+  <rect width="1200" height="1200" fill="#f4f5f7"/>
+  <defs>
+    <style>
+      .ink{fill:#292b45}.blue{fill:#4478e8}.cyan{fill:#55d1d8}.paper{fill:#fff4dc}
+    </style>
+    <g id="base">
+      <path class="cyan" d="M104 66h344c44 0 80 36 80 80v326c0 44-36 80-80 80H104c-44 0-80-36-80-80V146c0-44 36-80 80-80Z"/>
+      <path class="ink" d="M112 18h344c46 0 84 38 84 84v334c0 46-38 84-84 84H112c-46 0-84-38-84-84V102c0-46 38-84 84-84Z"/>
+      <path class="paper" d="M112 50h344c28 0 52 24 52 52v226L322 488H112c-28 0-52-24-52-52V102c0-28 24-52 52-52Z"/>
+      <path class="blue" d="M322 488 508 328v108c0 28-24 52-52 52Z"/>
+    </g>
+  </defs>
+
+  <!-- 1 · two quiet note strokes -->
+  <g transform="translate(28 28)">
+    <use href="#base"/>
+    <rect class="ink" x="150" y="204" width="236" height="42" rx="21"/>
+    <rect class="ink" x="150" y="286" width="156" height="42" rx="21"/>
+  </g>
+
+  <!-- 2 · three balanced note strokes -->
+  <g transform="translate(628 28)">
+    <use href="#base"/>
+    <rect class="ink" x="150" y="176" width="236" height="38" rx="19"/>
+    <rect class="ink" x="150" y="248" width="178" height="38" rx="19"/>
+    <rect class="cyan" x="150" y="320" width="116" height="38" rx="19"/>
+  </g>
+
+  <!-- 3 · centered peek aperture -->
+  <g transform="translate(28 628)">
+    <use href="#base"/>
+    <rect class="ink" x="138" y="222" width="260" height="92" rx="46"/>
+    <rect class="cyan" x="184" y="248" width="168" height="40" rx="20"/>
+  </g>
+
+  <!-- 4 · title stroke plus preview indicator -->
+  <g transform="translate(628 628)">
+    <use href="#base"/>
+    <rect class="ink" x="150" y="198" width="224" height="42" rx="21"/>
+    <rect class="ink" x="150" y="280" width="138" height="42" rx="21"/>
+    <circle class="cyan" cx="356" cy="301" r="34"/>
+  </g>
+</svg>
