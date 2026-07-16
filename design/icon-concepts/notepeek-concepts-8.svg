@@ -1,0 +1,87 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="2400" height="1200" viewBox="0 0 2400 1200">
+  <rect width="2400" height="1200" fill="#f4f5f7"/>
+  <defs>
+    <style>
+      .ink{stroke:#292b45;stroke-width:30;stroke-linecap:round;stroke-linejoin:round}
+      .blue{fill:#4478e8}.cyan{fill:#55d1d8}.paper{fill:#fff4dc}.none{fill:none}
+    </style>
+  </defs>
+
+  <!-- 1 · offset source/preview pair -->
+  <g transform="translate(62 54)">
+    <rect x="62" y="54" width="290" height="398" rx="54" class="blue ink"/>
+    <rect x="222" y="112" width="290" height="398" rx="54" class="paper ink"/>
+    <path d="m120 222-36 42 36 42m74-84 36 42-36 42" class="none ink" stroke="#fff4dc"/>
+    <path d="M284 220h152m-152 76h112m-112 76h142" class="none ink" stroke="#55d1d8"/>
+    <path d="M318 432c38-43 100-43 138 0-38 43-100 43-138 0Z" class="cyan ink"/>
+    <circle cx="387" cy="432" r="20" fill="#292b45"/>
+  </g>
+
+  <!-- 2 · hinged editor and rendered page -->
+  <g transform="translate(654 54)">
+    <path d="M42 118c0-36 29-65 65-65h176c45 0 82 37 82 82v358H107c-36 0-65-29-65-65Z" class="blue ink"/>
+    <path d="M365 135c0-45 37-82 82-82h66c36 0 65 29 65 65v310c0 36-29 65-65 65H365Z" class="paper ink"/>
+    <path d="M365 134v360" class="none ink"/>
+    <path d="m132 214-40 44 40 44m72-88 40 44-40 44" class="none ink" stroke="#fff4dc"/>
+    <path d="M421 198h102m-102 72h76m-76 72h102" class="none ink" stroke="#55d1d8"/>
+    <path d="M426 414h92" class="none ink" stroke="#4478e8" stroke-width="42"/>
+  </g>
+
+  <!-- 3 · preview page sliding over code card -->
+  <g transform="translate(1240 54)">
+    <path d="M74 76h302c40 0 72 32 72 72v302c0 40-32 72-72 72H74c-40 0-72-32-72-72V148c0-40 32-72 72-72Z" class="blue ink"/>
+    <path d="M220 26h270c40 0 72 32 72 72v302c0 40-32 72-72 72H220Z" class="paper ink"/>
+    <path d="m96 230-38 42 38 42m70-84 38 42-38 42" class="none ink" stroke="#fff4dc"/>
+    <path d="M282 156h190m-190 78h132m-132 78h176" class="none ink" stroke="#55d1d8"/>
+    <circle cx="430" cy="396" r="58" class="cyan ink"/>
+    <path d="m472 438 54 54" class="none ink"/>
+  </g>
+
+  <!-- 4 · two documents connected by live-preview bridge -->
+  <g transform="translate(1838 54)">
+    <rect x="10" y="74" width="234" height="416" rx="50" class="blue ink"/>
+    <rect x="336" y="74" width="234" height="416" rx="50" class="paper ink"/>
+    <path d="m88 220-38 44 38 44m70-88 38 44-38 44" class="none ink" stroke="#fff4dc"/>
+    <path d="M406 190h96m-96 72h72m-72 72h96" class="none ink" stroke="#55d1d8"/>
+    <path d="M228 250h124" class="none ink" stroke="#55d1d8" stroke-width="56"/>
+    <path d="m308 210 44 40-44 40" class="none ink" stroke="#55d1d8" stroke-width="34"/>
+    <circle cx="454" cy="414" r="34" class="cyan ink"/>
+  </g>
+
+  <!-- 5 · layered sheets with broad lifted corner -->
+  <g transform="translate(62 638)">
+    <path d="m78 114 330-72c37-8 73 15 81 52l82 374c8 37-15 73-52 81l-330 72c-37 8-73-15-81-52L26 195c-8-37 15-73 52-81Z" class="cyan ink"/>
+    <rect x="80" y="60" width="430" height="472" rx="62" class="paper ink"/>
+    <path d="M292 532c74-58 146-136 218-238v176c0 34-28 62-62 62Z" class="blue ink"/>
+    <path d="M162 190h230m-230 82h164m-164 82h112" class="none ink" stroke="#4478e8"/>
+  </g>
+
+  <!-- 6 · page stack with a horizontal peek slot -->
+  <g transform="translate(654 638)">
+    <rect x="52" y="112" width="454" height="396" rx="64" class="cyan ink"/>
+    <rect x="92" y="72" width="454" height="396" rx="64" class="blue ink"/>
+    <rect x="132" y="32" width="454" height="396" rx="64" class="paper ink"/>
+    <path d="M214 162h256m-256 78h174" class="none ink" stroke="#4478e8"/>
+    <path d="M206 344c70-72 194-72 264 0-70 72-194 72-264 0Z" class="cyan ink"/>
+    <path d="M270 344h136" class="none ink" stroke="#292b45" stroke-width="44"/>
+  </g>
+
+  <!-- 7 · document cascade with corner preview window -->
+  <g transform="translate(1242 638)">
+    <path d="M58 128 390 38c36-10 74 12 84 48l102 376c10 36-12 74-48 84l-332 90c-36 10-74-12-84-48L10 212c-10-36 12-74 48-84Z" class="blue ink"/>
+    <rect x="80" y="54" width="430" height="470" rx="60" class="paper ink"/>
+    <path d="M164 184h224m-224 82h150m-150 82h104" class="none ink" stroke="#4478e8"/>
+    <path d="M334 524 510 326v136c0 34-28 62-62 62Z" class="cyan ink"/>
+    <circle cx="438" cy="432" r="42" fill="#292b45"/>
+    <circle cx="438" cy="432" r="18" fill="#fff4dc"/>
+  </g>
+
+  <!-- 8 · folded twin-page ribbon -->
+  <g transform="translate(1842 638)">
+    <path d="M76 70h196c42 0 76 34 76 76v338H128c-42 0-76-34-76-76V94c0-13 11-24 24-24Z" class="blue ink"/>
+    <path d="M348 146c0-42 34-76 76-76h120c13 0 24 11 24 24v314c0 42-34 76-76 76H348Z" class="paper ink"/>
+    <path d="m348 148-82 82 82 82 82-82Z" class="cyan ink"/>
+    <path d="M124 188h92m-92 74h70m240 52h78m-78 74h102" class="none ink" stroke="#fff4dc"/>
+    <path d="M434 194h90" class="none ink" stroke="#4478e8"/>
+  </g>
+</svg>
