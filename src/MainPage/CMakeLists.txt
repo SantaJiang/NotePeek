@@ -50,13 +50,22 @@ target_link_libraries(notepeek_core PUBLIC
 
 target_include_directories(notepeek_core PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}
+    # Bundled QScintilla headers are always needed: NotePeek ships custom lexers
+    # (e.g. QsciLexerQML, QsciLexerRust) that are not in upstream/system QScintilla.
     ${CMAKE_CURRENT_SOURCE_DIR}/../QScintilla
-    ${CMAKE_CURRENT_SOURCE_DIR}/../QScintilla/scintilla/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../third_party/cmark-gfm/src
-    ${CMAKE_CURRENT_BINARY_DIR}/../third_party/cmark-gfm/src
-    ${CMAKE_CURRENT_SOURCE_DIR}/../third_party/cmark-gfm/extensions
-    ${CMAKE_CURRENT_BINARY_DIR}/../third_party/cmark-gfm/extensions
+    ${NOTEPEEK_CMARK_INCLUDE_DIRS}
 )
+
+if(NOT NOTEPEEK_USE_SYSTEM_QSCINTILLA)
+    target_include_directories(notepeek_core PUBLIC
+        ${CMAKE_CURRENT_SOURCE_DIR}/../QScintilla/scintilla/include
+    )
+endif()
+
+# When using system qscintilla, compile the custom lexers from bundled source
+if(NOTEPEEK_USE_SYSTEM_QSCINTILLA)
+    target_sources(notepeek_core PRIVATE ${NOTEPEEK_QSCINTILLA_EXTRA_SOURCES})
+endif()
 
 add_library(notepeek_widgets STATIC
     mainwindow.cpp
@@ -172,10 +181,17 @@ elseif(APPLE)
         ${CMAKE_SOURCE_DIR}/src/MainPage/resource/notepeek.icns
     )
 elseif(UNIX)
-    set_target_properties(notepeek PROPERTIES
-        BUILD_RPATH "${CMAKE_BINARY_DIR}/src/QScintilla"
-        INSTALL_RPATH "$ORIGIN/../${CMAKE_INSTALL_LIBDIR}"
-    )
+    if(NOTEPEEK_USE_SYSTEM_QSCINTILLA)
+        set_target_properties(notepeek PROPERTIES
+            BUILD_RPATH ""
+            INSTALL_RPATH ""
+        )
+    else()
+        set_target_properties(notepeek PROPERTIES
+            BUILD_RPATH "${CMAKE_BINARY_DIR}/src/QScintilla"
+            INSTALL_RPATH "$ORIGIN/../${CMAKE_INSTALL_LIBDIR}"
+        )
+    endif()
 endif()
 
 # ---- Install ----
