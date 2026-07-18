@@ -201,8 +201,20 @@ install(TARGETS notepeek
 )
 
 # ---- Deploy (Qt6 only) ----
-if(Qt6_FOUND)
-    qt_generate_deploy_app_script(
+# On Linux, runtime dependencies (Qt libraries) should be declared as package
+# dependencies, not bundled. The deploy step is only needed for self-contained
+# distribution on Windows/macOS or for AppDir-type bundling.
+if(UNIX AND NOT APPLE)
+    set(NOTEPEEK_SKIP_DEPLOY_DEFAULT ON)
+else()
+    set(NOTEPEEK_SKIP_DEPLOY_DEFAULT OFF)
+endif()
+option(NOTEPEEK_SKIP_DEPLOY "Skip runtime dependency deployment"
+    ${NOTEPEEK_SKIP_DEPLOY_DEFAULT})
+mark_as_advanced(NOTEPEEK_SKIP_DEPLOY)
+
+if(Qt6_FOUND AND NOT NOTEPEEK_SKIP_DEPLOY)
+    qt6_generate_deploy_app_script(
         TARGET notepeek
         OUTPUT_SCRIPT deploy_script
         NO_UNSUPPORTED_PLATFORM_ERROR
