@@ -28,7 +28,6 @@
 ### 📦 Packaging & Deployment
 - **Single‑click installers** – DMG for macOS, NSIS for Windows, DEB/RPM for Linux
 - **Bundled dependencies** – QScintilla, cmark-gfm, and qlitehtml are embedded
-- **Direct‑install script** – Quick `/usr/local` installation on Linux without a package manager
 
 ## 📋 Supported Languages
 
@@ -87,16 +86,6 @@ cpack --config build/CPackConfig.cmake -G NSIS
 cpack --config build/CPackConfig.cmake -G "DEB;RPM"
 ```
 
-### Direct Install on Linux (without packages)
-
-```bash
-# Install to /usr/local
-sudo env PREFIX=/usr/local ./deploy/linux/install.sh
-
-# Uninstall
-sudo env PREFIX=/usr/local ./deploy/linux/uninstall.sh
-```
-
 ## 🏗️ Project Structure
 
 ```
@@ -112,9 +101,7 @@ NotePeek/
 │   ├── win/notepeek.ico        # Windows icon
 │   └── linux/                  # Linux desktop integration
 │       ├── notepeek.desktop    # Desktop entry
-│       ├── notepeek.appdata.xml# AppStream metadata
-│       ├── install.sh          # Direct‑install script
-│       └── uninstall.sh        # Uninstall script
+│       └── notepeek.appdata.xml# AppStream metadata
 └── src/                        # Source code
     ├── CMakeLists.txt          # Sub‑directory aggregation
     ├── QScintilla/             # Embedded QScintilla library
