@@ -30,6 +30,7 @@ CustomEditor::CustomEditor(QWidget *parent)
 {
     setAcceptDrops(true);
     setFrameShape(QFrame::NoFrame);
+    SendScintilla(QsciScintillaBase::SCI_SETMARGINLEFT, 0UL, 5L);
 }
 
 void CustomEditor::setFilePath(const QString &path)
