@@ -43,7 +43,6 @@ protected:
     void changeEvent(QEvent *event) override;
 
 private slots:
-    void onCloseClicked();
     void onFindTextChanged(const QString &text);
     void onReplaceTextChanged(const QString &text);
     void onCaseSensitiveToggled(bool checked);

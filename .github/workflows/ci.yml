@@ -30,7 +30,39 @@ jobs:
       - name: Install smoke test
         run: cmake --install build-ci --prefix "${{ runner.temp }}/notepeek-install"
       - name: Verify installed artifacts
-        run: python scripts/verify_install.py "${{ runner.temp }}/notepeek-install"
+        run: python scripts/verify_install.py "${{ runner.temp }}/notepeek-install" --run
+
+  qt-compatibility:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - qt-version: '5.15.2'
+            qt-major: '5'
+            os: ubuntu-22.04
+          - qt-version: '6.2.4'
+            qt-major: '6'
+            os: ubuntu-22.04
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: jurplel/install-qt-action@v4
+        with:
+          version: ${{ matrix.qt-version }}
+          cache: true
+      - uses: seanmiddleditch/gha-setup-ninja@v5
+      - name: Configure minimum supported Qt
+        run: >-
+          cmake -S . -B build-compat -G Ninja
+          -DCMAKE_BUILD_TYPE=Release
+          -DNOTEPEEK_FORCE_QT_MAJOR=${{ matrix.qt-major }}
+          -DNOTEPEEK_WARNINGS_AS_ERRORS=ON
+      - name: Build
+        run: cmake --build build-compat --parallel 2
+      - name: Test
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: ctest --test-dir build-compat --output-on-failure
 
   sanitizers:
     runs-on: ubuntu-24.04

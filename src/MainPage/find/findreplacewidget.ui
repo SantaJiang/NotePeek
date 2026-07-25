@@ -87,11 +87,6 @@
           <height>26</height>
          </size>
         </property>
-        <property name="font">
-         <font>
-          <pointsize>9</pointsize>
-         </font>
-        </property>
         <property name="toolButtonStyle">
          <enum>Qt::ToolButtonStyle::ToolButtonTextOnly</enum>
         </property>
@@ -120,11 +115,6 @@
           <height>26</height>
          </size>
         </property>
-        <property name="font">
-         <font>
-          <pointsize>9</pointsize>
-         </font>
-        </property>
         <property name="toolButtonStyle">
          <enum>Qt::ToolButtonStyle::ToolButtonTextOnly</enum>
         </property>
@@ -140,11 +130,6 @@
          <horstretch>0</horstretch>
          <verstretch>0</verstretch>
         </sizepolicy>
-       </property>
-       <property name="font">
-        <font>
-         <pointsize>9</pointsize>
-        </font>
        </property>
        <property name="editable">
         <bool>true</bool>
@@ -177,11 +162,6 @@
           <height>26</height>
          </size>
         </property>
-        <property name="font">
-         <font>
-          <pointsize>9</pointsize>
-         </font>
-        </property>
         <property name="toolButtonStyle">
          <enum>Qt::ToolButtonStyle::ToolButtonTextOnly</enum>
         </property>
@@ -213,13 +193,6 @@
          <height>16777215</height>
         </size>
        </property>
-       <property name="font">
-        <font>
-         <pointsize>9</pointsize>
-         <weight>50</weight>
-         <bold>false</bold>
-        </font>
-       </property>
        <property name="text">
         <string>Replace:</string>
        </property>
@@ -245,13 +218,6 @@
          <height>16777215</height>
         </size>
        </property>
-       <property name="font">
-        <font>
-         <pointsize>9</pointsize>
-         <weight>50</weight>
-         <bold>false</bold>
-        </font>
-       </property>
        <property name="text">
         <string>&amp;Find:</string>
        </property>
@@ -267,11 +233,6 @@
          <horstretch>0</horstretch>
          <verstretch>0</verstretch>
         </sizepolicy>
-       </property>
-       <property name="font">
-        <font>
-         <pointsize>9</pointsize>
-        </font>
        </property>
        <property name="editable">
         <bool>true</bool>
@@ -324,11 +285,6 @@
      </property>
      <item>
       <widget class="QCheckBox" name="checkBoxWrapAround">
-       <property name="font">
-        <font>
-         <pointsize>9</pointsize>
-        </font>
-       </property>
        <property name="text">
         <string>Wra&amp;p Around</string>
        </property>
@@ -336,11 +292,6 @@
      </item>
      <item>
       <widget class="QCheckBox" name="checkBoxMatchCase">
-       <property name="font">
-        <font>
-         <pointsize>9</pointsize>
-        </font>
-       </property>
        <property name="text">
         <string>Match &amp;case</string>
        </property>
@@ -348,11 +299,6 @@
      </item>
      <item>
       <widget class="QCheckBox" name="checkBoxMatchWholeWord">
-       <property name="font">
-        <font>
-         <pointsize>9</pointsize>
-        </font>
-       </property>
        <property name="text">
         <string>Match &amp;whole word only</string>
        </property>
@@ -360,11 +306,6 @@
      </item>
      <item>
       <widget class="QCheckBox" name="checkBoxBackwardsDirection">
-       <property name="font">
-        <font>
-         <pointsize>9</pointsize>
-        </font>
-       </property>
        <property name="text">
         <string>Backward direction</string>
        </property>

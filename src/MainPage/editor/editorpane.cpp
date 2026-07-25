@@ -106,8 +106,13 @@ EditorPane::EditorPane(QWidget *parent)
         ui->pushButton_sidePreview->setFont(QFont(fontFamilies.first()));
     }
     ui->pushButton_closeDoc->setText(QChar(0xf00d));
+    ui->pushButton_closeDoc->setToolTip(tr("Close current document"));
+    ui->pushButton_closeDoc->setAccessibleName(tr("Close current document"));
     ui->pushButton_sidePreview->setText(QChar(0xf0f6));
     ui->pushButton_sidePreview->setToolTip(tr("Side preview"));
+    ui->pushButton_sidePreview->setAccessibleName(tr("Toggle Markdown side preview"));
+    ui->pushButton_splitView->setAccessibleName(tr("Toggle split editor"));
+    ui->comboBox_files->setAccessibleName(tr("Open documents"));
     setSplitViewButtonCollapseMode(false);
     updateSidePreviewButton();
 

@@ -135,10 +135,27 @@ endif()
 
 # ---- Translations ----
 if(Qt6_FOUND)
-    qt_add_translations(notepeek
-        TS_FILES ${CMAKE_SOURCE_DIR}/i18n/notepeek_zh_CN.ts
-        RESOURCE_PREFIX "/i18n"
+    file(GLOB_RECURSE NOTEPEEK_TRANSLATION_SOURCES CONFIGURE_DEPENDS
+        "${CMAKE_CURRENT_SOURCE_DIR}/*.cpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/*.h"
+        "${CMAKE_CURRENT_SOURCE_DIR}/*.ui"
     )
+    if(Qt6_VERSION VERSION_LESS 6.7)
+        qt_add_translations(notepeek
+            TS_FILES ${CMAKE_SOURCE_DIR}/i18n/notepeek_zh_CN.ts
+            SOURCES ${NOTEPEEK_TRANSLATION_SOURCES}
+            LUPDATE_OPTIONS -no-obsolete
+            RESOURCE_PREFIX "/i18n"
+        )
+    else()
+        add_custom_target(notepeek_translation_sources SOURCES ${NOTEPEEK_TRANSLATION_SOURCES})
+        qt_add_translations(notepeek
+            SOURCE_TARGETS notepeek_translation_sources
+            TS_FILES ${CMAKE_SOURCE_DIR}/i18n/notepeek_zh_CN.ts
+            LUPDATE_OPTIONS -no-obsolete
+            RESOURCE_PREFIX "/i18n"
+        )
+    endif()
 else()
     qt5_add_translation(QM_FILES
         ${CMAKE_SOURCE_DIR}/i18n/notepeek_zh_CN.ts
@@ -182,9 +199,14 @@ elseif(APPLE)
         ${CMAKE_SOURCE_DIR}/THIRD_PARTY_NOTICES.md PROPERTIES
         MACOSX_PACKAGE_LOCATION Resources
     )
+    set_source_files_properties(
+        ${CMAKE_SOURCE_DIR}/docs/dependency-policy.md PROPERTIES
+        MACOSX_PACKAGE_LOCATION Resources
+    )
     target_sources(notepeek PRIVATE
         ${CMAKE_SOURCE_DIR}/src/MainPage/resource/notepeek.icns
         ${CMAKE_SOURCE_DIR}/THIRD_PARTY_NOTICES.md
+        ${CMAKE_SOURCE_DIR}/docs/dependency-policy.md
     )
 elseif(UNIX)
     set_target_properties(notepeek PROPERTIES
@@ -200,7 +222,9 @@ install(TARGETS notepeek
 )
 
 if(NOT APPLE)
-    install(FILES ${CMAKE_SOURCE_DIR}/THIRD_PARTY_NOTICES.md
+    install(FILES
+        ${CMAKE_SOURCE_DIR}/THIRD_PARTY_NOTICES.md
+        ${CMAKE_SOURCE_DIR}/docs/dependency-policy.md
         DESTINATION ${CMAKE_INSTALL_DATADIR}/notepeek
     )
 endif()
