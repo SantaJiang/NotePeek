@@ -26,12 +26,17 @@ FindReplaceWidget::FindReplaceWidget(QWidget *parent)
         ui->buttonClose->setFont(QFont(fontFamilies.first()));
     }
     ui->buttonClose->setText(QChar(0xf00d));
+    ui->buttonClose->setToolTip(tr("Close find and replace"));
+    ui->buttonClose->setAccessibleName(tr("Close find and replace"));
+    ui->buttonFind->setAccessibleName(tr("Find next"));
+    ui->buttonReplace->setAccessibleName(tr("Replace current match"));
+    ui->buttonReplaceAll->setAccessibleName(tr("Replace all matches"));
+    ui->comboFind->setAccessibleName(tr("Search text"));
+    ui->comboReplace->setAccessibleName(tr("Replacement text"));
 
     connect(ui->buttonFind, &QToolButton::clicked, this, &FindReplaceWidget::onFindClicked);
     connect(ui->buttonReplace, &QToolButton::clicked, this, &FindReplaceWidget::onReplaceClicked);
     connect(ui->buttonReplaceAll, &QToolButton::clicked, this, &FindReplaceWidget::onReplaceAllClicked);
-    connect(ui->buttonClose, &QToolButton::clicked, this, &FindReplaceWidget::onCloseClicked);
-
     connect(ui->comboFind->lineEdit(), &QLineEdit::textChanged, this, &FindReplaceWidget::onFindTextChanged);
     connect(ui->comboReplace->lineEdit(), &QLineEdit::textChanged, this, &FindReplaceWidget::onReplaceTextChanged);
 
@@ -197,11 +202,6 @@ void FindReplaceWidget::onReplaceAllClicked()
     if (m_manager) {
         m_manager->replaceAll();
     }
-}
-
-void FindReplaceWidget::onCloseClicked()
-{
-    close();
 }
 
 void FindReplaceWidget::onFindTextChanged(const QString &text)

@@ -1,13 +1,18 @@
 #include "editor/customeditor.h"
 #include "editor/documentcontroller.h"
+#include "editor/documentpath.h"
+#include "editor/documentsavecoordinator.h"
 #include "editor/editorpane.h"
 #include "editor/editormanager.h"
+#include "editor/externalfilewatcher.h"
+#include "editor/spliteditorcoordinator.h"
 #include "find/findreplacemanager.h"
 #include "tool/markdown/markdownpreviewer.h"
 #include "apppreferences.h"
 
 #include <QFile>
 #include <QTemporaryDir>
+#include <QSplitter>
 #include <QtTest>
 
 class EditorFeaturesTest : public QObject
@@ -251,6 +256,81 @@ private slots:
         manager.setFindText(QStringLiteral("aaa"));
 
         QTRY_COMPARE_WITH_TIMEOUT(refreshed.count(), 1, 1000);
+    }
+
+    void openingTheSameFileTwiceReusesThePage()
+    {
+        QTemporaryDir tempDir;
+        QVERIFY(tempDir.isValid());
+        const QString path = tempDir.filePath(QStringLiteral("same.txt"));
+        QFile file(path);
+        QVERIFY(file.open(QIODevice::WriteOnly));
+        QCOMPARE(file.write("same content"), qint64(12));
+        file.close();
+
+        EditorPane pane;
+        DocumentController controller(&pane, false);
+        controller.openFile(path);
+        QTRY_COMPARE_WITH_TIMEOUT(pane.count(), 1, 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(controller.currentEditor() && !controller.currentEditor()->isReadOnly(), 3000);
+
+        controller.openFile(path);
+        QCOMPARE(pane.count(), 1);
+    }
+
+    void splitCoordinatorSharesTheOpenDocument()
+    {
+        QTemporaryDir tempDir;
+        QVERIFY(tempDir.isValid());
+        const QString path = tempDir.filePath(QStringLiteral("shared.txt"));
+        QFile file(path);
+        QVERIFY(file.open(QIODevice::WriteOnly));
+        QCOMPARE(file.write("shared content"), qint64(14));
+        file.close();
+
+        QSplitter splitter;
+        EditorPane leftPane(&splitter);
+        EditorPane rightPane(&splitter);
+        DocumentSaveCoordinator saveCoordinator;
+        ExternalFileWatcher fileWatcher;
+        DocumentController left(&leftPane, false, &saveCoordinator, &fileWatcher);
+        DocumentController right(&rightPane, false, &saveCoordinator, &fileWatcher);
+        SplitEditorCoordinator coordinator(&left, &right, &splitter, false, &fileWatcher);
+
+        left.openFile(path);
+        QTRY_VERIFY_WITH_TIMEOUT(left.currentEditor() && !left.currentEditor()->isReadOnly(), 3000);
+        coordinator.setActiveController(&left);
+        coordinator.setSplitViewEnabled(true);
+
+        QTRY_COMPARE_WITH_TIMEOUT(rightPane.count(), 1, 3000);
+        QVERIFY(right.currentEditor());
+        QCOMPARE(left.currentEditor()->SendScintillaPtrResult(QsciScintillaBase::SCI_GETDOCPOINTER),
+                 right.currentEditor()->SendScintillaPtrResult(QsciScintillaBase::SCI_GETDOCPOINTER));
+    }
+
+    void externalFileWatcherReportsChangedMetadata()
+    {
+        QTemporaryDir tempDir;
+        QVERIFY(tempDir.isValid());
+        const QString path = tempDir.filePath(QStringLiteral("watched.txt"));
+        QFile file(path);
+        QVERIFY(file.open(QIODevice::WriteOnly));
+        QCOMPARE(file.write("old"), qint64(3));
+        file.close();
+
+        QObject owner;
+        ExternalFileWatcher watcher;
+        watcher.setTrackedFilePaths(&owner, {path});
+        watcher.recordFileState(path);
+        QSignalSpy changed(&watcher, &ExternalFileWatcher::externalFileChanged);
+
+        QVERIFY(file.open(QIODevice::WriteOnly | QIODevice::Truncate));
+        QCOMPARE(file.write("new content"), qint64(11));
+        file.close();
+        watcher.requestExternalChangeCheck(path);
+
+        QTRY_COMPARE_WITH_TIMEOUT(changed.size(), 1, 3000);
+        QCOMPARE(changed.first().first().toString(), DocumentPath::normalized(path));
     }
 
     void coalescesStaleMarkdownRenders()

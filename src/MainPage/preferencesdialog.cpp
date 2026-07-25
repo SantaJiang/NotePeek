@@ -276,8 +276,10 @@ PreferencesDialog::PreferencesDialog(QWidget *parent)
     layout->addStretch();
     layout->addWidget(buttons);
 
-    // Lock the dialog to a fixed size so it cannot be resized/maximised.
-    setFixedSize(kDialogWidth, sizeHint().height());
+    // Keep the compact default while allowing larger fonts and translations
+    // to request more space.
+    setMinimumWidth(kDialogWidth);
+    resize(kDialogWidth, sizeHint().height());
 
     loadFromPreferences();
 
