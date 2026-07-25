@@ -58,6 +58,30 @@ bool DocumentIO::loadEditorFile(const QString &filePath,
     return true;
 }
 
+bool DocumentIO::loadEditorFileWithEncoding(const QString &filePath,
+                                            DocumentEncoding encoding,
+                                            QByteArray *utf8Content,
+                                            DocumentFormat *format,
+                                            QString *errorMessage)
+{
+    QFile file(filePath);
+    if (!file.open(QFile::ReadOnly))
+    {
+        if (errorMessage)
+        {
+            *errorMessage = file.errorString();
+        }
+        return false;
+    }
+
+    QString text;
+    if (!DocumentFormatCodec::decodeWithEncoding(file.readAll(), encoding, &text, format, errorMessage))
+        return false;
+    if (utf8Content)
+        *utf8Content = text.toUtf8();
+    return true;
+}
+
 bool DocumentIO::saveTextFile(const QString &filePath, const QString &content, QString *errorMessage)
 {
     return saveTextFile(filePath, content, DocumentFormatCodec::defaultFormat(), errorMessage);

@@ -16,15 +16,19 @@
 #include <QApplication>
 #include <QProcess>
 #include <QDockWidget>
+#include <QMenu>
 #include <QSplitter>
+#include "editor/documentformat.h"
 #include "editor/customeditor.h"
 #include "editor/documentcontroller.h"
 #include "editor/documentpath.h"
+#include "editor/editormanager.h"
 #include "editor/documentsavecoordinator.h"
 #include "editor/editorpane.h"
 #include "editor/externalfilewatcher.h"
 #include "editor/spliteditorcoordinator.h"
 #include "widgets/fileexplorerdock.h"
+#include "widgets/searchresultsdock.h"
 
 namespace {
 
@@ -89,8 +93,6 @@ MainWindow::MainWindow(QWidget *parent,
     , m_fileExplorerDock(nullptr)
     , m_saveCoordinator(new DocumentSaveCoordinator(this))
     , m_externalFileWatcher(new ExternalFileWatcher(this))
-    , m_leftController(nullptr)
-    , m_rightController(nullptr)
     , m_editorCoordinator(nullptr)
     , m_singleFileWindow(false)
     , m_fileExplorerRootExplicit(false)
@@ -104,31 +106,30 @@ MainWindow::MainWindow(QWidget *parent,
     const bool hasFileArg = !initialFiles.isEmpty();
     m_singleFileWindow = singleFileWindow;
 
-    // A default blank document only makes sense when no file was requested.
-    m_leftController = new DocumentController(ui->editorPane,
-                                              !hasFileArg,
-                                              m_saveCoordinator,
-                                              m_externalFileWatcher,
-                                              this);
-    m_rightController = new DocumentController(ui->editorPaneRight,
-                                               false,
-                                               m_saveCoordinator,
-                                               m_externalFileWatcher,
-                                               this);
-
-    // Both panes need the previewer so the "open Markdown in preview" preference
-    // can render on open.
-    m_leftController->setMarkdownPreviewer(m_markdownPreviewer);
-    m_rightController->setMarkdownPreviewer(m_markdownPreviewer);
-
-    // Each pane's side-preview toolbar button toggles the preview for its own
-    // pane, mirroring the Tools ▸ Markdown ▸ Side Preview action.
-    connect(m_leftController->pane(), &EditorPane::sidePreviewToggleRequested,
-            this, [this]() { toggleMarkdownSidePreviewFor(m_leftController); });
-    connect(m_rightController->pane(), &EditorPane::sidePreviewToggleRequested,
-            this, [this]() { toggleMarkdownSidePreviewFor(m_rightController); });
+    const QList<EditorPane *> panes = { ui->editorPane, ui->editorPaneRight };
+    for (int paneIndex = 0; paneIndex < panes.size(); ++paneIndex)
+    {
+        // A default blank document only makes sense in the first pane and
+        // when no file was requested.
+        auto *controller = new DocumentController(panes.at(paneIndex),
+                                                  paneIndex == 0 && !hasFileArg,
+                                                  m_saveCoordinator,
+                                                  m_externalFileWatcher,
+                                                  this);
+        // Every pane needs the previewer so the "open Markdown in preview"
+        // preference can render on open.
+        controller->setMarkdownPreviewer(m_markdownPreviewer);
+        // Each pane's side-preview toolbar button toggles the preview for its
+        // own pane, mirroring the Tools ▸ Markdown ▸ Side Preview action.
+        connect(controller->pane(), &EditorPane::sidePreviewToggleRequested,
+                this, [this, controller]() { toggleMarkdownSidePreviewFor(controller); });
+        m_documentControllers.append(controller);
+    }
 
     ui->widget_findreplace->setFindReplaceManager(m_findReplaceManager);
+
+    // Must exist before the first updateToolActions(), which enables/disables it.
+    setupEncodingMenu();
 
     m_fileExplorerDock = new FileExplorerDock(this);
     addDockWidget(Qt::LeftDockWidgetArea, m_fileExplorerDock->dockWidget());
@@ -138,6 +139,38 @@ MainWindow::MainWindow(QWidget *parent,
             });
     connect(m_fileExplorerDock, &FileExplorerDock::openInNewWindowRequested,
             this, &MainWindow::openFileInNewWindow);
+
+    m_searchResultsDock = new SearchResultsDock(this);
+    addDockWidget(Qt::BottomDockWidgetArea, m_searchResultsDock->dockWidget());
+    m_searchResultsDock->setVisible(false);
+    connect(m_searchResultsDock, &SearchResultsDock::matchActivated,
+            this, &MainWindow::openFileAtSearchMatch);
+    // Search-result jumps into files that are still loading complete once the
+    // controller reports the file as opened.
+    for (DocumentController *controller : m_documentControllers)
+    {
+        connect(controller, &DocumentController::fileOpened,
+                this, [this](CustomEditor *editor, const QString &filePath) {
+                    if (!m_pendingSearchJump.active
+                        || !DocumentPath::equivalent(filePath, m_pendingSearchJump.filePath))
+                    {
+                        return;
+                    }
+                    m_pendingSearchJump.active = false;
+                    jumpToEditorLocation(editor,
+                                         m_pendingSearchJump.line,
+                                         m_pendingSearchJump.column,
+                                         m_pendingSearchJump.length);
+                });
+        connect(controller, &DocumentController::fileOpenFailed,
+                this, [this](const QString &filePath) {
+                    if (m_pendingSearchJump.active
+                        && DocumentPath::equivalent(filePath, m_pendingSearchJump.filePath))
+                    {
+                        m_pendingSearchJump.active = false;
+                    }
+                });
+    }
 
     // Seed the file-tree visibility from the preference.  This only sets the
     // startup state; the user's manual toggles during a session are never
@@ -151,8 +184,7 @@ MainWindow::MainWindow(QWidget *parent,
     ui->editorSplitter->setStretchFactor(1, 1);
     applyEditorSplitterStyle(ui->editorSplitter);
     applyMainWindowSeparatorStyle(this);
-    m_editorCoordinator = new SplitEditorCoordinator(m_leftController,
-                                                     m_rightController,
+    m_editorCoordinator = new SplitEditorCoordinator(m_documentControllers,
                                                      ui->editorSplitter,
                                                      m_singleFileWindow,
                                                      m_externalFileWatcher,
@@ -192,7 +224,7 @@ MainWindow::MainWindow(QWidget *parent,
                 message->setModal(false);
                 message->show();
             });
-    applyActiveController(m_leftController);
+    applyActiveController(m_documentControllers.value(0));
     if (m_singleFileWindow)
     {
         ui->editorPane->setTopbarVisible(false);
@@ -249,10 +281,8 @@ MainWindow::~MainWindow()
     // coordinator are still alive, independent of QObject child-list order.
     delete m_editorCoordinator;
     m_editorCoordinator = nullptr;
-    delete m_leftController;
-    m_leftController = nullptr;
-    delete m_rightController;
-    m_rightController = nullptr;
+    qDeleteAll(m_documentControllers);
+    m_documentControllers.clear();
     delete ui;
 }
 
@@ -261,9 +291,62 @@ void MainWindow::openFileByArg(const QString &fileName)
     openFileAndSetRootDirectory(fileName);
 }
 
+void MainWindow::setupEncodingMenu()
+{
+    // Tools ▸ Encoding.  Reopen reinterprets the on-disk bytes; convert
+    // changes the target format and saves the document in it.
+    m_encodingMenu = new QMenu(tr("Encoding"), this);
+    m_reopenEncodingMenu = m_encodingMenu->addMenu(tr("Reopen with Encoding"));
+    m_convertEncodingMenu = m_encodingMenu->addMenu(tr("Convert to Encoding and Save"));
+
+    const struct
+    {
+        DocumentEncoding encoding;
+        QString name;
+        // UTF-8 with BOM reads identically to UTF-8, so it is offered only as a
+        // conversion target, not as a way to reopen.
+        bool reopen;
+    } encodingEntries[] = {
+        { DocumentEncoding::Utf8, QStringLiteral("UTF-8"), true },
+        { DocumentEncoding::Utf8Bom, QStringLiteral("UTF-8 with BOM"), false },
+        { DocumentEncoding::Utf16LittleEndian, QStringLiteral("UTF-16 LE"), true },
+        { DocumentEncoding::Utf16BigEndian, QStringLiteral("UTF-16 BE"), true },
+    };
+    for (const auto &entry : encodingEntries)
+    {
+        const DocumentEncoding encoding = entry.encoding;
+        if (entry.reopen)
+        {
+            m_reopenEncodingMenu->addAction(entry.name, this, [this, encoding]() {
+                activeController()->reopenCurrentWithEncoding(encoding);
+            });
+        }
+
+        QAction *convertAction = m_convertEncodingMenu->addAction(entry.name, this, [this, encoding]() {
+            activeController()->convertEncodingAndSave(encoding);
+        });
+        convertAction->setCheckable(true);
+        convertAction->setData(int(encoding));
+        m_convertEncodingActions.append(convertAction);
+    }
+
+    // The current encoding is only known when the menu opens.
+    connect(m_encodingMenu, &QMenu::aboutToShow, this, [this]() {
+        CustomEditor *editor = activeController()->currentEditor();
+        const int currentEncoding = editor ? int(editor->documentFormat().encoding) : -1;
+        for (QAction *action : m_convertEncodingActions)
+        {
+            action->setChecked(action->data().toInt() == currentEncoding);
+        }
+        m_reopenEncodingMenu->setEnabled(editor && !editor->filePath().isEmpty());
+    });
+    ui->menuTool->addMenu(m_encodingMenu);
+}
+
 DocumentController *MainWindow::activeController() const
 {
-    return m_editorCoordinator ? m_editorCoordinator->activeController() : m_leftController;
+    return m_editorCoordinator ? m_editorCoordinator->activeController()
+                               : m_documentControllers.value(0);
 }
 
 void MainWindow::applyActiveController(DocumentController *controller)
@@ -332,6 +415,7 @@ void MainWindow::setRootDirectory(const QString &dirPath, bool explicitDirectory
     m_fileExplorerRootDirectory = normalizedAbsolutePath(dirPath);
     m_fileExplorerRootExplicit = explicitDirectoryRoot && !m_fileExplorerRootDirectory.isEmpty();
     m_fileExplorerDock->setRootDirectory(dirPath);
+    m_searchResultsDock->setSearchRoot(m_fileExplorerRootDirectory);
 }
 
 void MainWindow::syncFileExplorerToFile(const QString &filePath, bool allowImplicitRootChange)
@@ -518,6 +602,66 @@ void MainWindow::on_action_find_triggered()
     {
         ui->widget_findreplace->showWithInitialText(selectedText);
     }
+}
+
+void MainWindow::on_action_findInFiles_triggered()
+{
+    // Without an explicit root, search where the current file lives.
+    if (m_fileExplorerRootDirectory.isEmpty())
+    {
+        if (CustomEditor *editor = activeController()->currentEditor())
+        {
+            const QString filePath = editor->filePath();
+            if (!filePath.isEmpty())
+            {
+                m_searchResultsDock->setSearchRoot(QFileInfo(filePath).absolutePath());
+            }
+        }
+    }
+
+    m_searchResultsDock->setVisible(true);
+    CustomEditor *editor = activeController()->currentEditor();
+    m_searchResultsDock->focusSearchInput(editor ? editor->selectedText() : QString());
+}
+
+void MainWindow::openFileAtSearchMatch(const QString &filePath, int line, int column, int length)
+{
+    DocumentController *controller = activeController();
+    CustomEditor *existingEditor = controller->editorManager()->getEditorByFilePath(filePath);
+    if (existingEditor && !controller->isEditorLoading(existingEditor))
+    {
+        controller->openFile(filePath);
+        jumpToEditorLocation(existingEditor, line, column, length);
+    }
+    else
+    {
+        m_pendingSearchJump = { filePath, line, column, length, true };
+        controller->openFile(filePath);
+    }
+    syncFileExplorerToFile(filePath, false);
+}
+
+void MainWindow::jumpToEditorLocation(CustomEditor *editor, int line, int column, int length)
+{
+    if (!editor)
+        return;
+
+    const int lastLine = qMax(0, editor->lines() - 1);
+    const int targetLine = qBound(0, line, lastLine);
+    const int targetColumn = qBound(0, column, editor->lineLength(targetLine));
+    editor->ensureLineVisible(targetLine);
+    if (length > 0)
+    {
+        const int targetEnd = qBound(targetColumn,
+                                     targetColumn + length,
+                                     editor->lineLength(targetLine));
+        editor->setSelection(targetLine, targetColumn, targetLine, targetEnd);
+    }
+    else
+    {
+        editor->setCursorPosition(targetLine, targetColumn);
+    }
+    editor->setFocus();
 }
 
 void MainWindow::on_action_foldCurrentBlock_triggered()
@@ -728,6 +872,11 @@ void MainWindow::updateToolActions()
     ui->action_markdownPreview->setChecked(markdownSupported && previewVisible);
     ui->action_markdownExportPdf->setEnabled(markdownSupported);
     ui->menuToolMarkdown->setEnabled(markdownSupported);
+    if (m_encodingMenu)
+    {
+        m_encodingMenu->setEnabled(editor != nullptr
+                                   && !controller->pane()->isCurrentEditorHidden());
+    }
     ui->menuTool->setEnabled(true);
 
     controller->pane()->updateSidePreviewButton();

@@ -18,6 +18,11 @@ public:
                                QByteArray *utf8Content,
                                DocumentFormat *format,
                                QString *errorMessage);
+    static bool loadEditorFileWithEncoding(const QString &filePath,
+                                           DocumentEncoding encoding,
+                                           QByteArray *utf8Content,
+                                           DocumentFormat *format,
+                                           QString *errorMessage);
     static bool saveTextFile(const QString &filePath, const QString &content, QString *errorMessage);
     static bool saveTextFile(const QString &filePath,
                              const QString &content,

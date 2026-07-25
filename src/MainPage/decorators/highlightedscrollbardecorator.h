@@ -33,6 +33,7 @@ private:
     HighlightedScrollBar *m_scrollBar;
     int m_searchIndicator;
     int m_bookmarkMarker;
+    bool m_updatePending = false;
 };
 
 #endif // HIGHLIGHTEDSCROLLBARDECORATOR_H

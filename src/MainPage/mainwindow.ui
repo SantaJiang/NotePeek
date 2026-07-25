@@ -114,6 +114,7 @@
     <addaction name="action_paste"/>
     <addaction name="separator"/>
     <addaction name="action_find"/>
+    <addaction name="action_findInFiles"/>
     <addaction name="separator"/>
     <addaction name="action_goToMatchingBrace"/>
     <addaction name="action_completeWord"/>
@@ -268,6 +269,14 @@
    </property>
    <property name="shortcut">
     <string>Ctrl+F</string>
+   </property>
+  </action>
+  <action name="action_findInFiles">
+   <property name="text">
+    <string>Find in Files...</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+Shift+F</string>
    </property>
   </action>
   <action name="action_foldCurrentBlock">

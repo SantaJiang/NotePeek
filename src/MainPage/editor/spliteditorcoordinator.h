@@ -1,10 +1,14 @@
 #ifndef SPLITEDITORCOORDINATOR_H
 #define SPLITEDITORCOORDINATOR_H
 
+#include <QByteArray>
 #include <QList>
 #include <QObject>
+#include <QSet>
 #include <QString>
 #include <QUrl>
+
+#include "editor/documentformat.h"
 
 class CustomEditor;
 class DocumentController;
@@ -12,14 +16,31 @@ class ExternalFileWatcher;
 class QSplitter;
 class QWidget;
 
-// Keeps the two editor panes of the split view in sync: which pane is
-// active, mirroring opened/closed/renamed files and routing pane-level
-// signals to the main window.
+// Result of an off-thread disk read for an externally changed file.
+struct ExternalReloadResult
+{
+    bool success = false;
+    QByteArray content;
+    DocumentFormat format;
+    QString errorMessage;
+};
+
+// Keeps the editor panes of the split view in sync: which pane is active,
+// mirroring opened/closed/renamed files and routing pane-level signals to the
+// main window. The coordinator is pane-count agnostic (it operates on an
+// ordered controller list); the application currently constructs it with two
+// panes.
 class SplitEditorCoordinator : public QObject
 {
     Q_OBJECT
 
 public:
+    SplitEditorCoordinator(const QList<DocumentController *> &controllers,
+                           QSplitter *splitter,
+                           bool singleFileWindow,
+                           ExternalFileWatcher *externalFileWatcher = nullptr,
+                           QObject *parent = nullptr);
+    // Convenience for the common two-pane setup.
     SplitEditorCoordinator(DocumentController *leftController,
                            DocumentController *rightController,
                            QSplitter *splitter,
@@ -58,15 +79,19 @@ private:
                                      const QString &oldFilePath,
                                      const QString &newFilePath);
     void reloadExternallyChangedFile(DocumentController *source, const QString &filePath);
+    void applyExternalReload(DocumentController *source,
+                             const QString &filePath,
+                             const ExternalReloadResult &result);
     void showSameFileInOtherPane(DocumentController *source);
 
-    DocumentController *m_leftController;
-    DocumentController *m_rightController;
+    QList<DocumentController *> m_controllers;
     QSplitter *m_splitter;
     DocumentController *m_activeController;
     bool m_syncingEditorPanes;
     bool m_splitViewEnabled;
     bool m_singleFileWindow;
+    QSet<QString> m_reloadsInFlight;
+    QSet<QString> m_reloadRerunRequested;
 };
 
 #endif // SPLITEDITORCOORDINATOR_H

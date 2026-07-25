@@ -40,6 +40,8 @@ add_library(notepeek_core STATIC
     editor/lexers/mesonlexer.h
     editor/supportedfilepolicy.cpp
     editor/supportedfilepolicy.h
+    find/filesearcher.cpp
+    find/filesearcher.h
     tool/cpp/headersourcemanager.cpp
     tool/cpp/headersourcemanager.h
     tool/markdown/markdownpreviewer.cpp
@@ -108,6 +110,8 @@ add_library(notepeek_widgets STATIC
     widgets/filetypefilterproxymodel.h
     widgets/qscieditorinfostatusbar.cpp
     widgets/qscieditorinfostatusbar.h
+    widgets/searchresultsdock.cpp
+    widgets/searchresultsdock.h
 )
 
 target_link_libraries(notepeek_widgets PUBLIC

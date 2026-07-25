@@ -232,6 +232,7 @@ PreferencesDialog::PreferencesDialog(QWidget *parent)
     , m_bracketAssistance(new QCheckBox(tr("Match and auto-close brackets"), this))
     , m_smartIndentation(new QCheckBox(tr("Indent guides and smart Tab/Backspace"), this))
     , m_documentCompletion(new QCheckBox(tr("Suggest words from the current document"), this))
+    , m_languageCombo(new QComboBox(this))
 {
     setWindowTitle(tr("Preferences"));
     setModal(true);
@@ -250,8 +251,16 @@ PreferencesDialog::PreferencesDialog(QWidget *parent)
     fontsLayout->addLayout(makeSettingsRow(tr("Text font"), makeFontRow(m_textFontCombo, m_textFontSize, fontsSection), fontsSection));
     fontsLayout->addLayout(makeSettingsRow(tr("Code font"), makeFontRow(m_codeFontCombo, m_codeFontSize, fontsSection), fontsSection));
 
+    // Language names stay untranslated so each entry is readable in the
+    // language it selects. Takes effect after a restart.
+    m_languageCombo->addItem(tr("System default"), QString());
+    m_languageCombo->addItem(QStringLiteral("English"), QStringLiteral("en"));
+    m_languageCombo->addItem(QStringLiteral("简体中文"), QStringLiteral("zh_CN"));
+    m_languageCombo->setToolTip(tr("Takes effect the next time NotePeek starts."));
+
     auto *generalSection = makeSection(tr("General"), this);
     auto *generalLayout = qobject_cast<QVBoxLayout *>(generalSection->layout());
+    generalLayout->addLayout(makeSettingsRow(tr("Language"), m_languageCombo, generalSection));
     generalLayout->addLayout(makeSettingsRow(tr("Startup"), m_showFileTree, generalSection));
     generalLayout->addLayout(makeSettingsRow(tr("Markdown"), m_markdownSidePreview, generalSection));
 
@@ -306,6 +315,9 @@ void PreferencesDialog::loadFromPreferences()
     m_bracketAssistance->setChecked(prefs.bracketAssistanceEnabled());
     m_smartIndentation->setChecked(prefs.smartIndentationEnabled());
     m_documentCompletion->setChecked(prefs.documentCompletionEnabled());
+
+    const int languageIndex = m_languageCombo->findData(prefs.language());
+    m_languageCombo->setCurrentIndex(languageIndex >= 0 ? languageIndex : 0);
 }
 
 void PreferencesDialog::commit()
@@ -320,6 +332,7 @@ void PreferencesDialog::commit()
     prefs.setBracketAssistanceEnabled(m_bracketAssistance->isChecked());
     prefs.setSmartIndentationEnabled(m_smartIndentation->isChecked());
     prefs.setDocumentCompletionEnabled(m_documentCompletion->isChecked());
+    prefs.setLanguage(m_languageCombo->currentData().toString());
 
     prefs.save();
 

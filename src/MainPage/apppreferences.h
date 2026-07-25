@@ -48,6 +48,11 @@ public:
     bool documentCompletionEnabled() const { return m_documentCompletionEnabled; }
     void setDocumentCompletionEnabled(bool enabled) { m_documentCompletionEnabled = enabled; }
 
+    // UI language as a locale name ("en", "zh_CN"); empty follows the system
+    // locale. Applied at the next launch.
+    QString language() const { return m_language; }
+    void setLanguage(const QString &language) { m_language = language; }
+
     // Sensible cross-platform defaults, honouring the fonts bundled with the
     // application (Source Code Pro, Fira Code) before falling back to a
     // platform monospace family.
@@ -70,6 +75,7 @@ private:
     bool m_bracketAssistanceEnabled;
     bool m_smartIndentationEnabled;
     bool m_documentCompletionEnabled;
+    QString m_language;
 };
 
 #endif // APPPREFERENCES_H

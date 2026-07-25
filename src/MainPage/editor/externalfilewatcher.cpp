@@ -121,11 +121,19 @@ void ExternalFileWatcher::refreshWatchedFiles()
         }
     }
 
+    // Snapshot the watched sets once: QFileSystemWatcher::files()/directories()
+    // rebuild a list on every call, which made these loops quadratic.
+    QSet<QString> alreadyWatchedFiles;
+    for (const QString &watchedFile : m_fileWatcher->files())
+    {
+        alreadyWatchedFiles.insert(watchedFile);
+    }
+
     QSet<QString> directories;
     for (const QString &filePath : m_trackedFilePaths)
     {
         const QFileInfo fileInfo(filePath);
-        if (fileInfo.exists() && !m_fileWatcher->files().contains(filePath))
+        if (fileInfo.exists() && !alreadyWatchedFiles.contains(filePath))
         {
             m_fileWatcher->addPath(filePath);
         }
@@ -138,8 +146,10 @@ void ExternalFileWatcher::refreshWatchedFiles()
     }
 
     const QStringList watchedDirectories = m_fileWatcher->directories();
+    QSet<QString> alreadyWatchedDirectories;
     for (const QString &watchedDirectory : watchedDirectories)
     {
+        alreadyWatchedDirectories.insert(watchedDirectory);
         if (!directories.contains(normalizedFilePath(watchedDirectory)))
         {
             m_fileWatcher->removePath(watchedDirectory);
@@ -147,7 +157,7 @@ void ExternalFileWatcher::refreshWatchedFiles()
     }
     for (const QString &directoryPath : directories)
     {
-        if (!m_fileWatcher->directories().contains(directoryPath))
+        if (!alreadyWatchedDirectories.contains(directoryPath))
         {
             m_fileWatcher->addPath(directoryPath);
         }

@@ -12,6 +12,8 @@
 #include <Qsci/qscilexermarkdown.h>
 #include <Qsci/qscilexerpython.h>
 #include <Qsci/qscilexerrust.h>
+#include <memory>
+
 #include "decorators/highlightedscrollbardecorator.h"
 #include "editor/customeditor.h"
 #include "editor/documentregistry.h"
@@ -405,9 +407,25 @@ void EditorManager::setupEditor(CustomEditor *editor)
     // Apply theme-aware colors (margin background/foreground, caret line, etc.)
     applyEditorColors(editor);
 
-    // Connect signals
-    connect(editor, &CustomEditor::textChanged, this, [editor]() {
-        emit editor->modificationChanged(editor->isModified());
+    // Connect signals.  Scintilla only reports savepoint transitions itself;
+    // this forwards the modify state after text changes too, but only when the
+    // state actually flipped — the downstream slots (tab title, watcher checks)
+    // are not cheap enough to run on every keystroke.
+    auto lastModificationState = std::make_shared<bool>(editor->isModified());
+    connect(editor, &CustomEditor::modificationChanged, this,
+            [editor, lastModificationState](bool) {
+        // CustomEditor can intentionally remain dirty after Scintilla reaches
+        // its internal save point (for example when that snapshot failed to
+        // reach disk), so use the editor's effective state rather than the raw
+        // Scintilla signal argument.
+        *lastModificationState = editor->isModified();
+    });
+    connect(editor, &CustomEditor::textChanged, this, [editor, lastModificationState]() {
+        const bool modified = editor->isModified();
+        if (*lastModificationState == modified)
+            return;
+        *lastModificationState = modified;
+        emit editor->modificationChanged(modified);
     });
     connect(editor, &CustomEditor::linesChanged, this, [this, editor]() {
         updateLineNumberMarginWidth(editor);

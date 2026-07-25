@@ -12,6 +12,8 @@
 - **Multi-tab editing** – Open multiple files in tabs, with drag‑and‑drop reordering
 - **Syntax highlighting** – Supports **50+ programming/markup/configuration languages and file formats** (see list below)
 - **Find & Replace** – Full‑featured search with scroll‑bar result markers
+- **Find in Files** – Project‑wide search (`Ctrl+Shift+F`) with a grouped result list and jump‑to‑match
+- **Encoding control** – Auto‑detects UTF‑8/UTF‑16, and lets you reopen or convert with an explicit encoding
 - **C/C++ header‑source switching** – Quick jump between `.h` and `.cpp/.cxx` files
 - **File‑system browser** – Integrated directory tree (dock) for quick file opening
 
@@ -23,10 +25,11 @@
 - **Consistent look & feel** – Fusion style on macOS, Windows, and Linux
 - **High‑DPI support** – Automatically adapts to Retina and Hi‑DPI displays
 - **System integration** – macOS: double‑click files in Finder; Windows: Start‑menu shortcut; Linux: desktop entry & AppStream metadata
-- **Internationalization** – Built‑in translation system (Chinese included)
+- **Internationalization** – Built‑in translation system (Chinese included), with an in‑app language preference
 
 ### 📦 Packaging & Deployment
 - **Single‑click installers** – DMG for macOS, NSIS for Windows, DEB/RPM for Linux
+- **Automated releases** – Pushing a `v*` tag builds and attaches installers for all three platforms
 - **Bundled dependencies** – QScintilla, cmark-gfm, and qlitehtml are embedded
 
 ## 📋 Supported Languages

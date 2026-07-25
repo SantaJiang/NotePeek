@@ -231,6 +231,67 @@ bool DocumentFormatCodec::decode(const QByteArray &bytes,
     return true;
 }
 
+bool DocumentFormatCodec::decodeWithEncoding(const QByteArray &bytes,
+                                             DocumentEncoding encoding,
+                                             QString *text,
+                                             DocumentFormat *format,
+                                             QString *errorMessage)
+{
+    DocumentFormat resolved = defaultFormat();
+    resolved.encoding = encoding;
+    QString decoded;
+
+    if (encoding == DocumentEncoding::Utf8 || encoding == DocumentEncoding::Utf8Bom)
+    {
+        QByteArray payload = bytes;
+        if (payload.startsWith("\xef\xbb\xbf"))
+        {
+            payload = payload.mid(3);
+            resolved.encoding = DocumentEncoding::Utf8Bom;
+        }
+        else if (encoding == DocumentEncoding::Utf8Bom)
+        {
+            resolved.encoding = DocumentEncoding::Utf8;
+        }
+        if (!isValidUtf8(payload))
+        {
+            if (errorMessage)
+                *errorMessage = QStringLiteral("The file contains invalid UTF-8 data.");
+            return false;
+        }
+        decoded = QString::fromUtf8(payload);
+    }
+    else
+    {
+        const bool littleEndian = encoding == DocumentEncoding::Utf16LittleEndian;
+        QByteArray payload = bytes;
+        if ((littleEndian && payload.startsWith("\xff\xfe"))
+            || (!littleEndian && payload.startsWith("\xfe\xff")))
+        {
+            payload = payload.mid(2);
+        }
+        if (payload.size() % 2 != 0)
+        {
+            if (errorMessage)
+                *errorMessage = QStringLiteral("The UTF-16 file has an incomplete code unit.");
+            return false;
+        }
+        if (!decodeUtf16(payload, littleEndian, &decoded))
+        {
+            if (errorMessage)
+                *errorMessage = QStringLiteral("The UTF-16 file contains an invalid surrogate pair.");
+            return false;
+        }
+    }
+
+    resolved.lineEnding = detectLineEnding(decoded, resolved.lineEnding);
+    if (text)
+        *text = normalizedEditorText(decoded);
+    if (format)
+        *format = resolved;
+    return true;
+}
+
 QByteArray DocumentFormatCodec::encode(const QString &text, const DocumentFormat &format)
 {
     const DocumentLineEnding outputEnding = format.lineEnding == DocumentLineEnding::Mixed
@@ -242,20 +303,24 @@ QByteArray DocumentFormatCodec::encode(const QString &text, const DocumentFormat
     if (format.encoding == DocumentEncoding::Utf8Bom)
         return QByteArray("\xef\xbb\xbf", 3) + output.toUtf8();
 
+    const bool littleEndian = format.encoding == DocumentEncoding::Utf16LittleEndian;
+    const qsizetype unitCount = output.size();
     QByteArray bytes;
-    bytes.reserve(2 + output.size() * 2);
-    bytes.append(format.encoding == DocumentEncoding::Utf16LittleEndian
-                     ? QByteArray("\xff\xfe", 2)
-                     : QByteArray("\xfe\xff", 2));
-    for (QChar character : output)
+    bytes.resize(2 + unitCount * 2);
+    uchar *out = reinterpret_cast<uchar *>(bytes.data());
+    out[0] = littleEndian ? 0xff : 0xfe;
+    out[1] = littleEndian ? 0xfe : 0xff;
+    out += 2;
+    const ushort *units = reinterpret_cast<const ushort *>(output.utf16());
+    if (littleEndian)
     {
-        const quint16 value = character.unicode();
-        char unit[2];
-        if (format.encoding == DocumentEncoding::Utf16LittleEndian)
-            qToLittleEndian(value, reinterpret_cast<uchar *>(unit));
-        else
-            qToBigEndian(value, reinterpret_cast<uchar *>(unit));
-        bytes.append(unit, 2);
+        for (qsizetype index = 0; index < unitCount; ++index)
+            qToLittleEndian<quint16>(units[index], out + index * 2);
+    }
+    else
+    {
+        for (qsizetype index = 0; index < unitCount; ++index)
+            qToBigEndian<quint16>(units[index], out + index * 2);
     }
     return bytes;
 }

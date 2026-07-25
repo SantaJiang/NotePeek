@@ -2,6 +2,7 @@
 
 #include "editor/customeditor.h"
 #include "editor/documentcontroller.h"
+#include "editor/documentio.h"
 #include "editor/documentpath.h"
 #include "editor/editormanager.h"
 #include "editor/filesavedialog.h"
@@ -10,31 +11,33 @@
 #include "editor/performanceconstants.h"
 
 #include <QFileInfo>
+#include <QFutureWatcher>
 #include <QHash>
 #include <QMap>
 #include <QScopedValueRollback>
 #include <QSet>
 #include <QSplitter>
 #include <QWidget>
+#include <QtConcurrent>
 #include <Qsci/qsciscintillabase.h>
 
-SplitEditorCoordinator::SplitEditorCoordinator(DocumentController *leftController,
-                                               DocumentController *rightController,
+SplitEditorCoordinator::SplitEditorCoordinator(const QList<DocumentController *> &controllers,
                                                QSplitter *splitter,
                                                bool singleFileWindow,
                                                ExternalFileWatcher *externalFileWatcher,
                                                QObject *parent)
     : QObject(parent)
-    , m_leftController(leftController)
-    , m_rightController(rightController)
+    , m_controllers(controllers)
     , m_splitter(splitter)
-    , m_activeController(leftController)
+    , m_activeController(controllers.value(0))
     , m_syncingEditorPanes(false)
     , m_splitViewEnabled(false)
     , m_singleFileWindow(singleFileWindow)
 {
-    connectController(m_leftController);
-    connectController(m_rightController);
+    for (DocumentController *controller : m_controllers)
+    {
+        connectController(controller);
+    }
     if (externalFileWatcher)
     {
         connect(externalFileWatcher, &ExternalFileWatcher::externalFileChanged,
@@ -45,14 +48,28 @@ SplitEditorCoordinator::SplitEditorCoordinator(DocumentController *leftControlle
     setSplitViewEnabled(false);
 }
 
+SplitEditorCoordinator::SplitEditorCoordinator(DocumentController *leftController,
+                                               DocumentController *rightController,
+                                               QSplitter *splitter,
+                                               bool singleFileWindow,
+                                               ExternalFileWatcher *externalFileWatcher,
+                                               QObject *parent)
+    : SplitEditorCoordinator(QList<DocumentController *>{ leftController, rightController },
+                             splitter,
+                             singleFileWindow,
+                             externalFileWatcher,
+                             parent)
+{
+}
+
 DocumentController *SplitEditorCoordinator::activeController() const
 {
-    return m_activeController ? m_activeController : m_leftController;
+    return m_activeController ? m_activeController : m_controllers.value(0);
 }
 
 QList<DocumentController *> SplitEditorCoordinator::controllers() const
 {
-    return { m_leftController, m_rightController };
+    return m_controllers;
 }
 
 void SplitEditorCoordinator::setActiveController(DocumentController *controller)
@@ -84,17 +101,28 @@ void SplitEditorCoordinator::setSplitViewEnabled(bool enabled)
     }
 
     m_splitViewEnabled = true;
-    m_leftController->pane()->setVisible(true);
-    m_rightController->pane()->setVisible(true);
-    m_leftController->pane()->setSplitViewButtonCollapseMode(true);
-    m_rightController->pane()->setSplitViewButtonCollapseMode(true);
-    m_leftController->pane()->setSplitViewButtonVisible(true);
-    m_rightController->pane()->setSplitViewButtonVisible(true);
+    for (DocumentController *controller : m_controllers)
+    {
+        controller->pane()->setVisible(true);
+        controller->pane()->setSplitViewButtonCollapseMode(true);
+        controller->pane()->setSplitViewButtonVisible(true);
+    }
 
     const QList<int> sizes = m_splitter->sizes();
-    if (sizes.size() < 2 || sizes.at(0) == 0 || sizes.at(1) == 0)
+    bool needsRebalance = sizes.size() < m_controllers.size();
+    for (int size : sizes)
     {
-        m_splitter->setSizes({ 1, 1 });
+        needsRebalance = needsRebalance || size == 0;
+    }
+    if (needsRebalance)
+    {
+        QList<int> equalSizes;
+        equalSizes.reserve(m_controllers.size());
+        for (int index = 0; index < m_controllers.size(); ++index)
+        {
+            equalSizes.append(1);
+        }
+        m_splitter->setSizes(equalSizes);
     }
 
     showSameFileInOtherPane(source);
@@ -222,34 +250,42 @@ void SplitEditorCoordinator::updateActivePaneForFocus(QWidget *widget)
 
 DocumentController *SplitEditorCoordinator::otherController(DocumentController *controller) const
 {
-    return controller == m_leftController ? m_rightController : m_leftController;
+    const int index = m_controllers.indexOf(controller);
+    if (index == -1 || m_controllers.size() < 2)
+    {
+        return m_controllers.value(0);
+    }
+    return m_controllers.at((index + 1) % m_controllers.size());
 }
 
 DocumentController *SplitEditorCoordinator::visibleSingleController() const
 {
-    if (m_rightController->pane()->isVisible() && !m_leftController->pane()->isVisible())
+    for (DocumentController *controller : m_controllers)
     {
-        return m_rightController;
+        if (controller->pane()->isVisible())
+        {
+            return controller;
+        }
     }
 
-    return m_leftController;
+    return m_controllers.value(0);
 }
 
 void SplitEditorCoordinator::setSingleVisibleController(DocumentController *controller)
 {
     if (!controller)
     {
-        controller = m_leftController;
+        controller = m_controllers.value(0);
     }
 
     m_splitViewEnabled = false;
-    m_leftController->pane()->setVisible(controller == m_leftController);
-    m_rightController->pane()->setVisible(controller == m_rightController);
-
-    m_leftController->pane()->setSplitViewButtonCollapseMode(false);
-    m_rightController->pane()->setSplitViewButtonCollapseMode(false);
-    m_leftController->pane()->setSplitViewButtonVisible(controller == m_leftController);
-    m_rightController->pane()->setSplitViewButtonVisible(controller == m_rightController);
+    for (DocumentController *candidate : m_controllers)
+    {
+        const bool isTarget = candidate == controller;
+        candidate->pane()->setVisible(isTarget);
+        candidate->pane()->setSplitViewButtonCollapseMode(false);
+        candidate->pane()->setSplitViewButtonVisible(isTarget);
+    }
 
     setActiveController(controller);
 }
@@ -398,8 +434,19 @@ void SplitEditorCoordinator::syncRenamedFileToOtherPanes(DocumentController *sou
 
 void SplitEditorCoordinator::reloadExternallyChangedFile(DocumentController *source, const QString &filePath)
 {
-    if (m_syncingEditorPanes || filePath.isEmpty())
+    if (filePath.isEmpty())
         return;
+
+    const QString reloadKey = DocumentPath::normalized(filePath);
+    if (m_syncingEditorPanes)
+    {
+        // A chunked apply services queued events. Remember watcher activity
+        // that arrives during that nested event processing and read again once
+        // the current snapshot has been fully applied.
+        if (m_reloadsInFlight.contains(reloadKey))
+            m_reloadRerunRequested.insert(reloadKey);
+        return;
+    }
 
     const QFileInfo info(filePath);
     const bool deleted = !info.exists() || !info.isFile();
@@ -423,17 +470,79 @@ void SplitEditorCoordinator::reloadExternallyChangedFile(DocumentController *sou
         return;
     }
 
+    bool tracked = false;
+    for (DocumentController *controller : controllers())
+    {
+        if (controller->hasTrackedFile(filePath))
+        {
+            tracked = true;
+            break;
+        }
+    }
+    if (!tracked)
+        return;
+
+    // The disk read runs off the UI thread. Only one read per path is in
+    // flight; further change events for the same path queue a single re-run so
+    // the newest on-disk content is never missed.
+    if (m_reloadsInFlight.contains(reloadKey))
+    {
+        m_reloadRerunRequested.insert(reloadKey);
+        return;
+    }
+    m_reloadsInFlight.insert(reloadKey);
+
+    auto *watcher = new QFutureWatcher<ExternalReloadResult>(this);
+    connect(watcher, &QFutureWatcher<ExternalReloadResult>::finished,
+            this, [this, watcher, source, filePath, reloadKey]() {
+        const ExternalReloadResult result = watcher->result();
+        watcher->deleteLater();
+        bool rerunRequested = m_reloadRerunRequested.remove(reloadKey);
+
+        applyExternalReload(source, filePath, result);
+
+        rerunRequested = m_reloadRerunRequested.remove(reloadKey) || rerunRequested;
+        m_reloadsInFlight.remove(reloadKey);
+
+        if (rerunRequested)
+        {
+            reloadExternallyChangedFile(nullptr, filePath);
+        }
+    });
+    watcher->setFuture(QtConcurrent::run([filePath]() {
+        ExternalReloadResult result;
+        result.success = DocumentIO::loadEditorFile(filePath,
+                                                    &result.content,
+                                                    &result.format,
+                                                    &result.errorMessage);
+        return result;
+    }));
+}
+
+void SplitEditorCoordinator::applyExternalReload(DocumentController *source,
+                                                 const QString &filePath,
+                                                 const ExternalReloadResult &result)
+{
+    if (!result.success)
+    {
+        for (DocumentController *controller : controllers())
+            controller->markExternalConflict(filePath, false);
+        emit externalFileConflict(filePath, false);
+        return;
+    }
+
     QScopedValueRollback<bool> syncing(m_syncingEditorPanes, true);
     bool reloaded = false;
     if (source)
     {
-        reloaded = source->reloadFileFromDiskIfUnmodified(filePath);
+        reloaded = source->applyReloadedContent(filePath, result.content, result.format);
     }
     for (DocumentController *controller : controllers())
     {
         if (controller != source)
         {
-            reloaded = controller->reloadFileFromDiskIfUnmodified(filePath) || reloaded;
+            reloaded = controller->applyReloadedContent(filePath, result.content, result.format)
+                       || reloaded;
         }
     }
     if (!reloaded)

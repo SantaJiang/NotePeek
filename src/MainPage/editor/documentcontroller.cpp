@@ -17,14 +17,26 @@
 #include "find/findreplacemanager.h"
 
 #include <QApplication>
+#include <QCoreApplication>
 #include <QEventLoop>
 #include <QFileInfo>
+#include <QFutureWatcher>
 #include <QMap>
 #include <QMessageBox>
+#include <QScopedValueRollback>
 #include <QSet>
 #include <QSignalBlocker>
+#include <QTimer>
+#include <QtConcurrent>
+
+#include <functional>
+#include <memory>
 
 namespace {
+
+// Insert budget per event-loop tick. Large enough to load typical files in a
+// single pass, small enough that a 100+ MB insert keeps the UI responsive.
+constexpr qsizetype ChunkedInsertBytes = 8 * 1024 * 1024;
 
 bool isMarkdownPath(const QString &filePath)
 {
@@ -48,6 +60,12 @@ void replaceEditorText(CustomEditor *editor, const QByteArray &utf8Content)
     if (!editor)
         return;
 
+    // Scintilla silently ignores modifications on a read-only document, so
+    // lift the flag around the replacement (initial loads keep the editor
+    // read-only until the content is in place).
+    const bool wasReadOnly = editor->isReadOnly();
+    if (wasReadOnly)
+        editor->setReadOnly(false);
     editor->SendScintilla(QsciScintillaBase::SCI_SETUNDOCOLLECTION, 0UL);
     editor->SendScintilla(QsciScintillaBase::SCI_CLEARALL);
     if (!utf8Content.isEmpty())
@@ -59,6 +77,8 @@ void replaceEditorText(CustomEditor *editor, const QByteArray &utf8Content)
     editor->SendScintilla(QsciScintillaBase::SCI_SETUNDOCOLLECTION, 1UL);
     editor->SendScintilla(QsciScintillaBase::SCI_EMPTYUNDOBUFFER);
     editor->SendScintilla(QsciScintillaBase::SCI_SETSAVEPOINT);
+    if (wasReadOnly)
+        editor->setReadOnly(true);
 }
 
 } // namespace
@@ -145,6 +165,11 @@ void DocumentController::attachFindReplaceManager(FindReplaceManager *manager)
 
 void DocumentController::openFile(const QString &filePath, bool activate)
 {
+    if (m_drainingSaves)
+    {
+        return;
+    }
+
     const int previousIndex = m_pane->currentIndex();
 
     // If the file is already open, just activate it.
@@ -167,6 +192,7 @@ void DocumentController::openFile(const QString &filePath, bool activate)
     }
     editor->setFilePath(filePath);
     editor->setReadOnly(true);
+    m_editorsLoading.insert(editor);
 
     const QFileInfo fileInfo(filePath);
     DocumentPage *page = createPage(editor, filePath);
@@ -286,7 +312,11 @@ bool DocumentController::saveFile(CustomEditor *editor, const QString &filePath)
 
     // The application-scoped save coordinator serializes writes to the same
     // destination even when they originate from different split panes.
-    dispatchAsyncSave(editor, filePath, utf8Content, oldFilePath, newFilePath);
+    dispatchAsyncSave(editor,
+                      filePath,
+                      utf8Content,
+                      oldFilePath,
+                      newFilePath);
     editor->setPersistenceState(DocumentPersistenceState::Saving);
 
     editor->setModified(false);
@@ -313,12 +343,18 @@ void DocumentController::dispatchAsyncSave(CustomEditor *editor,
         documentKey = editor;
     }
     const quint64 documentGeneration = m_saveCoordinator->beginDocumentSave(documentKey);
-    m_pendingSaves.insert(requestId, { editor,
-                                       oldFilePath,
-                                       newFilePath,
-                                       utf8Content,
-                                       documentKey,
-                                       documentGeneration });
+    PendingSave pending;
+    pending.editor = editor;
+    pending.oldFilePath = oldFilePath;
+    pending.newFilePath = newFilePath;
+    pending.documentKey = documentKey;
+    pending.documentGeneration = documentGeneration;
+    pending.restoreFormatOnFailure = editor->hasPendingEncodingConversion();
+    if (pending.restoreFormatOnFailure)
+    {
+        pending.formatAtDispatch = editor->documentFormat();
+    }
+    m_pendingSaves.insert(requestId, pending);
     m_persistence->saveFileAsync({ requestId,
                                    filePath,
                                    utf8Content,
@@ -339,6 +375,128 @@ void DocumentController::setSavingTitle(CustomEditor *editor, const QString &fil
     }
 }
 
+void DocumentController::insertContentInChunks(CustomEditor *editor,
+                                               const QByteArray &utf8Content,
+                                               std::function<void()> onFinished)
+{
+    if (!editor)
+        return;
+
+    if (utf8Content.size() <= ChunkedInsertBytes)
+    {
+        replaceEditorText(editor, utf8Content);
+        if (onFinished)
+            onFinished();
+        return;
+    }
+
+    const bool wasReadOnly = editor->isReadOnly();
+    editor->setReadOnly(false);
+    editor->SendScintilla(QsciScintillaBase::SCI_SETUNDOCOLLECTION, 0UL);
+    editor->SendScintilla(QsciScintillaBase::SCI_CLEARALL);
+    editor->setReadOnly(wasReadOnly);
+    m_editorsWithChunkedInsert.insert(editor);
+
+    QPointer<DocumentController> self(this);
+    QPointer<CustomEditor> guard(editor);
+    CustomEditor *rawEditor = editor;
+    auto offset = std::make_shared<qsizetype>(0);
+    auto step = std::make_shared<std::function<void()>>();
+    // The closure holds only a weak reference to itself; the pending timer
+    // lambdas hold the strong references, so the chain frees itself once the
+    // last tick has run (or the controller/editor died).
+    std::weak_ptr<std::function<void()>> weakStep = step;
+    *step = [self, guard, rawEditor, offset, utf8Content, onFinished, weakStep]() {
+        if (!self)
+            return;
+        if (!guard)
+        {
+            self->m_editorsWithChunkedInsert.remove(rawEditor);
+            return;
+        }
+
+        CustomEditor *target = guard.data();
+        const qsizetype total = utf8Content.size();
+        const qsizetype chunk = qMin(ChunkedInsertBytes, total - *offset);
+        const bool readOnly = target->isReadOnly();
+        target->setReadOnly(false);
+        target->SendScintilla(QsciScintillaBase::SCI_APPENDTEXT,
+                              static_cast<unsigned long>(chunk),
+                              utf8Content.constData() + *offset);
+        target->setReadOnly(readOnly);
+        *offset += chunk;
+
+        if (*offset < total)
+        {
+            if (auto strongStep = weakStep.lock())
+            {
+                QTimer::singleShot(0, self.data(), [strongStep]() { (*strongStep)(); });
+            }
+            return;
+        }
+
+        self->m_editorsWithChunkedInsert.remove(rawEditor);
+        target->SendScintilla(QsciScintillaBase::SCI_SETUNDOCOLLECTION, 1UL);
+        target->SendScintilla(QsciScintillaBase::SCI_EMPTYUNDOBUFFER);
+        target->SendScintilla(QsciScintillaBase::SCI_SETSAVEPOINT);
+        if (onFinished)
+            onFinished();
+    };
+    (*step)();
+}
+
+bool DocumentController::replaceContentWithEventLoopYield(CustomEditor *editor,
+                                                          const QByteArray &utf8Content)
+{
+    if (!editor)
+        return false;
+
+    if (utf8Content.size() <= ChunkedInsertBytes)
+    {
+        replaceEditorText(editor, utf8Content);
+        return true;
+    }
+
+    const bool wasReadOnly = editor->isReadOnly();
+    const bool updatesWereEnabled = editor->updatesEnabled();
+    QPointer<CustomEditor> guard(editor);
+    CustomEditor *rawEditor = editor;
+
+    m_editorsWithChunkedInsert.insert(editor);
+    editor->setUpdatesEnabled(false);
+    editor->setReadOnly(false);
+    editor->SendScintilla(QsciScintillaBase::SCI_SETUNDOCOLLECTION, 0UL);
+    editor->SendScintilla(QsciScintillaBase::SCI_CLEARALL);
+
+    qsizetype offset = 0;
+    while (offset < utf8Content.size())
+    {
+        const qsizetype chunk = qMin(ChunkedInsertBytes, utf8Content.size() - offset);
+        editor->SendScintilla(QsciScintillaBase::SCI_APPENDTEXT,
+                              static_cast<unsigned long>(chunk),
+                              utf8Content.constData() + offset);
+        offset += chunk;
+        if (offset < utf8Content.size())
+        {
+            QCoreApplication::processEvents(QEventLoop::ExcludeUserInputEvents);
+            if (!guard)
+            {
+                m_editorsWithChunkedInsert.remove(rawEditor);
+                return false;
+            }
+            editor = guard.data();
+        }
+    }
+
+    editor->SendScintilla(QsciScintillaBase::SCI_SETUNDOCOLLECTION, 1UL);
+    editor->SendScintilla(QsciScintillaBase::SCI_EMPTYUNDOBUFFER);
+    editor->SendScintilla(QsciScintillaBase::SCI_SETSAVEPOINT);
+    editor->setReadOnly(wasReadOnly);
+    editor->setUpdatesEnabled(updatesWereEnabled);
+    m_editorsWithChunkedInsert.remove(rawEditor);
+    return true;
+}
+
 void DocumentController::onFileLoaded(const DocumentLoadResult &result)
 {
     const PendingLoad pending = m_pendingLoads.take(result.requestId);
@@ -355,10 +513,10 @@ void DocumentController::onFileLoaded(const DocumentLoadResult &result)
         return;
     }
 
-    editor->setReadOnly(false);
-
     if (!result.success)
     {
+        m_editorsLoading.remove(editor);
+        editor->setReadOnly(false);
         m_pane->removePage(tabIndex);
         emit editorClosed(editor);
         m_editorManager->forgetEditor(editor);
@@ -373,36 +531,55 @@ void DocumentController::onFileLoaded(const DocumentLoadResult &result)
                              tr("Cannot read file %1:\n%2.")
                              .arg(result.filePath)
                              .arg(result.errorMessage));
+        emit fileOpenFailed(result.filePath);
         return;
     }
 
+    // The editor stays read-only and repaint-suppressed until the whole
+    // content is in place; chunked insertion keeps the event loop alive for
+    // files above the per-tick budget.
     editor->setUpdatesEnabled(false);
-    replaceEditorText(editor, result.content);
-    editor->setDocumentFormat(result.format);
-    applyDocumentLineEnding(editor, result.format.lineEnding);
-    editor->setUpdatesEnabled(true);
+    QPointer<CustomEditor> editorGuard(editor);
+    QPointer<DocumentPage> pageGuard(page);
+    const DocumentFormat format = result.format;
+    const QString filePath = result.filePath;
+    const bool largeFile = result.largeFile;
+    const bool activate = pending.activate;
+    const int previousIndex = pending.previousIndex;
+    insertContentInChunks(editor, result.content,
+                          [this, editorGuard, pageGuard, format, filePath, largeFile, activate, previousIndex]() {
+        if (!editorGuard)
+            return;
 
-    if (!result.largeFile && AppPreferences::instance().markdownDefaultPreview() && m_markdownPreviewer)
-    {
-        if (auto *markdownPage = qobject_cast<MarkdownDocumentPage *>(page))
+        CustomEditor *editor = editorGuard.data();
+        editor->setDocumentFormat(format);
+        applyDocumentLineEnding(editor, format.lineEnding);
+        editor->setUpdatesEnabled(true);
+        editor->setReadOnly(false);
+
+        if (!largeFile && AppPreferences::instance().markdownDefaultPreview() && m_markdownPreviewer)
         {
-            markdownPage->setInitialViewMode(true, m_markdownPreviewer, pending.activate);
+            if (auto *markdownPage = qobject_cast<MarkdownDocumentPage *>(pageGuard.data()))
+            {
+                markdownPage->setInitialViewMode(true, m_markdownPreviewer, activate);
+            }
         }
-    }
 
-    setCurrentFile(editor, result.filePath);
-    m_editorManager->updateLineNumberMarginWidth(editor);
-    closeDefaultEditorIfUnused();
-    if (pending.activate)
-    {
-        m_pane->focusEditor(editor);
-    }
-    else if (pending.previousIndex >= 0 && pending.previousIndex < m_pane->count())
-    {
-        m_pane->setCurrentIndex(pending.previousIndex);
-    }
+        setCurrentFile(editor, filePath);
+        m_editorManager->updateLineNumberMarginWidth(editor);
+        closeDefaultEditorIfUnused();
+        if (activate)
+        {
+            m_pane->focusEditor(editor);
+        }
+        else if (previousIndex >= 0 && previousIndex < m_pane->count())
+        {
+            m_pane->setCurrentIndex(previousIndex);
+        }
 
-    emit fileOpened(editor, result.filePath);
+        m_editorsLoading.remove(editor);
+        emit fileOpened(editor, filePath);
+    });
 }
 
 void DocumentController::onFileSaved(const DocumentSaveResult &result)
@@ -428,19 +605,20 @@ void DocumentController::onFileSaved(const DocumentSaveResult &result)
 
     if (!result.success)
     {
+        const DocumentFormat currentFormat = editor ? editor->documentFormat()
+                                                    : DocumentFormat{};
+        if (latestForEditor && editor && pending.restoreFormatOnFailure
+            && currentFormat.encoding == pending.formatAtDispatch.encoding
+            && currentFormat.lineEnding == pending.formatAtDispatch.lineEnding)
+        {
+            editor->finishEncodingConversion(false);
+        }
         if (latestForEditor && editor)
             editor->setPersistenceState(DocumentPersistenceState::SaveFailed);
         // An obsolete failure must not dirty a document after a newer request
         // has already superseded it.
-        if (latestForEditor && !editor->isModified())
-        {
-            editor->setModified(true);
-            emit editorModificationChanged(editor, true);
-            if (editor == currentEditor())
-            {
-                emit modificationChanged(true);
-            }
-        }
+        if (latestForEditor && editor)
+            editor->markModified();
 
         // Restore the tab title from the transient "(saving)" state so the tab
         // does not stay stuck showing that a save is in progress.
@@ -467,20 +645,14 @@ void DocumentController::onFileSaved(const DocumentSaveResult &result)
 
     if (latestForEditor)
     {
-        QByteArray currentContent;
-        QString snapshotError;
-        if (m_persistence->saveEditorSnapshot(editor,
-                                              &currentContent,
-                                              &snapshotError)
-            && currentContent == pending.utf8Content)
-        {
-            editor->setModified(false);
-            editor->setPersistenceState(DocumentPersistenceState::Clean);
-        }
-        else
-        {
-            editor->setPersistenceState(DocumentPersistenceState::Dirty);
-        }
+        if (pending.restoreFormatOnFailure)
+            editor->finishEncodingConversion(true);
+        // saveFile() cleared the modified flag when the snapshot was taken, so
+        // any modification now means the user edited while the write was in
+        // flight — the buffer no longer matches the bytes on disk.
+        editor->setPersistenceState(editor->isModified()
+                                        ? DocumentPersistenceState::Dirty
+                                        : DocumentPersistenceState::Clean);
         applySavedFileState(editor, result.filePath, pending.oldFilePath, pending.newFilePath);
     }
 }
@@ -600,6 +772,11 @@ void DocumentController::applySavedFileState(CustomEditor *editor,
 
 void DocumentController::waitForPendingSaves()
 {
+    // Completion results are delivered as queued signals, so waiting must
+    // keep processing main-thread events. m_drainingSaves shields the
+    // controller from re-entrant document mutations (external reloads, opens,
+    // closes) that those events could otherwise trigger mid-drain.
+    const QScopedValueRollback<bool> draining(m_drainingSaves, true);
     while (!m_pendingSaves.isEmpty())
     {
         QEventLoop loop;
@@ -628,6 +805,7 @@ bool DocumentController::hasPendingSave(CustomEditor *editor) const
 
 void DocumentController::waitForPendingSaves(CustomEditor *editor)
 {
+    const QScopedValueRollback<bool> draining(m_drainingSaves, true);
     while (hasPendingSave(editor))
     {
         QEventLoop loop;
@@ -639,6 +817,13 @@ void DocumentController::waitForPendingSaves(CustomEditor *editor)
 
 void DocumentController::requestClose(int index)
 {
+    // A close arriving while another close is draining saves (event-loop
+    // re-entrance) would corrupt the pane state mid-operation.
+    if (m_drainingSaves)
+    {
+        return;
+    }
+
     DocumentPage *page = m_pane->pageAt(index);
     CustomEditor *editor = page ? page->editor() : nullptr;
     if (!editor)
@@ -671,6 +856,11 @@ void DocumentController::requestClose(int index)
 
 bool DocumentController::closeFileIfUnmodified(const QString &filePath)
 {
+    if (m_drainingSaves)
+    {
+        return false;
+    }
+
     const int index = indexOfFile(filePath);
     if (index == -1)
     {
@@ -770,7 +960,7 @@ void DocumentController::openSharedDocument(CustomEditor *sourceEditor, bool act
     connectEditorSignals(editor);
     const int tabIndex = m_pane->addPage(page, displayName, filePath);
 
-    if (filePath.isEmpty() && !sourceEditor->isModified() && sourceEditor->text().isEmpty())
+    if (filePath.isEmpty() && !sourceEditor->isModified() && sourceEditor->length() == 0)
     {
         m_defaultEditor = editor;
     }
@@ -812,36 +1002,25 @@ bool DocumentController::adoptSharedDocumentPath(CustomEditor *sourceEditor, con
     return true;
 }
 
-bool DocumentController::reloadFileFromDiskIfUnmodified(const QString &filePath)
+bool DocumentController::hasTrackedFile(const QString &filePath) const
 {
     const QString normalizedPath = DocumentRegistry::normalizedFilePath(filePath);
-    if (normalizedPath.isEmpty()
-        || !DocumentRegistry::trackedFilePaths(m_editorManager->getEditors()).contains(normalizedPath))
-    {
-        return false;
-    }
+    return !normalizedPath.isEmpty()
+           && DocumentRegistry::trackedFilePaths(m_editorManager->getEditors()).contains(normalizedPath);
+}
 
-    const QFileInfo fileInfo(normalizedPath);
-    const bool exists = fileInfo.exists() && fileInfo.isFile();
-
-    if (!exists)
+bool DocumentController::applyReloadedContent(const QString &filePath,
+                                              const QByteArray &utf8Content,
+                                              const DocumentFormat &format)
+{
+    const QString normalizedPath = DocumentRegistry::normalizedFilePath(filePath);
+    if (m_drainingSaves || normalizedPath.isEmpty() || !hasTrackedFile(normalizedPath))
     {
-        recordFileState(normalizedPath);
-        refreshWatchedFiles();
         return false;
     }
 
     if (hasModifiedEditorForFile(normalizedPath))
     {
-        return false;
-    }
-
-    QString content;
-    DocumentFormat format;
-    QString errorMessage;
-    if (!DocumentIO::loadTextFile(normalizedPath, &content, &format, &errorMessage))
-    {
-        refreshWatchedFiles();
         return false;
     }
 
@@ -853,6 +1032,14 @@ bool DocumentController::reloadFileFromDiskIfUnmodified(const QString &filePath)
     for (CustomEditor *editor : m_editorManager->getEditors())
     {
         if (!editor || DocumentRegistry::normalizedFilePath(editor->filePath()) != normalizedPath)
+        {
+            continue;
+        }
+
+        // An editor still receiving its initial chunked content must not be
+        // replaced under the inserter's feet; the watcher fires again on the
+        // next external change.
+        if (m_editorsWithChunkedInsert.contains(editor))
         {
             continue;
         }
@@ -875,7 +1062,10 @@ bool DocumentController::reloadFileFromDiskIfUnmodified(const QString &filePath)
         const int xOffset = editor->SendScintilla(QsciScintillaBase::SCI_GETXOFFSET);
 
         const QSignalBlocker blocker(editor);
-        replaceEditorText(editor, content.toUtf8());
+        if (!replaceContentWithEventLoopYield(editor, utf8Content))
+        {
+            continue;
+        }
         editor->setDocumentFormat(format);
         applyDocumentLineEnding(editor, format.lineEnding);
         editor->setExternalConflict(false);
@@ -911,6 +1101,175 @@ bool DocumentController::reloadFileFromDiskIfUnmodified(const QString &filePath)
     return reloaded;
 }
 
+void DocumentController::reopenCurrentWithEncoding(DocumentEncoding encoding)
+{
+    CustomEditor *editor = currentEditor();
+    if (m_drainingSaves || !editor || editor->filePath().isEmpty()
+        || m_editorsWithChunkedInsert.contains(editor)
+        || m_editorsWithEncodingReload.contains(editor))
+    {
+        return;
+    }
+
+    // Reopening must observe the last successfully written snapshot. Otherwise
+    // a concurrent save can finish after the read and leave disk and memory
+    // representing different revisions.
+    waitForPendingSaves(editor);
+    if (!editor || m_drainingSaves || m_editorsWithEncodingReload.contains(editor))
+    {
+        return;
+    }
+
+    if (editor->isModified())
+    {
+        const auto answer = QMessageBox::question(
+            m_pane, tr("Reopen with Encoding"),
+            tr("Reopening the file will discard the unsaved changes. Continue?"),
+            QMessageBox::Yes | QMessageBox::Cancel, QMessageBox::Cancel);
+        if (answer != QMessageBox::Yes)
+        {
+            return;
+        }
+    }
+
+    struct EncodedReloadResult
+    {
+        bool success = false;
+        QByteArray content;
+        DocumentFormat format;
+        QString errorMessage;
+    };
+
+    const QString filePath = editor->filePath();
+    const quint64 expectedRevision = m_editorContentRevisions.value(editor);
+    const quint64 reloadGeneration = editor->beginEncodingReload();
+    const bool wasReadOnly = editor->isReadOnly();
+    editor->setReadOnly(true);
+    m_editorsWithEncodingReload.insert(editor);
+    QPointer<CustomEditor> editorGuard(editor);
+    CustomEditor *rawEditor = editor;
+    auto *watcher = new QFutureWatcher<EncodedReloadResult>(this);
+    connect(watcher, &QFutureWatcher<EncodedReloadResult>::finished,
+            this, [this, watcher, editorGuard, rawEditor, filePath, expectedRevision, reloadGeneration, wasReadOnly]() {
+        const EncodedReloadResult result = watcher->result();
+        watcher->deleteLater();
+
+        CustomEditor *editor = editorGuard.data();
+        m_editorsWithEncodingReload.remove(rawEditor);
+        if (!editor)
+        {
+            return;
+        }
+        editor->setReadOnly(wasReadOnly);
+        if (!DocumentPath::equivalent(editor->filePath(), filePath))
+        {
+            return;
+        }
+        if (!editor->isCurrentEncodingReload(reloadGeneration))
+        {
+            return;
+        }
+        // A shared view can still modify the same Scintilla document while
+        // this view is read-only. Never replace a revision newer than the one
+        // the user agreed to discard.
+        if (m_editorContentRevisions.value(editor) != expectedRevision)
+        {
+            return;
+        }
+        if (!result.success)
+        {
+            QMessageBox::warning(m_pane, tr("NotePeek"),
+                                 tr("Cannot read file %1:\n%2.")
+                                 .arg(filePath)
+                                 .arg(result.errorMessage));
+            return;
+        }
+
+        int line = 0;
+        int index = 0;
+        editor->getCursorPosition(&line, &index);
+        const int firstVisibleLine = editor->SendScintilla(QsciScintillaBase::SCI_GETFIRSTVISIBLELINE);
+
+        {
+            const QSignalBlocker blocker(editor);
+            if (!replaceContentWithEventLoopYield(editor, result.content))
+            {
+                return;
+            }
+            editor->setDocumentFormat(result.format);
+            applyDocumentLineEnding(editor, result.format.lineEnding);
+            editor->setExternalConflict(false);
+            editor->setModified(false);
+            editor->setPersistenceState(DocumentPersistenceState::Clean);
+
+            const int targetLine = qBound(0, line, qMax(0, editor->lines() - 1));
+            editor->setCursorPosition(targetLine, qBound(0, index, editor->lineLength(targetLine)));
+            editor->SendScintilla(QsciScintillaBase::SCI_SETFIRSTVISIBLELINE, firstVisibleLine);
+            m_editorManager->updateLineNumberMarginWidth(editor);
+        }
+
+        if (DocumentPage *page = m_pane->pageForEditor(editor))
+        {
+            page->refreshPreview();
+        }
+        recordFileState(filePath);
+        emit editorModificationChanged(editor, false);
+        if (editor == currentEditor())
+        {
+            emit modificationChanged(false);
+            emit currentFileChanged(editor, filePath);
+        }
+    });
+    watcher->setFuture(QtConcurrent::run([filePath, encoding]() {
+        EncodedReloadResult result;
+        result.success = DocumentIO::loadEditorFileWithEncoding(filePath,
+                                                                encoding,
+                                                                &result.content,
+                                                                &result.format,
+                                                                &result.errorMessage);
+        return result;
+    }));
+}
+
+bool DocumentController::convertEncodingAndSave(DocumentEncoding encoding)
+{
+    CustomEditor *editor = currentEditor();
+    if (!editor)
+    {
+        return false;
+    }
+
+    DocumentFormat format = editor->documentFormat();
+    if (format.encoding == encoding)
+    {
+        return true;
+    }
+    editor->beginEncodingConversion(encoding);
+
+    QString filePath = editor->filePath();
+    if (filePath.isEmpty())
+    {
+        filePath = m_persistence->promptSaveFileName(m_pane);
+        if (filePath.isEmpty())
+        {
+            editor->finishEncodingConversion(false);
+            return false;
+        }
+    }
+
+    if (!saveFile(editor, filePath))
+    {
+        editor->finishEncodingConversion(false);
+        return false;
+    }
+    return true;
+}
+
+bool DocumentController::isEditorLoading(CustomEditor *editor) const
+{
+    return editor && m_editorsLoading.contains(editor);
+}
+
 bool DocumentController::hasModifiedEditorForFile(const QString &filePath) const
 {
     return DocumentRegistry::hasModifiedEditorForFile(m_editorManager->getEditors(), filePath);
@@ -923,8 +1282,8 @@ void DocumentController::markExternalConflict(const QString &filePath, bool dele
         if (!editor || !DocumentPath::equivalent(editor->filePath(), filePath))
             continue;
         editor->setExternalConflict(true, deleted);
-        if (deleted && !editor->isModified())
-            editor->setModified(true);
+        if (deleted)
+            editor->markModified();
     }
     recordFileState(filePath);
 }
@@ -1007,11 +1366,21 @@ void DocumentController::connectEditorSignals(CustomEditor *editor)
 
     connect(editor, SIGNAL(modificationChanged(bool)), this, SLOT(onEditorModificationChanged()));
     connect(editor, SIGNAL(copyAvailable(bool)), this, SIGNAL(copyAvailable(bool)));
+    m_editorContentRevisions.insert(editor, 0);
+    connect(editor, &CustomEditor::textChanged, this, [this, editor]() {
+        ++m_editorContentRevisions[editor];
+    });
+    connect(editor, &QObject::destroyed, this, [this, editor]() {
+        m_editorContentRevisions.remove(editor);
+        m_editorsLoading.remove(editor);
+        m_editorsWithEncodingReload.remove(editor);
+        m_editorsWithChunkedInsert.remove(editor);
+    });
 }
 
 bool DocumentController::closeDefaultEditorIfUnused()
 {
-    if (!m_defaultEditor || m_defaultEditor->isModified() || !m_defaultEditor->text().isEmpty())
+    if (!m_defaultEditor || m_defaultEditor->isModified() || m_defaultEditor->length() != 0)
     {
         return false;
     }
