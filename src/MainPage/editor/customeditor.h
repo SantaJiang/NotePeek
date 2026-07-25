@@ -25,6 +25,16 @@ public:
     void shareDocumentSessionFrom(const CustomEditor *source);
     void setPersistenceState(DocumentPersistenceState state);
     DocumentPersistenceState persistenceState() const;
+    bool isModified() const;
+    void setModified(bool modified) override;
+    // QsciScintilla::setModified(true) is intentionally a no-op. This keeps a
+    // shared forced-dirty state for failed saves and external deletions.
+    void markModified();
+    void beginEncodingConversion(DocumentEncoding encoding);
+    bool hasPendingEncodingConversion() const;
+    void finishEncodingConversion(bool success);
+    quint64 beginEncodingReload();
+    bool isCurrentEncodingReload(quint64 generation) const;
     void setCodeEditingFeaturesEnabled(bool enabled);
     bool codeEditingFeaturesEnabled() const;
     void setBracketAssistanceEnabled(bool enabled);

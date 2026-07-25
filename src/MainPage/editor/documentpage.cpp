@@ -362,7 +362,14 @@ void MarkdownDocumentPage::updatePreview()
         return;
     }
 
-    m_latestPreviewRequestId = m_previewer->renderPreviewAsync(m_editor->text(),
+    // Snapshot straight from Scintilla's buffer: text() would copy the whole
+    // document twice (SCI_GETTEXT + UTF-16 conversion); this converts once.
+    const char *buffer = reinterpret_cast<const char *>(
+        m_editor->SendScintillaPtrResult(QsciScintillaBase::SCI_GETCHARACTERPOINTER));
+    const QString markdown = buffer
+                                 ? QString::fromUtf8(buffer, documentLength)
+                                 : m_editor->text();
+    m_latestPreviewRequestId = m_previewer->renderPreviewAsync(markdown,
                                                                m_editor->filePath(),
                                                                this);
 }

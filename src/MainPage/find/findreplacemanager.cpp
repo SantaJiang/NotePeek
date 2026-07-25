@@ -4,7 +4,6 @@
 #include "editor/performanceconstants.h"
 #include "decorators/highlightedscrollbardecorator.h"
 #include <QMessageBox>
-#include <QFileInfo>
 #include <QTimer>
 #include <QScrollBar>
 
@@ -170,11 +169,17 @@ void FindReplaceManager::replaceAll()
     int replaceCount = 0;
     bool found = m_editor->findFirst(m_findText, re, cs, wo, wrap, forward);
 
+    // One undo step for the whole pass, and no repaints per match — a large
+    // replace-all otherwise restyles and repaints the view once per occurrence.
+    m_editor->setUpdatesEnabled(false);
+    m_editor->beginUndoAction();
     while (found) {
         m_editor->replaceSelectedText(m_replaceText);
         replaceCount++;
         found = m_editor->findNext();
     }
+    m_editor->endUndoAction();
+    m_editor->setUpdatesEnabled(true);
 
     m_editor->setCursorPosition(currentLine, currentIndex);
     m_editor->SendScintilla(QsciScintillaBase::SCI_SETFIRSTVISIBLELINE, firstVisibleLine);
@@ -366,9 +371,9 @@ bool FindReplaceManager::isLargeFile() const
     if (!m_editor)
         return false;
 
-    QString filePath = m_editor->filePath();
-    QFileInfo fileInfo(filePath);
-    return (fileInfo.size() > PerformanceConstants::LargeFileSize);
+    // The in-memory buffer is the authority: an unsaved buffer has no on-disk
+    // size, and the disk size can differ from what is actually being searched.
+    return m_editor->length() > PerformanceConstants::LargeFileSize;
 }
 
 bool FindReplaceManager::selectionMatchesSearchResults(int position, int length) const

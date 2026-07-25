@@ -81,19 +81,6 @@ int main(int argc, char *argv[])
     qDebug() << "Running on unknown platform";
 #endif
 
-    //translate
-    QTranslator translator;
-    const QStringList uiLanguages = QLocale::system().uiLanguages();
-    for (const QString &locale : uiLanguages)
-    {
-        const QString baseName = QStringLiteral("notepeek_") + QLocale(locale).name();
-        if (translator.load(QStringLiteral(":/i18n/") + baseName))
-        {
-            a.installTranslator(&translator);
-            break;
-        }
-    }
-
     //font — install the bundled families so they are available as editor fonts
     //regardless of what the host system ships.
     if (QFontDatabase::addApplicationFont(QStringLiteral("://resource/SourceCodePro-Regular.ttf")) == -1)
@@ -113,8 +100,31 @@ int main(int argc, char *argv[])
     }
 
     // Load persisted user preferences after the fonts are registered so font
-    // validation sees the bundled families.
+    // validation sees the bundled families, and before the translator so the
+    // language preference can override the system locale.
     AppPreferences::instance().load();
+
+    //translate — an explicit language preference wins over the system locale
+    QTranslator translator;
+    QStringList uiLanguages;
+    const QString preferredLanguage = AppPreferences::instance().language();
+    if (!preferredLanguage.isEmpty())
+    {
+        uiLanguages.append(preferredLanguage);
+    }
+    else
+    {
+        uiLanguages = QLocale::system().uiLanguages();
+    }
+    for (const QString &locale : uiLanguages)
+    {
+        const QString baseName = QStringLiteral("notepeek_") + QLocale(locale).name();
+        if (translator.load(QStringLiteral(":/i18n/") + baseName))
+        {
+            a.installTranslator(&translator);
+            break;
+        }
+    }
 
     MainWindow w(nullptr,
                  commandLine.positionalArguments(),

@@ -69,7 +69,13 @@ bool DocumentPersistenceService::saveEditorSnapshot(CustomEditor *editor,
     }
     else
     {
-        *utf8Content = DocumentFormatCodec::encode(editor->text(), format);
+        // Convert straight from Scintilla's buffer; text() would copy the
+        // whole document an extra time before the encode pass.
+        const char *buffer = reinterpret_cast<const char *>(
+            editor->SendScintillaPtrResult(QsciScintillaBase::SCI_GETCHARACTERPOINTER));
+        const QString text = buffer ? QString::fromUtf8(buffer, int(length))
+                                    : editor->text();
+        *utf8Content = DocumentFormatCodec::encode(text, format);
     }
     return true;
 }

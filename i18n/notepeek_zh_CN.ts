@@ -4,66 +4,78 @@
 <context>
     <name>DocumentController</name>
     <message>
-        <location filename="../src/MainPage/editor/documentcontroller.cpp" line="280"/>
-        <location filename="../src/MainPage/editor/documentcontroller.cpp" line="372"/>
-        <location filename="../src/MainPage/editor/documentcontroller.cpp" line="460"/>
-        <location filename="../src/MainPage/editor/documentcontroller.cpp" line="526"/>
-        <location filename="../src/MainPage/editor/documentcontroller.cpp" line="536"/>
+        <location filename="../src/MainPage/editor/documentcontroller.cpp" line="298"/>
+        <location filename="../src/MainPage/editor/documentcontroller.cpp" line="458"/>
+        <location filename="../src/MainPage/editor/documentcontroller.cpp" line="563"/>
+        <location filename="../src/MainPage/editor/documentcontroller.cpp" line="621"/>
+        <location filename="../src/MainPage/editor/documentcontroller.cpp" line="631"/>
+        <location filename="../src/MainPage/editor/documentcontroller.cpp" line="1050"/>
         <source>NotePeek</source>
         <translation>NotePeek</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/editor/documentcontroller.cpp" line="281"/>
-        <location filename="../src/MainPage/editor/documentcontroller.cpp" line="527"/>
+        <location filename="../src/MainPage/editor/documentcontroller.cpp" line="299"/>
+        <location filename="../src/MainPage/editor/documentcontroller.cpp" line="622"/>
         <source>Cannot prepare file %1 for saving:
 %2.</source>
         <translation>无法准备文件 %1 以进行保存：
 %2。</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/editor/documentcontroller.cpp" line="336"/>
+        <location filename="../src/MainPage/editor/documentcontroller.cpp" line="353"/>
         <source>untitled.txt</source>
         <translation>未命名.txt</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/editor/documentcontroller.cpp" line="338"/>
+        <location filename="../src/MainPage/editor/documentcontroller.cpp" line="355"/>
         <source> (saving)</source>
         <translation>（正在保存）</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/editor/documentcontroller.cpp" line="373"/>
+        <location filename="../src/MainPage/editor/documentcontroller.cpp" line="459"/>
+        <location filename="../src/MainPage/editor/documentcontroller.cpp" line="1051"/>
         <source>Cannot read file %1:
 %2.</source>
         <translation>无法读取文件 %1：
 %2。</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/editor/documentcontroller.cpp" line="461"/>
-        <location filename="../src/MainPage/editor/documentcontroller.cpp" line="537"/>
+        <location filename="../src/MainPage/editor/documentcontroller.cpp" line="564"/>
+        <location filename="../src/MainPage/editor/documentcontroller.cpp" line="632"/>
         <source>Cannot write file %1:
 %2.</source>
         <translation>无法写入文件 %1：
 %2。</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/editor/documentcontroller.cpp" line="716"/>
-        <location filename="../src/MainPage/editor/documentcontroller.cpp" line="718"/>
-        <location filename="../src/MainPage/editor/documentcontroller.cpp" line="757"/>
+        <location filename="../src/MainPage/editor/documentcontroller.cpp" line="811"/>
+        <location filename="../src/MainPage/editor/documentcontroller.cpp" line="813"/>
+        <location filename="../src/MainPage/editor/documentcontroller.cpp" line="852"/>
         <source>Untitled</source>
         <translation>未命名</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/editor/documentcontroller.cpp" line="1167"/>
+        <location filename="../src/MainPage/editor/documentcontroller.cpp" line="1018"/>
+        <source>Reopen with Encoding</source>
+        <translation>以指定编码重新打开</translation>
+    </message>
+    <message>
+        <location filename="../src/MainPage/editor/documentcontroller.cpp" line="1019"/>
+        <source>Reopening the file will discard the unsaved changes. Continue?</source>
+        <translation>重新打开文件将丢弃未保存的更改。是否继续？</translation>
+    </message>
+    <message>
+        <location filename="../src/MainPage/editor/documentcontroller.cpp" line="1371"/>
         <source>The file was deleted outside NotePeek. Saving will recreate it.</source>
         <translation>文件已在 NotePeek 外部被删除。保存将重新创建该文件。</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/editor/documentcontroller.cpp" line="1168"/>
+        <location filename="../src/MainPage/editor/documentcontroller.cpp" line="1372"/>
         <source>The file changed outside NotePeek. Saving will overwrite those changes.</source>
         <translation>文件已在 NotePeek 外部发生更改。保存将覆盖这些更改。</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/editor/documentcontroller.cpp" line="1170"/>
+        <location filename="../src/MainPage/editor/documentcontroller.cpp" line="1374"/>
         <source>External File Conflict</source>
         <translation>外部文件冲突</translation>
     </message>
@@ -86,28 +98,28 @@
         <translation>无法访问编辑器缓冲区。</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/editor/documentpersistenceservice.cpp" line="94"/>
+        <location filename="../src/MainPage/editor/documentpersistenceservice.cpp" line="100"/>
         <source>The file is larger than the supported 256 MB editing limit.</source>
         <translation>文件超过支持的 256 MB 编辑上限。</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/editor/documentpersistenceservice.cpp" line="118"/>
+        <location filename="../src/MainPage/editor/documentpersistenceservice.cpp" line="124"/>
         <source>Text Files (*.txt)</source>
         <translation>文本文件 (*.txt)</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/editor/documentpersistenceservice.cpp" line="129"/>
-        <location filename="../src/MainPage/editor/documentpersistenceservice.cpp" line="139"/>
+        <location filename="../src/MainPage/editor/documentpersistenceservice.cpp" line="135"/>
+        <location filename="../src/MainPage/editor/documentpersistenceservice.cpp" line="145"/>
         <source>All Files (*)</source>
         <translation>所有文件 (*)</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/editor/documentpersistenceservice.cpp" line="132"/>
+        <location filename="../src/MainPage/editor/documentpersistenceservice.cpp" line="138"/>
         <source>Save As</source>
         <translation>另存为</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/editor/documentpersistenceservice.cpp" line="159"/>
+        <location filename="../src/MainPage/editor/documentpersistenceservice.cpp" line="165"/>
         <source>untitled.txt</source>
         <translation>未命名.txt</translation>
     </message>
@@ -115,7 +127,7 @@
 <context>
     <name>EditorManager</name>
     <message>
-        <location filename="../src/MainPage/editor/editormanager.cpp" line="275"/>
+        <location filename="../src/MainPage/editor/editormanager.cpp" line="277"/>
         <source>Untitled</source>
         <translation>未命名</translation>
     </message>
@@ -211,40 +223,40 @@
 <context>
     <name>FindReplaceManager</name>
     <message>
-        <location filename="../src/MainPage/find/findreplacemanager.cpp" line="53"/>
-        <location filename="../src/MainPage/find/findreplacemanager.cpp" line="90"/>
+        <location filename="../src/MainPage/find/findreplacemanager.cpp" line="52"/>
+        <location filename="../src/MainPage/find/findreplacemanager.cpp" line="89"/>
         <source>Find</source>
         <translation>查找</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/find/findreplacemanager.cpp" line="53"/>
-        <location filename="../src/MainPage/find/findreplacemanager.cpp" line="90"/>
-        <location filename="../src/MainPage/find/findreplacemanager.cpp" line="120"/>
-        <location filename="../src/MainPage/find/findreplacemanager.cpp" line="148"/>
+        <location filename="../src/MainPage/find/findreplacemanager.cpp" line="52"/>
+        <location filename="../src/MainPage/find/findreplacemanager.cpp" line="89"/>
+        <location filename="../src/MainPage/find/findreplacemanager.cpp" line="119"/>
+        <location filename="../src/MainPage/find/findreplacemanager.cpp" line="147"/>
         <source>No active editor.</source>
         <translation>当前没有文件</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/find/findreplacemanager.cpp" line="120"/>
-        <location filename="../src/MainPage/find/findreplacemanager.cpp" line="129"/>
+        <location filename="../src/MainPage/find/findreplacemanager.cpp" line="119"/>
+        <location filename="../src/MainPage/find/findreplacemanager.cpp" line="128"/>
         <source>Replace</source>
         <translation>替换</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/find/findreplacemanager.cpp" line="148"/>
-        <location filename="../src/MainPage/find/findreplacemanager.cpp" line="153"/>
-        <location filename="../src/MainPage/find/findreplacemanager.cpp" line="182"/>
+        <location filename="../src/MainPage/find/findreplacemanager.cpp" line="147"/>
+        <location filename="../src/MainPage/find/findreplacemanager.cpp" line="152"/>
+        <location filename="../src/MainPage/find/findreplacemanager.cpp" line="187"/>
         <source>Replace All</source>
         <translation>替换所有</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/find/findreplacemanager.cpp" line="129"/>
-        <location filename="../src/MainPage/find/findreplacemanager.cpp" line="153"/>
+        <location filename="../src/MainPage/find/findreplacemanager.cpp" line="128"/>
+        <location filename="../src/MainPage/find/findreplacemanager.cpp" line="152"/>
         <source>The search field is empty.</source>
         <translation>搜索字段为空</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/find/findreplacemanager.cpp" line="183"/>
+        <location filename="../src/MainPage/find/findreplacemanager.cpp" line="188"/>
         <source>Replaced %1 occurrence(s).</source>
         <translation>已替换 %1 处。</translation>
     </message>
@@ -337,12 +349,12 @@
     <name>MainWindow</name>
     <message>
         <location filename="../src/MainPage/mainwindow.ui" line="14"/>
-        <location filename="../src/MainPage/mainwindow.cpp" line="694"/>
+        <location filename="../src/MainPage/mainwindow.cpp" line="825"/>
         <source>NotePeek</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="../src/MainPage/mainwindow.ui" line="315"/>
+        <location filename="../src/MainPage/mainwindow.ui" line="324"/>
         <source>Side Preview</source>
         <translation>侧边预览</translation>
     </message>
@@ -352,22 +364,22 @@
         <translation>代码折叠</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/mainwindow.ui" line="275"/>
+        <location filename="../src/MainPage/mainwindow.ui" line="284"/>
         <source>Fold/Unfold Current Block</source>
         <translation>折叠/展开当前代码块</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/mainwindow.ui" line="283"/>
+        <location filename="../src/MainPage/mainwindow.ui" line="292"/>
         <source>Fold/Unfold All</source>
         <translation>折叠/展开全部</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/mainwindow.ui" line="288"/>
+        <location filename="../src/MainPage/mainwindow.ui" line="297"/>
         <source>Go to Matching Bracket</source>
         <translation>跳转到匹配括号</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/mainwindow.ui" line="296"/>
+        <location filename="../src/MainPage/mainwindow.ui" line="305"/>
         <source>Complete Word</source>
         <translation>补全单词</translation>
     </message>
@@ -392,263 +404,288 @@
         <translation>编辑</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/mainwindow.ui" line="123"/>
+        <location filename="../src/MainPage/mainwindow.ui" line="124"/>
         <source>Tool</source>
         <translation>工具</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/mainwindow.ui" line="127"/>
+        <location filename="../src/MainPage/mainwindow.ui" line="128"/>
         <source>C++</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="../src/MainPage/mainwindow.ui" line="133"/>
+        <location filename="../src/MainPage/mainwindow.ui" line="134"/>
         <source>Markdown</source>
         <translation>Markdown</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/mainwindow.ui" line="157"/>
-        <location filename="../src/MainPage/mainwindow.cpp" line="390"/>
+        <location filename="../src/MainPage/mainwindow.ui" line="158"/>
+        <location filename="../src/MainPage/mainwindow.cpp" line="464"/>
         <source>Open File</source>
         <translation>打开文件</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/mainwindow.ui" line="160"/>
+        <location filename="../src/MainPage/mainwindow.ui" line="161"/>
         <source>Ctrl+O</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="../src/MainPage/mainwindow.ui" line="165"/>
+        <location filename="../src/MainPage/mainwindow.ui" line="166"/>
         <source>New</source>
         <translation>新建</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/mainwindow.ui" line="168"/>
+        <location filename="../src/MainPage/mainwindow.ui" line="169"/>
         <source>Ctrl+N</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="../src/MainPage/mainwindow.ui" line="173"/>
+        <location filename="../src/MainPage/mainwindow.ui" line="174"/>
         <source>Save</source>
         <translation>保存</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/mainwindow.ui" line="176"/>
+        <location filename="../src/MainPage/mainwindow.ui" line="177"/>
         <source>Ctrl+S</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="../src/MainPage/mainwindow.ui" line="181"/>
+        <location filename="../src/MainPage/mainwindow.ui" line="182"/>
         <source>Exit</source>
         <translation>退出</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/mainwindow.ui" line="184"/>
+        <location filename="../src/MainPage/mainwindow.ui" line="185"/>
         <source>Ctrl+Q</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="../src/MainPage/mainwindow.ui" line="189"/>
+        <location filename="../src/MainPage/mainwindow.ui" line="190"/>
         <source>About</source>
         <translation>关于</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/mainwindow.ui" line="192"/>
+        <location filename="../src/MainPage/mainwindow.ui" line="193"/>
         <source>F1</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="../src/MainPage/mainwindow.ui" line="197"/>
+        <location filename="../src/MainPage/mainwindow.ui" line="198"/>
         <source>Open Folder</source>
         <translation>打开文件夹</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/mainwindow.ui" line="200"/>
+        <location filename="../src/MainPage/mainwindow.ui" line="201"/>
         <source>Ctrl+Shift+O</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="../src/MainPage/mainwindow.ui" line="211"/>
+        <location filename="../src/MainPage/mainwindow.ui" line="212"/>
         <source>Show SlideBar</source>
         <translation>显示侧边栏</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/mainwindow.ui" line="214"/>
+        <location filename="../src/MainPage/mainwindow.ui" line="215"/>
         <source>Ctrl+E</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="../src/MainPage/mainwindow.ui" line="219"/>
+        <location filename="../src/MainPage/mainwindow.ui" line="220"/>
         <source>Save As...</source>
         <translation>另存为...</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/mainwindow.ui" line="222"/>
+        <location filename="../src/MainPage/mainwindow.ui" line="223"/>
         <source>Ctrl+Shift+S</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="../src/MainPage/mainwindow.ui" line="278"/>
+        <location filename="../src/MainPage/mainwindow.ui" line="276"/>
+        <source>Find in Files...</source>
+        <translation>在文件中查找...</translation>
+    </message>
+    <message>
+        <location filename="../src/MainPage/mainwindow.ui" line="279"/>
+        <source>Ctrl+Shift+F</source>
+        <translation>Ctrl+Shift+F</translation>
+    </message>
+    <message>
+        <location filename="../src/MainPage/mainwindow.ui" line="287"/>
         <source>Ctrl+Shift+[</source>
         <translation>Ctrl+Shift+[</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/mainwindow.ui" line="291"/>
+        <location filename="../src/MainPage/mainwindow.ui" line="300"/>
         <source>Ctrl+Shift+\</source>
         <translation>Ctrl+Shift+\</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/mainwindow.ui" line="299"/>
+        <location filename="../src/MainPage/mainwindow.ui" line="308"/>
         <source>Ctrl+Space</source>
         <translation>Ctrl+Space</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/mainwindow.ui" line="318"/>
+        <location filename="../src/MainPage/mainwindow.ui" line="327"/>
         <source>F5</source>
         <translation>F5</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/mainwindow.ui" line="323"/>
+        <location filename="../src/MainPage/mainwindow.ui" line="332"/>
         <source>Export to PDF...</source>
         <translation>导出为 PDF...</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/mainwindow.ui" line="328"/>
+        <location filename="../src/MainPage/mainwindow.ui" line="337"/>
         <source>Preferences</source>
         <translation>首选项</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/mainwindow.ui" line="331"/>
+        <location filename="../src/MainPage/mainwindow.ui" line="340"/>
         <source>Ctrl+,</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="../src/MainPage/mainwindow.ui" line="227"/>
+        <location filename="../src/MainPage/mainwindow.ui" line="228"/>
         <source>Undo</source>
         <translation>撤销</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/mainwindow.ui" line="230"/>
+        <location filename="../src/MainPage/mainwindow.ui" line="231"/>
         <source>Ctrl+Z</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="../src/MainPage/mainwindow.ui" line="235"/>
+        <location filename="../src/MainPage/mainwindow.ui" line="236"/>
         <source>Redo</source>
         <translation>重做</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/mainwindow.ui" line="238"/>
+        <location filename="../src/MainPage/mainwindow.ui" line="239"/>
         <source>Ctrl+Y</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="../src/MainPage/mainwindow.ui" line="243"/>
+        <location filename="../src/MainPage/mainwindow.ui" line="244"/>
         <source>Cut</source>
         <translation>剪切</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/mainwindow.ui" line="246"/>
+        <location filename="../src/MainPage/mainwindow.ui" line="247"/>
         <source>Ctrl+X</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="../src/MainPage/mainwindow.ui" line="251"/>
+        <location filename="../src/MainPage/mainwindow.ui" line="252"/>
         <source>Copy</source>
         <translation>复制</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/mainwindow.ui" line="254"/>
+        <location filename="../src/MainPage/mainwindow.ui" line="255"/>
         <source>Ctrl+C</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="../src/MainPage/mainwindow.ui" line="259"/>
+        <location filename="../src/MainPage/mainwindow.ui" line="260"/>
         <source>Paste</source>
         <translation>粘贴</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/mainwindow.ui" line="262"/>
+        <location filename="../src/MainPage/mainwindow.ui" line="263"/>
         <source>Ctrl+V</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="../src/MainPage/mainwindow.ui" line="267"/>
+        <location filename="../src/MainPage/mainwindow.ui" line="268"/>
         <source>Find/Replace</source>
         <translation>查找/替换</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/mainwindow.ui" line="270"/>
+        <location filename="../src/MainPage/mainwindow.ui" line="271"/>
         <source>Ctrl+F</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="../src/MainPage/mainwindow.ui" line="304"/>
+        <location filename="../src/MainPage/mainwindow.ui" line="313"/>
         <source>Switch Header/Source File</source>
         <translation>切换头文件/源文件</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/mainwindow.ui" line="307"/>
+        <location filename="../src/MainPage/mainwindow.ui" line="316"/>
         <source>F4</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="../src/MainPage/mainwindow.cpp" line="183"/>
+        <location filename="../src/MainPage/mainwindow.cpp" line="211"/>
         <source>External File Conflict</source>
         <translation>外部文件冲突</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/mainwindow.cpp" line="185"/>
+        <location filename="../src/MainPage/mainwindow.cpp" line="213"/>
         <source>%1 was deleted outside NotePeek. The in-memory copy was kept and marked modified.</source>
         <translation>%1 已在 NotePeek 外部被删除。内存中的副本已保留并标记为已修改。</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/mainwindow.cpp" line="187"/>
+        <location filename="../src/MainPage/mainwindow.cpp" line="215"/>
         <source>%1 changed outside NotePeek and could not be reloaded safely. Review the in-memory copy before overwriting it.</source>
         <translation>%1 已在 NotePeek 外部发生更改，无法安全地重新加载。覆盖前请检查内存中的副本。</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/mainwindow.cpp" line="402"/>
+        <location filename="../src/MainPage/mainwindow.cpp" line="250"/>
+        <source>Encoding</source>
+        <translation>编码</translation>
+    </message>
+    <message>
+        <location filename="../src/MainPage/mainwindow.cpp" line="251"/>
+        <source>Reopen with Encoding</source>
+        <translation>以指定编码重新打开</translation>
+    </message>
+    <message>
+        <location filename="../src/MainPage/mainwindow.cpp" line="252"/>
+        <source>Convert to Encoding and Save</source>
+        <translation>转换编码并保存</translation>
+    </message>
+    <message>
+        <location filename="../src/MainPage/mainwindow.cpp" line="476"/>
         <source>Open Directory...</source>
         <translation>打开文件夹...</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/mainwindow.cpp" line="618"/>
+        <location filename="../src/MainPage/mainwindow.cpp" line="749"/>
         <source>Export Markdown to PDF</source>
         <translation>将 Markdown 导出为 PDF</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/mainwindow.cpp" line="620"/>
+        <location filename="../src/MainPage/mainwindow.cpp" line="751"/>
         <source>PDF Files (*.pdf)</source>
         <translation>PDF 文件 (*.pdf)</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/mainwindow.cpp" line="634"/>
+        <location filename="../src/MainPage/mainwindow.cpp" line="765"/>
         <source>Export Failed</source>
         <translation>导出失败</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/mainwindow.cpp" line="635"/>
+        <location filename="../src/MainPage/mainwindow.cpp" line="766"/>
         <source>Could not export Markdown to PDF.</source>
         <translation>无法将 Markdown 导出为 PDF。</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/mainwindow.cpp" line="692"/>
+        <location filename="../src/MainPage/mainwindow.cpp" line="823"/>
         <source>Untitled</source>
         <translation>未命名</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/mainwindow.cpp" line="702"/>
+        <location filename="../src/MainPage/mainwindow.cpp" line="833"/>
         <source>%1 - %2</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="../src/MainPage/mainwindow.cpp" line="697"/>
+        <location filename="../src/MainPage/mainwindow.cpp" line="828"/>
         <source>%1 - %2[*]</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="../src/MainPage/mainwindow.cpp" line="434"/>
+        <location filename="../src/MainPage/mainwindow.cpp" line="508"/>
         <source>For Yueyue</source>
         <translation>致玥玥</translation>
     </message>
@@ -682,37 +719,52 @@
         <translation>启动时显示文件树</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/preferencesdialog.cpp" line="236"/>
+        <location filename="../src/MainPage/preferencesdialog.cpp" line="237"/>
         <source>Preferences</source>
         <translation>首选项</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/preferencesdialog.cpp" line="248"/>
+        <location filename="../src/MainPage/preferencesdialog.cpp" line="249"/>
         <source>Editor Fonts</source>
         <translation>编辑器字体</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/preferencesdialog.cpp" line="250"/>
+        <location filename="../src/MainPage/preferencesdialog.cpp" line="251"/>
         <source>Text font</source>
         <translation>文本字体</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/preferencesdialog.cpp" line="251"/>
+        <location filename="../src/MainPage/preferencesdialog.cpp" line="252"/>
         <source>Code font</source>
         <translation>代码字体</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/preferencesdialog.cpp" line="253"/>
+        <location filename="../src/MainPage/preferencesdialog.cpp" line="256"/>
+        <source>System default</source>
+        <translation>跟随系统</translation>
+    </message>
+    <message>
+        <location filename="../src/MainPage/preferencesdialog.cpp" line="259"/>
+        <source>Takes effect the next time NotePeek starts.</source>
+        <translation>将在下次启动 NotePeek 时生效。</translation>
+    </message>
+    <message>
+        <location filename="../src/MainPage/preferencesdialog.cpp" line="261"/>
         <source>General</source>
         <translation>常规</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/preferencesdialog.cpp" line="255"/>
+        <location filename="../src/MainPage/preferencesdialog.cpp" line="263"/>
+        <source>Language</source>
+        <translation>语言</translation>
+    </message>
+    <message>
+        <location filename="../src/MainPage/preferencesdialog.cpp" line="264"/>
         <source>Startup</source>
         <translation>启动</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/preferencesdialog.cpp" line="256"/>
+        <location filename="../src/MainPage/preferencesdialog.cpp" line="265"/>
         <source>Markdown</source>
         <translation>Markdown</translation>
     </message>
@@ -722,12 +774,12 @@
         <translation>打开时显示侧边预览</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/preferencesdialog.cpp" line="258"/>
+        <location filename="../src/MainPage/preferencesdialog.cpp" line="267"/>
         <source>Code Editing</source>
         <translation>代码编辑</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/preferencesdialog.cpp" line="260"/>
+        <location filename="../src/MainPage/preferencesdialog.cpp" line="269"/>
         <source>Folding</source>
         <translation>代码折叠</translation>
     </message>
@@ -737,7 +789,7 @@
         <translation>显示折叠控件</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/preferencesdialog.cpp" line="261"/>
+        <location filename="../src/MainPage/preferencesdialog.cpp" line="270"/>
         <source>Brackets</source>
         <translation>括号</translation>
     </message>
@@ -747,7 +799,7 @@
         <translation>匹配并自动闭合括号</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/preferencesdialog.cpp" line="262"/>
+        <location filename="../src/MainPage/preferencesdialog.cpp" line="271"/>
         <source>Indentation</source>
         <translation>缩进</translation>
     </message>
@@ -757,7 +809,7 @@
         <translation>缩进参考线和智能 Tab/退格</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/preferencesdialog.cpp" line="263"/>
+        <location filename="../src/MainPage/preferencesdialog.cpp" line="272"/>
         <source>Completion</source>
         <translation>补全</translation>
     </message>
@@ -853,9 +905,79 @@
     </message>
 </context>
 <context>
+    <name>SearchResultsDock</name>
+    <message>
+        <location filename="../src/MainPage/widgets/searchresultsdock.cpp" line="30"/>
+        <source>Search Results</source>
+        <translation>搜索结果</translation>
+    </message>
+    <message>
+        <location filename="../src/MainPage/widgets/searchresultsdock.cpp" line="34"/>
+        <location filename="../src/MainPage/widgets/searchresultsdock.cpp" line="219"/>
+        <source>Search</source>
+        <translation>搜索</translation>
+    </message>
+    <message>
+        <location filename="../src/MainPage/widgets/searchresultsdock.cpp" line="39"/>
+        <source>Search in files...</source>
+        <translation>在文件中搜索...</translation>
+    </message>
+    <message>
+        <location filename="../src/MainPage/widgets/searchresultsdock.cpp" line="43"/>
+        <source>Match case</source>
+        <translation>区分大小写</translation>
+    </message>
+    <message>
+        <location filename="../src/MainPage/widgets/searchresultsdock.cpp" line="47"/>
+        <source>Whole words only</source>
+        <translation>全字匹配</translation>
+    </message>
+    <message>
+        <location filename="../src/MainPage/widgets/searchresultsdock.cpp" line="114"/>
+        <location filename="../src/MainPage/widgets/searchresultsdock.cpp" line="181"/>
+        <source>Search canceled.</source>
+        <translation>搜索已取消。</translation>
+    </message>
+    <message>
+        <location filename="../src/MainPage/widgets/searchresultsdock.cpp" line="126"/>
+        <source>Open a directory first to search in files.</source>
+        <translation>请先打开一个目录再进行文件搜索。</translation>
+    </message>
+    <message>
+        <location filename="../src/MainPage/widgets/searchresultsdock.cpp" line="132"/>
+        <source>Searching in %1...</source>
+        <translation>正在 %1 中搜索...</translation>
+    </message>
+    <message>
+        <location filename="../src/MainPage/widgets/searchresultsdock.cpp" line="160"/>
+        <source>%1: %2</source>
+        <translation>%1: %2</translation>
+    </message>
+    <message>
+        <location filename="../src/MainPage/widgets/searchresultsdock.cpp" line="173"/>
+        <source>%1 (%2)</source>
+        <translation>%1 (%2)</translation>
+    </message>
+    <message>
+        <location filename="../src/MainPage/widgets/searchresultsdock.cpp" line="185"/>
+        <source>Showing the first %1 matches; refine the search to see the rest.</source>
+        <translation>仅显示前 %1 处匹配；请缩小搜索范围以查看其余结果。</translation>
+    </message>
+    <message>
+        <location filename="../src/MainPage/widgets/searchresultsdock.cpp" line="190"/>
+        <source>%1 match(es) in %2 file(s).</source>
+        <translation>在 %2 个文件中找到 %1 处匹配。</translation>
+    </message>
+    <message>
+        <location filename="../src/MainPage/widgets/searchresultsdock.cpp" line="219"/>
+        <source>Cancel</source>
+        <translation>取消</translation>
+    </message>
+</context>
+<context>
     <name>SplitEditorCoordinator</name>
     <message>
-        <location filename="../src/MainPage/editor/spliteditorcoordinator.cpp" line="135"/>
+        <location filename="../src/MainPage/editor/spliteditorcoordinator.cpp" line="138"/>
         <source>untitled.txt</source>
         <translation>未命名.txt</translation>
     </message>

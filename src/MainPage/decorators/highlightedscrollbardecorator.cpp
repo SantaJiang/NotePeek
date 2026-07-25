@@ -1,6 +1,7 @@
 #include "decorators/highlightedscrollbardecorator.h"
 #include "decorators/highlightedscrollbar.h"
 #include "themecolors.h"
+#include <QTimer>
 #include <Qsci/qsciscintilla.h>
 
 HighlightedScrollBarDecorator::HighlightedScrollBarDecorator(QsciScintilla *editor)
@@ -79,8 +80,18 @@ void HighlightedScrollBarDecorator::handleScroll(int value)
 
 void HighlightedScrollBarDecorator::updateScrollBar()
 {
-    if (m_scrollBar) {
-        m_scrollBar->updateScrollBarFromEditor();
-        m_scrollBar->update();
+    // Every keystroke, cursor move, selection change and scroll lands here;
+    // coalesce the bursts so one event-loop pass repaints the bar only once.
+    if (m_updatePending)
+    {
+        return;
     }
+    m_updatePending = true;
+    QTimer::singleShot(0, this, [this]() {
+        m_updatePending = false;
+        if (m_scrollBar) {
+            m_scrollBar->updateScrollBarFromEditor();
+            m_scrollBar->update();
+        }
+    });
 }

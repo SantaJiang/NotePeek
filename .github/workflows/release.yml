@@ -1,0 +1,54 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  package:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-14
+            cpack-generator: DragNDrop
+          - os: windows-2022
+            cpack-generator: NSIS
+          - os: ubuntu-22.04
+            cpack-generator: 'DEB;RPM'
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: jurplel/install-qt-action@v4
+        with:
+          version: '6.8.3'
+          cache: true
+      - uses: seanmiddleditch/gha-setup-ninja@v5
+      - name: Install Linux packaging tools
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y rpm
+      - name: Configure
+        run: >-
+          cmake -S . -B build-release -G Ninja
+          -DCMAKE_BUILD_TYPE=Release
+          -DNOTEPEEK_WARNINGS_AS_ERRORS=ON
+      - name: Build
+        run: cmake --build build-release --parallel 2
+      - name: Test
+        run: ctest --test-dir build-release --output-on-failure
+      - name: Package
+        shell: bash
+        run: cpack --config build-release/CPackConfig.cmake -G "${{ matrix.cpack-generator }}" -B "${{ github.workspace }}/packages"
+      - name: Attach packages to the GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            packages/NotePeek-*.dmg
+            packages/NotePeek-*.exe
+            packages/NotePeek-*.deb
+            packages/NotePeek-*.rpm
+          generate_release_notes: true

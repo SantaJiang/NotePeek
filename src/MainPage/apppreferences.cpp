@@ -152,6 +152,7 @@ void AppPreferences::load()
         settings.value(QStringLiteral("smartIndentationEnabled"), true).toBool();
     m_documentCompletionEnabled =
         settings.value(QStringLiteral("documentCompletionEnabled"), false).toBool();
+    m_language = settings.value(QStringLiteral("language"), QString()).toString();
 
     settings.endGroup();
 }
@@ -171,6 +172,7 @@ void AppPreferences::save() const
     settings.setValue(QStringLiteral("bracketAssistanceEnabled"), m_bracketAssistanceEnabled);
     settings.setValue(QStringLiteral("smartIndentationEnabled"), m_smartIndentationEnabled);
     settings.setValue(QStringLiteral("documentCompletionEnabled"), m_documentCompletionEnabled);
+    settings.setValue(QStringLiteral("language"), m_language);
 
     settings.endGroup();
 }

@@ -9,6 +9,8 @@
 #include <QString>
 #include <QUrl>
 
+#include <functional>
+
 #include "editor/documentpersistenceservice.h"
 
 class CustomEditor;
@@ -60,13 +62,25 @@ public:
     bool closeFileIfUnmodified(const QString &filePath);
     void createDefaultDocument();
     int indexOfFile(const QString &filePath) const;
+    bool isEditorLoading(CustomEditor *editor) const;
 
     // Shared documents (split view)
     void openSharedDocument(CustomEditor *sourceEditor, bool activate = true);
     bool adoptSharedDocumentPath(CustomEditor *sourceEditor, const QString &newFilePath);
 
-    // External change handling
-    bool reloadFileFromDiskIfUnmodified(const QString &filePath);
+    // Encoding overrides. Reopen reinterprets the on-disk bytes in the given
+    // encoding (prompting if unsaved changes would be discarded); convert
+    // changes the target format and saves the document in it.
+    void reopenCurrentWithEncoding(DocumentEncoding encoding);
+    bool convertEncodingAndSave(DocumentEncoding encoding);
+
+    // External change handling. Disk IO for external reloads happens in
+    // SplitEditorCoordinator (off the UI thread); the controller only applies
+    // already-loaded content to its editors.
+    bool hasTrackedFile(const QString &filePath) const;
+    bool applyReloadedContent(const QString &filePath,
+                              const QByteArray &utf8Content,
+                              const DocumentFormat &format);
     bool hasModifiedEditorForFile(const QString &filePath) const;
     void markExternalConflict(const QString &filePath, bool deleted);
 
@@ -76,6 +90,7 @@ signals:
     void editorCreated(CustomEditor *editor);
     void editorClosed(CustomEditor *editor);
     void fileOpened(CustomEditor *editor, const QString &filePath);
+    void fileOpenFailed(const QString &filePath);
     void filePathChanged(CustomEditor *editor, const QString &oldFilePath, const QString &newFilePath);
     void currentFileChanged(CustomEditor *editor, const QString &filePath);
     void externalFileChanged(const QString &filePath);
@@ -104,13 +119,27 @@ private:
         QPointer<CustomEditor> editor;
         QString oldFilePath;
         QString newFilePath;
-        QByteArray utf8Content;
         void *documentKey = nullptr;
         quint64 documentGeneration = 0;
+        bool restoreFormatOnFailure = false;
+        DocumentFormat formatAtDispatch;
     };
 
     void connectEditorSignals(CustomEditor *editor);
     bool closeDefaultEditorIfUnused();
+    // Replaces the editor content, yielding to the event loop between chunks
+    // for content above the per-tick budget. onFinished runs after the last
+    // chunk (immediately for small content); it is skipped if the editor or
+    // the controller is destroyed mid-insert.
+    void insertContentInChunks(CustomEditor *editor,
+                               const QByteArray &utf8Content,
+                               std::function<void()> onFinished);
+    // Used by reload paths that must finish before their caller updates all
+    // views sharing the same Scintilla document. Large buffers are appended in
+    // bounded chunks and the event loop is serviced between chunks without
+    // accepting user input.
+    bool replaceContentWithEventLoopYield(CustomEditor *editor,
+                                          const QByteArray &utf8Content);
     void dispatchAsyncSave(CustomEditor *editor,
                            const QString &filePath,
                            const QByteArray &utf8Content,
@@ -143,6 +172,13 @@ private:
     quint64 m_nextAsyncRequestId = 1;
     QHash<quint64, PendingLoad> m_pendingLoads;
     QHash<quint64, PendingSave> m_pendingSaves;
+    QSet<CustomEditor *> m_editorsWithChunkedInsert;
+    QSet<CustomEditor *> m_editorsLoading;
+    QSet<CustomEditor *> m_editorsWithEncodingReload;
+    QHash<CustomEditor *, quint64> m_editorContentRevisions;
+    // True while a synchronous save drain is processing events; guards
+    // against re-entrant document mutations during the wait.
+    bool m_drainingSaves = false;
 };
 
 #endif // DOCUMENTCONTROLLER_H

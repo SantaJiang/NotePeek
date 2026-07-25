@@ -43,3 +43,18 @@ set_tests_properties(notepeek_performance_test PROPERTIES
     ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
     LABELS "performance"
 )
+
+add_executable(notepeek_newfeatures_test
+    newfeatures_test.cpp
+)
+
+target_link_libraries(notepeek_newfeatures_test PRIVATE
+    notepeek_widgets
+    Qt${NOTEPEEK_QT_MAJOR}::Test
+)
+notepeek_configure_project_target(notepeek_newfeatures_test)
+
+add_test(NAME notepeek_newfeatures_test COMMAND notepeek_newfeatures_test)
+set_tests_properties(notepeek_newfeatures_test PROPERTIES
+    ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
+)

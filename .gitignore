@@ -53,6 +53,8 @@ CMakeLists.txt.user*
 # CMake
 /build/
 cmake-build-*/
+# CTest working directory
+/Testing/
 
 # IDE
 .vscode/

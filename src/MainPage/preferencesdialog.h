@@ -37,6 +37,7 @@ private:
     QCheckBox *m_bracketAssistance;
     QCheckBox *m_smartIndentation;
     QCheckBox *m_documentCompletion;
+    QComboBox *m_languageCombo;
 };
 
 #endif // PREFERENCESDIALOG_H

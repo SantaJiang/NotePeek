@@ -24,6 +24,8 @@ struct MarkdownRenderResult
     QVector<int> sourceLines;
 };
 
+Q_DECLARE_METATYPE(MarkdownRenderResult)
+
 class MarkdownPreviewer : public QObject
 {
     Q_OBJECT
