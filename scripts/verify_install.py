@@ -35,6 +35,7 @@ def main() -> None:
         require_file(prefix / "share" / "notepeek" / "THIRD_PARTY_NOTICES.md")
         require_file(prefix / "share" / "notepeek" / "dependency-policy.md")
         libraries = list((prefix / "bin").glob("qscintilla2*.dll"))
+        libraries += list((prefix / "bin").glob("libqscintilla2*.dll"))
     else:
         executable = prefix / "bin" / "notepeek"
         require_file(executable)

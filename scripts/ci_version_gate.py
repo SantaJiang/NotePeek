@@ -19,6 +19,7 @@ CI_INFRASTRUCTURE_PATHS = {
     ".github/workflows/release.yml",
     "scripts/ci_command.py",
     "scripts/ci_version_gate.py",
+    "scripts/verify_install.py",
 }
 # Versions at or below this line predate automatic releases. This prevents the
 # initial workflow rollout from publishing an existing, untagged version.

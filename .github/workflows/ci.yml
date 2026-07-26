@@ -95,7 +95,11 @@ jobs:
       - name: Install smoke test
         run: cmake --install build-ci --prefix "${{ runner.temp }}/notepeek-install"
       - name: Verify installed artifacts
-        run: python scripts/verify_install.py "${{ runner.temp }}/notepeek-install" --run
+        run: >-
+          python scripts/ci_command.py
+          --title "Installed app verification failed on ${{ runner.os }}"
+          -- python scripts/verify_install.py
+          "${{ runner.temp }}/notepeek-install" --run
       - name: Package release installers
         if: needs.version_gate.outputs.release == 'true'
         run: >-
