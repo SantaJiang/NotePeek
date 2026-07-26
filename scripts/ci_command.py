@@ -45,6 +45,8 @@ def main() -> int:
     return_code = process.wait()
     if return_code:
         details = "".join(tail).strip()
+        if len(details) > 3500:
+            details = "...\n" + details[-3500:]
         print(f"::error title={args.title}::{annotation_escape(details)}")
     return return_code
 

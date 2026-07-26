@@ -21,6 +21,8 @@ jobs:
           - os: windows-2022
             cpack-generator: NSIS
             artifact-name: notepeek-windows
+            qt-arch: win64_mingw
+            qt-tools: 'tools_mingw1310,qt.tools.win64_mingw1310'
           - os: ubuntu-22.04
             cpack-generator: 'DEB;RPM'
             artifact-name: notepeek-linux
@@ -30,6 +32,8 @@ jobs:
       - uses: jurplel/install-qt-action@v4
         with:
           version: '6.8.3'
+          arch: ${{ matrix.qt-arch }}
+          tools: ${{ matrix.qt-tools }}
           cache: true
       - name: Install Linux packaging tools
         if: runner.os == 'Linux'
@@ -41,10 +45,17 @@ jobs:
       - name: Build
         run: cmake --build build-release --parallel 2
       - name: Test
-        run: ctest --test-dir build-release --output-on-failure
+        run: >-
+          python scripts/ci_command.py
+          --title "Release tests failed on ${{ runner.os }}"
+          -- ctest --test-dir build-release --output-on-failure
       - name: Package
-        shell: bash
-        run: cpack --config build-release/CPackConfig.cmake -G "${{ matrix.cpack-generator }}" -B "${{ github.workspace }}/packages"
+        run: >-
+          python scripts/ci_command.py
+          --title "Release packaging failed on ${{ runner.os }}"
+          -- cpack --config build-release/CPackConfig.cmake
+          -G "${{ matrix.cpack-generator }}"
+          -B "${{ github.workspace }}/packages"
       - name: Upload release installers
         uses: actions/upload-artifact@v6
         with:

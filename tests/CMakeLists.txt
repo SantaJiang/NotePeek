@@ -3,6 +3,7 @@ add_executable(notepeek_documentio_test
 )
 
 target_link_libraries(notepeek_documentio_test PRIVATE
+    notepeek_core
     notepeek_widgets
     Qt${NOTEPEEK_QT_MAJOR}::Test
 )
@@ -18,6 +19,7 @@ add_executable(notepeek_editorfeatures_test
 )
 
 target_link_libraries(notepeek_editorfeatures_test PRIVATE
+    notepeek_core
     notepeek_widgets
     Qt${NOTEPEEK_QT_MAJOR}::Test
 )
@@ -33,6 +35,7 @@ add_executable(notepeek_performance_test
 )
 
 target_link_libraries(notepeek_performance_test PRIVATE
+    notepeek_core
     notepeek_widgets
     Qt${NOTEPEEK_QT_MAJOR}::Test
 )
@@ -49,6 +52,7 @@ add_executable(notepeek_newfeatures_test
 )
 
 target_link_libraries(notepeek_newfeatures_test PRIVATE
+    notepeek_core
     notepeek_widgets
     Qt${NOTEPEEK_QT_MAJOR}::Test
 )

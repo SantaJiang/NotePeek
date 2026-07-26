@@ -61,6 +61,8 @@ jobs:
           - os: windows-2022
             cpack-generator: NSIS
             artifact-name: notepeek-windows
+            qt-arch: win64_mingw
+            qt-tools: 'tools_mingw1310,qt.tools.win64_mingw1310'
           - os: macos-15
             cpack-generator: DragNDrop
             artifact-name: notepeek-macos
@@ -70,6 +72,8 @@ jobs:
       - uses: jurplel/install-qt-action@v4
         with:
           version: '6.8.3'
+          arch: ${{ matrix.qt-arch }}
+          tools: ${{ matrix.qt-tools }}
           cache: true
       - name: Install Linux packaging tools
         if: runner.os == 'Linux' && needs.version_gate.outputs.release == 'true'
@@ -84,16 +88,24 @@ jobs:
           --title "Qt 6 build failed on ${{ runner.os }}"
           -- cmake --build build-ci --parallel 2
       - name: Test
-        run: ctest --test-dir build-ci --output-on-failure
+        run: >-
+          python scripts/ci_command.py
+          --title "Qt 6 tests failed on ${{ runner.os }}"
+          -- ctest --test-dir build-ci --output-on-failure
       - name: Install smoke test
         run: cmake --install build-ci --prefix "${{ runner.temp }}/notepeek-install"
       - name: Verify installed artifacts
-        run: python scripts/verify_install.py "${{ runner.temp }}/notepeek-install" --run
+        run: >-
+          python scripts/ci_command.py
+          --title "Installed app verification failed on ${{ runner.os }}"
+          -- python scripts/verify_install.py
+          "${{ runner.temp }}/notepeek-install" --run
       - name: Package release installers
         if: needs.version_gate.outputs.release == 'true'
-        shell: bash
         run: >-
-          cpack --config build-ci/CPackConfig.cmake
+          python scripts/ci_command.py
+          --title "Packaging failed on ${{ runner.os }}"
+          -- cpack --config build-ci/CPackConfig.cmake
           -G "${{ matrix.cpack-generator }}"
           -B "${{ github.workspace }}/packages"
       - name: Upload release installers
@@ -132,7 +144,10 @@ jobs:
       - name: Test
         env:
           QT_QPA_PLATFORM: offscreen
-        run: ctest --test-dir build-compat --output-on-failure
+        run: >-
+          python scripts/ci_command.py
+          --title "Qt 5.15 tests failed"
+          -- ctest --test-dir build-compat --output-on-failure
 
   publish-release:
     needs: [version_gate, build-and-test, qt5-compatibility]
