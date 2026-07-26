@@ -43,10 +43,17 @@ jobs:
       - name: Build
         run: cmake --build build-release --parallel 2
       - name: Test
-        run: ctest --test-dir build-release --output-on-failure
+        run: >-
+          python scripts/ci_command.py
+          --title "Release tests failed on ${{ runner.os }}"
+          -- ctest --test-dir build-release --output-on-failure
       - name: Package
-        shell: bash
-        run: cpack --config build-release/CPackConfig.cmake -G "${{ matrix.cpack-generator }}" -B "${{ github.workspace }}/packages"
+        run: >-
+          python scripts/ci_command.py
+          --title "Release packaging failed on ${{ runner.os }}"
+          -- cpack --config build-release/CPackConfig.cmake
+          -G "${{ matrix.cpack-generator }}"
+          -B "${{ github.workspace }}/packages"
       - name: Upload release installers
         uses: actions/upload-artifact@v6
         with:

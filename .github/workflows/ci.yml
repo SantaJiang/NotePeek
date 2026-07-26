@@ -86,16 +86,20 @@ jobs:
           --title "Qt 6 build failed on ${{ runner.os }}"
           -- cmake --build build-ci --parallel 2
       - name: Test
-        run: ctest --test-dir build-ci --output-on-failure
+        run: >-
+          python scripts/ci_command.py
+          --title "Qt 6 tests failed on ${{ runner.os }}"
+          -- ctest --test-dir build-ci --output-on-failure
       - name: Install smoke test
         run: cmake --install build-ci --prefix "${{ runner.temp }}/notepeek-install"
       - name: Verify installed artifacts
         run: python scripts/verify_install.py "${{ runner.temp }}/notepeek-install" --run
       - name: Package release installers
         if: needs.version_gate.outputs.release == 'true'
-        shell: bash
         run: >-
-          cpack --config build-ci/CPackConfig.cmake
+          python scripts/ci_command.py
+          --title "Packaging failed on ${{ runner.os }}"
+          -- cpack --config build-ci/CPackConfig.cmake
           -G "${{ matrix.cpack-generator }}"
           -B "${{ github.workspace }}/packages"
       - name: Upload release installers
@@ -134,7 +138,10 @@ jobs:
       - name: Test
         env:
           QT_QPA_PLATFORM: offscreen
-        run: ctest --test-dir build-compat --output-on-failure
+        run: >-
+          python scripts/ci_command.py
+          --title "Qt 5.15 tests failed"
+          -- ctest --test-dir build-compat --output-on-failure
 
   publish-release:
     needs: [version_gate, build-and-test, qt5-compatibility]

@@ -29,6 +29,7 @@
 #include <QTimer>
 #include <QtConcurrent>
 
+#include <cstdint>
 #include <functional>
 #include <memory>
 
@@ -71,7 +72,7 @@ void replaceEditorText(CustomEditor *editor, const QByteArray &utf8Content)
     if (!utf8Content.isEmpty())
     {
         editor->SendScintilla(QsciScintillaBase::SCI_ADDTEXT,
-                              static_cast<unsigned long>(utf8Content.size()),
+                              static_cast<std::uintptr_t>(utf8Content.size()),
                               utf8Content.constData());
     }
     editor->SendScintilla(QsciScintillaBase::SCI_SETUNDOCOLLECTION, 1UL);
@@ -421,7 +422,7 @@ void DocumentController::insertContentInChunks(CustomEditor *editor,
         const bool readOnly = target->isReadOnly();
         target->setReadOnly(false);
         target->SendScintilla(QsciScintillaBase::SCI_APPENDTEXT,
-                              static_cast<unsigned long>(chunk),
+                              static_cast<std::uintptr_t>(chunk),
                               utf8Content.constData() + *offset);
         target->setReadOnly(readOnly);
         *offset += chunk;
@@ -473,7 +474,7 @@ bool DocumentController::replaceContentWithEventLoopYield(CustomEditor *editor,
     {
         const qsizetype chunk = qMin(ChunkedInsertBytes, utf8Content.size() - offset);
         editor->SendScintilla(QsciScintillaBase::SCI_APPENDTEXT,
-                              static_cast<unsigned long>(chunk),
+                              static_cast<std::uintptr_t>(chunk),
                               utf8Content.constData() + offset);
         offset += chunk;
         if (offset < utf8Content.size())
