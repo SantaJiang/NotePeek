@@ -17,8 +17,12 @@ ZERO_SHA = "0" * 40
 CI_INFRASTRUCTURE_PATHS = {
     ".github/workflows/ci.yml",
     ".github/workflows/release.yml",
+    "scripts/ci_command.py",
     "scripts/ci_version_gate.py",
 }
+# Versions at or below this line predate automatic releases. This prevents the
+# initial workflow rollout from publishing an existing, untagged version.
+AUTO_RELEASE_BASELINE = (1, 3)
 
 
 def git(*args: str) -> str:
@@ -42,6 +46,13 @@ def project_version(revision: str) -> tuple[int, int, int]:
 
 def changed_paths(before: str, after: str) -> set[str]:
     return set(filter(None, git("diff", "--name-only", before, after).splitlines()))
+
+
+def minor_line_has_release_tag(version: tuple[int, int, int]) -> bool:
+    tag_pattern = re.compile(
+        rf"^[vV]{version[0]}\.{version[1]}\.\d+(?:[-+].*)?$"
+    )
+    return any(tag_pattern.match(tag) for tag in git("tag", "--list").splitlines())
 
 
 def emit(run_ci: bool, release: bool, version: str, reason: str) -> None:
@@ -87,6 +98,16 @@ def main() -> int:
             version,
             f"major/minor version did not increase: {before_version[0]}.{before_version[1]} "
             f"to {after_version[0]}.{after_version[1]}",
+        )
+    elif (
+        after_version[:2] > AUTO_RELEASE_BASELINE
+        and not minor_line_has_release_tag(after_version)
+    ):
+        emit(
+            True,
+            True,
+            version,
+            f"retrying unpublished {after_version[0]}.{after_version[1]} release",
         )
     elif paths & CI_INFRASTRUCTURE_PATHS:
         emit(True, False, version, "CI infrastructure changed")
