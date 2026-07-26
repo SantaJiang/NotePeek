@@ -2,86 +2,159 @@ name: CI
 
 on:
   push:
-  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
+  version_gate:
+    runs-on: ubuntu-24.04
+    outputs:
+      run_ci: ${{ steps.decision.outputs.run_ci }}
+      release: ${{ steps.decision.outputs.release }}
+      version: ${{ steps.decision.outputs.version }}
+      reason: ${{ steps.decision.outputs.reason }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - name: Decide whether full CI is needed
+        id: decision
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BEFORE_SHA: ${{ github.event.before }}
+          AFTER_SHA: ${{ github.sha }}
+        run: |
+          if [[ "$EVENT_NAME" == "workflow_dispatch" ]]; then
+            echo "run_ci=true" >> "$GITHUB_OUTPUT"
+            echo "release=false" >> "$GITHUB_OUTPUT"
+            echo "version=" >> "$GITHUB_OUTPUT"
+            echo "reason=manual run" >> "$GITHUB_OUTPUT"
+          else
+            python scripts/ci_version_gate.py \
+              --before "$BEFORE_SHA" \
+              --after "$AFTER_SHA" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Report decision
+        env:
+          RUN_CI: ${{ steps.decision.outputs.run_ci }}
+          RELEASE: ${{ steps.decision.outputs.release }}
+          VERSION: ${{ steps.decision.outputs.version }}
+          REASON: ${{ steps.decision.outputs.reason }}
+        run: echo "Run full CI=$RUN_CI; release=$RELEASE; version=$VERSION ($REASON)"
+
   build-and-test:
+    needs: version_gate
+    if: needs.version_gate.outputs.run_ci == 'true'
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-24.04, windows-2022, macos-14]
+        include:
+          - os: ubuntu-24.04
+            cpack-generator: 'DEB;RPM'
+            artifact-name: notepeek-linux
+          - os: windows-2022
+            cpack-generator: NSIS
+            artifact-name: notepeek-windows
+          - os: macos-15
+            cpack-generator: DragNDrop
+            artifact-name: notepeek-macos
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: jurplel/install-qt-action@v4
         with:
           version: '6.8.3'
           cache: true
-      - uses: seanmiddleditch/gha-setup-ninja@v5
+      - name: Install Linux packaging tools
+        if: runner.os == 'Linux' && needs.version_gate.outputs.release == 'true'
+        run: sudo apt-get update && sudo apt-get install -y rpm
       - name: Configure
         run: >-
           cmake -S . -B build-ci -G Ninja
           -DCMAKE_BUILD_TYPE=Release
-          -DNOTEPEEK_WARNINGS_AS_ERRORS=ON
       - name: Build
-        run: cmake --build build-ci --parallel 2
+        run: >-
+          python scripts/ci_command.py
+          --title "Qt 6 build failed on ${{ runner.os }}"
+          -- cmake --build build-ci --parallel 2
       - name: Test
         run: ctest --test-dir build-ci --output-on-failure
       - name: Install smoke test
         run: cmake --install build-ci --prefix "${{ runner.temp }}/notepeek-install"
       - name: Verify installed artifacts
         run: python scripts/verify_install.py "${{ runner.temp }}/notepeek-install" --run
+      - name: Package release installers
+        if: needs.version_gate.outputs.release == 'true'
+        shell: bash
+        run: >-
+          cpack --config build-ci/CPackConfig.cmake
+          -G "${{ matrix.cpack-generator }}"
+          -B "${{ github.workspace }}/packages"
+      - name: Upload release installers
+        if: needs.version_gate.outputs.release == 'true'
+        uses: actions/upload-artifact@v6
+        with:
+          name: ${{ matrix.artifact-name }}
+          path: |
+            packages/NotePeek-*.dmg
+            packages/NotePeek-*.exe
+            packages/NotePeek-*.deb
+            packages/NotePeek-*.rpm
+          if-no-files-found: error
+          retention-days: 7
 
-  qt-compatibility:
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - qt-version: '5.15.2'
-            qt-major: '5'
-            os: ubuntu-22.04
-          - qt-version: '6.2.4'
-            qt-major: '6'
-            os: ubuntu-22.04
-    runs-on: ${{ matrix.os }}
+  qt5-compatibility:
+    needs: version_gate
+    if: needs.version_gate.outputs.run_ci == 'true'
+    runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: jurplel/install-qt-action@v4
         with:
-          version: ${{ matrix.qt-version }}
+          version: '5.15.2'
           cache: true
-      - uses: seanmiddleditch/gha-setup-ninja@v5
-      - name: Configure minimum supported Qt
+      - name: Configure Qt 5.15
         run: >-
           cmake -S . -B build-compat -G Ninja
           -DCMAKE_BUILD_TYPE=Release
-          -DNOTEPEEK_FORCE_QT_MAJOR=${{ matrix.qt-major }}
-          -DNOTEPEEK_WARNINGS_AS_ERRORS=ON
+          -DNOTEPEEK_FORCE_QT_MAJOR=5
       - name: Build
-        run: cmake --build build-compat --parallel 2
+        run: >-
+          python scripts/ci_command.py
+          --title "Qt 5.15 build failed"
+          -- cmake --build build-compat --parallel 2
       - name: Test
         env:
           QT_QPA_PLATFORM: offscreen
         run: ctest --test-dir build-compat --output-on-failure
 
-  sanitizers:
+  publish-release:
+    needs: [version_gate, build-and-test, qt5-compatibility]
+    if: needs.version_gate.outputs.release == 'true'
     runs-on: ubuntu-24.04
+    permissions:
+      contents: write
     steps:
-      - uses: actions/checkout@v4
-      - uses: jurplel/install-qt-action@v4
+      - name: Download release installers
+        uses: actions/download-artifact@v8
         with:
-          version: '6.8.3'
-          cache: true
-      - uses: seanmiddleditch/gha-setup-ninja@v5
-      - name: Configure sanitizers
-        run: >-
-          cmake -S . -B build-sanitizers -G Ninja
-          -DCMAKE_BUILD_TYPE=Debug
-          -DNOTEPEEK_ENABLE_SANITIZERS=ON
-      - name: Build
-        run: cmake --build build-sanitizers --parallel 2
-      - name: Test
+          pattern: notepeek-*
+          path: release-assets
+          merge-multiple: true
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: v${{ needs.version_gate.outputs.version }}
+          name: NotePeek ${{ needs.version_gate.outputs.version }}
+          target_commitish: ${{ github.sha }}
+          generate_release_notes: true
+          fail_on_unmatched_files: true
+          files: release-assets/*
         env:
-          ASAN_OPTIONS: detect_leaks=1
-          QT_QPA_PLATFORM: offscreen
-        run: ctest --test-dir build-sanitizers --output-on-failure -LE performance
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -3,6 +3,7 @@
 
 #include <QObject>
 #include <QHash>
+#include <QMetaType>
 #include <QPointer>
 #include <QQueue>
 #include <QString>

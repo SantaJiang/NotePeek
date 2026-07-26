@@ -233,8 +233,10 @@ if(NOT APPLE)
     )
 endif()
 
-# ---- Deploy (Qt6 only) ----
-if(Qt6_FOUND)
+# ---- Deploy (Qt 6.3+ only) ----
+# qt_generate_deploy_app_script was introduced in Qt 6.3. Linux packages use
+# their declared system Qt dependencies instead of bundling Qt libraries.
+if(Qt6_FOUND AND COMMAND qt_generate_deploy_app_script AND (APPLE OR WIN32))
     qt_generate_deploy_app_script(
         TARGET notepeek
         OUTPUT_SCRIPT deploy_script
