@@ -109,6 +109,10 @@ elseif(UNIX)
     set(CPACK_DEBIAN_PACKAGE_SECTION "editors")
     set(CPACK_RPM_PACKAGE_LICENSE "GPLv3")
     set(CPACK_RPM_PACKAGE_GROUP "Applications/Editors")
+    # Rely on the explicit Qt requirements below. Ubuntu's RPM dependency
+    # scanner otherwise emits an invalid empty mimehandler() requirement for
+    # the freedesktop MimeType list in notepeek.desktop.
+    set(CPACK_RPM_PACKAGE_AUTOREQ "no")
     if(NOTEPEEK_QT_MAJOR EQUAL 6)
         set(CPACK_DEBIAN_PACKAGE_DEPENDS "libc6 (>= 2.28), libstdc++6 (>= 9), libqt6widgets6 (>= 6.2), libqt6printsupport6 (>= 6.2), libqt6svg6 (>= 6.2)")
         set(CPACK_RPM_PACKAGE_REQUIRES "qt6-qtbase >= 6.2, qt6-qtsvg >= 6.2")

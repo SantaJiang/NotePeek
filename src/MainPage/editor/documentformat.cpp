@@ -179,7 +179,7 @@ bool DocumentFormatCodec::decode(const QByteArray &bytes,
             return false;
         }
         detected.encoding = DocumentEncoding::Utf8Bom;
-        decoded = QString::fromUtf8(payload);
+        decoded = QString::fromUtf8(payload.constData(), payload.size());
     }
     else if (bytes.startsWith("\xff\xfe"))
     {
@@ -222,7 +222,7 @@ bool DocumentFormatCodec::decode(const QByteArray &bytes,
             return false;
         }
         detected.encoding = DocumentEncoding::Utf8;
-        decoded = QString::fromUtf8(bytes);
+        decoded = QString::fromUtf8(bytes.constData(), bytes.size());
     }
 
     detected.lineEnding = detectLineEnding(decoded, detected.lineEnding);
@@ -261,7 +261,7 @@ bool DocumentFormatCodec::decodeWithEncoding(const QByteArray &bytes,
                 *errorMessage = QStringLiteral("The file contains invalid UTF-8 data.");
             return false;
         }
-        decoded = QString::fromUtf8(payload);
+        decoded = QString::fromUtf8(payload.constData(), payload.size());
     }
     else
     {
