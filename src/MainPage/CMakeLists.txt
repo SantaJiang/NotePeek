@@ -125,6 +125,7 @@ add_executable(notepeek
 )
 
 target_link_libraries(notepeek PRIVATE
+    notepeek_core
     notepeek_widgets
 )
 notepeek_configure_project_target(notepeek)
