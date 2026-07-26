@@ -1,5 +1,7 @@
 #include "editor/documentformat.h"
 
+#include <limits>
+
 #include <QtEndian>
 #include <QVector>
 

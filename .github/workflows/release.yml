@@ -21,6 +21,7 @@ jobs:
           - os: windows-2022
             cpack-generator: NSIS
             artifact-name: notepeek-windows
+            qt-arch: win64_mingw
           - os: ubuntu-22.04
             cpack-generator: 'DEB;RPM'
             artifact-name: notepeek-linux
@@ -30,6 +31,7 @@ jobs:
       - uses: jurplel/install-qt-action@v4
         with:
           version: '6.8.3'
+          arch: ${{ matrix.qt-arch }}
           cache: true
       - name: Install Linux packaging tools
         if: runner.os == 'Linux'

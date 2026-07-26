@@ -61,6 +61,7 @@ jobs:
           - os: windows-2022
             cpack-generator: NSIS
             artifact-name: notepeek-windows
+            qt-arch: win64_mingw
           - os: macos-15
             cpack-generator: DragNDrop
             artifact-name: notepeek-macos
@@ -70,6 +71,7 @@ jobs:
       - uses: jurplel/install-qt-action@v4
         with:
           version: '6.8.3'
+          arch: ${{ matrix.qt-arch }}
           cache: true
       - name: Install Linux packaging tools
         if: runner.os == 'Linux' && needs.version_gate.outputs.release == 'true'
