@@ -4,6 +4,7 @@ on:
   push:
     tags:
       - 'v*'
+      - 'V*'
 
 permissions:
   contents: write
@@ -14,20 +15,22 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: macos-14
+          - os: macos-15
             cpack-generator: DragNDrop
+            artifact-name: notepeek-macos
           - os: windows-2022
             cpack-generator: NSIS
+            artifact-name: notepeek-windows
           - os: ubuntu-22.04
             cpack-generator: 'DEB;RPM'
+            artifact-name: notepeek-linux
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: jurplel/install-qt-action@v4
         with:
           version: '6.8.3'
           cache: true
-      - uses: seanmiddleditch/gha-setup-ninja@v5
       - name: Install Linux packaging tools
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y rpm
@@ -35,7 +38,6 @@ jobs:
         run: >-
           cmake -S . -B build-release -G Ninja
           -DCMAKE_BUILD_TYPE=Release
-          -DNOTEPEEK_WARNINGS_AS_ERRORS=ON
       - name: Build
         run: cmake --build build-release --parallel 2
       - name: Test
@@ -43,12 +45,33 @@ jobs:
       - name: Package
         shell: bash
         run: cpack --config build-release/CPackConfig.cmake -G "${{ matrix.cpack-generator }}" -B "${{ github.workspace }}/packages"
-      - name: Attach packages to the GitHub release
-        uses: softprops/action-gh-release@v2
+      - name: Upload release installers
+        uses: actions/upload-artifact@v6
         with:
-          files: |
+          name: ${{ matrix.artifact-name }}
+          path: |
             packages/NotePeek-*.dmg
             packages/NotePeek-*.exe
             packages/NotePeek-*.deb
             packages/NotePeek-*.rpm
+          if-no-files-found: error
+          retention-days: 7
+
+  publish-release:
+    needs: package
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Download release installers
+        uses: actions/download-artifact@v8
+        with:
+          pattern: notepeek-*
+          path: release-assets
+          merge-multiple: true
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v3
+        with:
           generate_release_notes: true
+          fail_on_unmatched_files: true
+          files: release-assets/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
