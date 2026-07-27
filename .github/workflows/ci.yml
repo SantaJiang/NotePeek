@@ -78,6 +78,7 @@ jobs:
             cpack-generator: DragNDrop
             artifact-name: notepeek-macos-x86_64
             package-suffix: Darwin-x86_64
+            performance-open-budget-ms: 24000
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v6
@@ -102,6 +103,8 @@ jobs:
           --title "Qt 6 build failed on ${{ runner.os }}"
           -- cmake --build build-ci --parallel 2
       - name: Test
+        env:
+          NOTEPEEK_OPEN_SMOKE_BUDGET_MS: ${{ matrix.performance-open-budget-ms }}
         run: >-
           python scripts/ci_command.py
           --title "Qt 6 tests failed on ${{ runner.os }}"

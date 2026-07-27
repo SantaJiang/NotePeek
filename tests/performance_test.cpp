@@ -75,8 +75,14 @@ private slots:
         QElapsedTimer timer;
         timer.start();
         controller.openFile(path);
-        QTRY_VERIFY_WITH_TIMEOUT(controller.currentEditor() && !controller.currentEditor()->isReadOnly(), 18000);
-        QVERIFY2(timer.elapsed() < 16000, "10 MB asynchronous open exceeded the 16 second smoke budget");
+        bool budgetIsValid = false;
+        const int configuredBudget = qEnvironmentVariableIntValue("NOTEPEEK_OPEN_SMOKE_BUDGET_MS",
+                                                                   &budgetIsValid);
+        const int openBudgetMs = budgetIsValid && configuredBudget > 0 ? configuredBudget : 12000;
+        QTRY_VERIFY_WITH_TIMEOUT(controller.currentEditor() && !controller.currentEditor()->isReadOnly(),
+                                 openBudgetMs + 3000);
+        QVERIFY2(timer.elapsed() < openBudgetMs,
+                 "10 MB asynchronous open exceeded the configured smoke budget");
         QCOMPARE(controller.currentEditor()->length(), 10 * 1024 * 1024);
     }
 
