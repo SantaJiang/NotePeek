@@ -64,6 +64,59 @@ private slots:
         QVERIFY(fileWindow.findChild<QMenu *>() != nullptr);
     }
 
+    void usesUntranslatedNameForUntitledDocuments()
+    {
+        MainWindow window;
+
+        EditorPane *defaultPane = nullptr;
+        for (EditorPane *pane : window.findChildren<EditorPane *>())
+        {
+            if (pane->count() > 0)
+            {
+                defaultPane = pane;
+                break;
+            }
+        }
+
+        QVERIFY(defaultPane);
+        QCOMPARE(defaultPane->pageTitle(defaultPane->currentIndex()),
+                 QStringLiteral("untitled"));
+        QVERIFY(window.windowTitle().contains(QStringLiteral("untitled")));
+    }
+
+    void aboutDialogIsWindowModal()
+    {
+        MainWindow window;
+        window.show();
+
+        bool foundAboutDialog = false;
+        Qt::WindowModality modality = Qt::NonModal;
+        QWidget *dialogParent = nullptr;
+        QTimer::singleShot(0, [&]() {
+            for (QWidget *widget : QApplication::topLevelWidgets())
+            {
+                auto *messageBox = qobject_cast<QMessageBox *>(widget);
+                if (!messageBox || !messageBox->isVisible())
+                {
+                    continue;
+                }
+
+                foundAboutDialog = true;
+                modality = messageBox->windowModality();
+                dialogParent = messageBox->parentWidget();
+                messageBox->accept();
+                break;
+            }
+        });
+
+        QVERIFY(QMetaObject::invokeMethod(&window,
+                                          "on_action_about_triggered",
+                                          Qt::DirectConnection));
+        QVERIFY(foundAboutDialog);
+        QCOMPARE(modality, Qt::WindowModal);
+        QCOMPARE(dialogParent, static_cast<QWidget *>(&window));
+    }
+
     void searchesAcrossDirectoryTree()
     {
         QTemporaryDir root;

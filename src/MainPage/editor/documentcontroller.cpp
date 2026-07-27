@@ -370,7 +370,7 @@ void DocumentController::setSavingTitle(CustomEditor *editor, const QString &fil
         QString title = QFileInfo(filePath).fileName();
         if (title.isEmpty())
         {
-            title = tr("untitled.txt");
+            title = QStringLiteral("untitled.txt");
         }
         m_pane->setPageTitle(index, title + tr(" (saving)"));
     }
@@ -904,9 +904,9 @@ bool DocumentController::closeFileIfUnmodified(const QString &filePath)
 
 void DocumentController::createDefaultDocument()
 {
-    CustomEditor *editor = m_editorManager->createEditor(tr("Untitled"));
+    CustomEditor *editor = m_editorManager->createEditor(QStringLiteral("untitled"));
     DocumentPage *page = createPage(editor, QString());
-    const int tabIndex = m_pane->addPage(page, tr("Untitled"), QString());
+    const int tabIndex = m_pane->addPage(page, QStringLiteral("untitled"), QString());
     m_pane->setCurrentIndex(tabIndex);
 
     m_defaultEditor = editor;
@@ -945,7 +945,7 @@ void DocumentController::openSharedDocument(CustomEditor *sourceEditor, bool act
         closeFileIfUnmodified(filePath);
     }
 
-    QString displayName = filePath.isEmpty() ? tr("Untitled") : QFileInfo(filePath).fileName();
+    QString displayName = filePath.isEmpty() ? QStringLiteral("untitled") : QFileInfo(filePath).fileName();
     if (sourceEditor->isModified())
     {
         displayName += '*';

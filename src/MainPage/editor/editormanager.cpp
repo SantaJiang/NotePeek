@@ -274,7 +274,7 @@ EditorManager::~EditorManager()
 CustomEditor *EditorManager::createEditor(const QString &name)
 {
     CustomEditor *editor = new CustomEditor();
-    editor->setWindowTitle(name.isEmpty() ? tr("Untitled") : name);
+    editor->setWindowTitle(name.isEmpty() ? QStringLiteral("untitled") : name);
     setupEditor(editor);
     connect(editor, &CustomEditor::filesDropped,  this, &EditorManager::filesDropped);
 

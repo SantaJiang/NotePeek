@@ -511,11 +511,19 @@ void MainWindow::on_action_exit_triggered()
 
 void MainWindow::on_action_about_triggered()
 {
-    QMessageBox::about(this, QString(),
-                       QStringLiteral("<h3>%1 v%2</h3>"
-                                      "<p>%3</p>"
-                                      R"(<p>%4</p>)")
-                       .arg(QApplication::applicationDisplayName(), QApplication::applicationVersion(), "Copyright © 2026 Santa.", tr("For Yueyue")));
+    QMessageBox aboutBox(QMessageBox::NoIcon,
+                         QString(),
+                         QStringLiteral("<h3>%1 v%2</h3>"
+                                        "<p>%3</p>"
+                                        R"(<p>%4</p>)")
+                             .arg(QApplication::applicationDisplayName(),
+                                  QApplication::applicationVersion(),
+                                  "Copyright © 2026 Santa.",
+                                  tr("For Yueyue")),
+                         QMessageBox::Ok,
+                         this);
+    aboutBox.setWindowModality(Qt::WindowModal);
+    aboutBox.exec();
 }
 
 void MainWindow::on_action_showSlideBar_triggered(bool checked)
@@ -833,7 +841,7 @@ void MainWindow::updateWindowTitle(bool modified)
         return;
 
     const QString filePath = editor->filePath();
-    const QString title = filePath.isEmpty() ? tr("Untitled") : QFileInfo(filePath).fileName();
+    const QString title = filePath.isEmpty() ? QStringLiteral("untitled") : QFileInfo(filePath).fileName();
 
     const QString appName = tr("NotePeek");
     if (modified)
