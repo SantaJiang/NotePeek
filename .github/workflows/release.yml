@@ -17,15 +17,27 @@ jobs:
         include:
           - os: macos-15
             cpack-generator: DragNDrop
-            artifact-name: notepeek-macos
+            artifact-name: notepeek-macos-arm64
+            package-suffix: Darwin-arm64
+          - os: macos-15-intel
+            cpack-generator: DragNDrop
+            artifact-name: notepeek-macos-x86_64
+            package-suffix: Darwin-x86_64
           - os: windows-2022
             cpack-generator: NSIS
             artifact-name: notepeek-windows
+            package-suffix: win64
             qt-arch: win64_mingw
             qt-tools: 'tools_mingw1310,qt.tools.win64_mingw1310'
           - os: ubuntu-22.04
             cpack-generator: 'DEB;RPM'
-            artifact-name: notepeek-linux
+            artifact-name: notepeek-linux-x86_64
+            package-suffix: Linux-x86_64
+          - os: ubuntu-24.04-arm
+            cpack-generator: 'DEB;RPM'
+            artifact-name: notepeek-linux-arm64
+            package-suffix: Linux-arm64
+            qt-arch: linux_gcc_arm64
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v6
@@ -35,6 +47,7 @@ jobs:
           arch: ${{ matrix.qt-arch }}
           tools: ${{ matrix.qt-tools }}
           cache: true
+          cache-key-prefix: notepeek-qt-${{ matrix.artifact-name }}
       - name: Install Linux packaging tools
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y rpm
@@ -42,6 +55,7 @@ jobs:
         run: >-
           cmake -S . -B build-release -G Ninja
           -DCMAKE_BUILD_TYPE=Release
+          -DNOTEPEEK_PACKAGE_SUFFIX=${{ matrix.package-suffix }}
       - name: Build
         run: cmake --build build-release --parallel 2
       - name: Test
