@@ -20,6 +20,7 @@ CI_INFRASTRUCTURE_PATHS = {
     "scripts/ci_command.py",
     "scripts/ci_version_gate.py",
     "scripts/verify_install.py",
+    "tests/performance_test.cpp",
 }
 # Versions at or below this line predate automatic releases. This prevents the
 # initial workflow rollout from publishing an existing, untagged version.

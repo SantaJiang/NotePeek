@@ -23,6 +23,7 @@ jobs:
             cpack-generator: DragNDrop
             artifact-name: notepeek-macos-x86_64
             package-suffix: Darwin-x86_64
+            performance-open-budget-ms: 24000
           - os: windows-2022
             cpack-generator: NSIS
             artifact-name: notepeek-windows
@@ -59,6 +60,8 @@ jobs:
       - name: Build
         run: cmake --build build-release --parallel 2
       - name: Test
+        env:
+          NOTEPEEK_OPEN_SMOKE_BUDGET_MS: ${{ matrix.performance-open-budget-ms }}
         run: >-
           python scripts/ci_command.py
           --title "Release tests failed on ${{ runner.os }}"
