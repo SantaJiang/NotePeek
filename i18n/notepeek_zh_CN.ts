@@ -24,7 +24,7 @@
     <message>
         <location filename="../src/MainPage/editor/documentcontroller.cpp" line="353"/>
         <source>untitled.txt</source>
-        <translation>未命名.txt</translation>
+        <translation>untitled.txt</translation>
     </message>
     <message>
         <location filename="../src/MainPage/editor/documentcontroller.cpp" line="355"/>
@@ -52,7 +52,7 @@
         <location filename="../src/MainPage/editor/documentcontroller.cpp" line="813"/>
         <location filename="../src/MainPage/editor/documentcontroller.cpp" line="852"/>
         <source>Untitled</source>
-        <translation>未命名</translation>
+        <translation>untitled</translation>
     </message>
     <message>
         <location filename="../src/MainPage/editor/documentcontroller.cpp" line="1018"/>
@@ -121,7 +121,7 @@
     <message>
         <location filename="../src/MainPage/editor/documentpersistenceservice.cpp" line="165"/>
         <source>untitled.txt</source>
-        <translation>未命名.txt</translation>
+        <translation>untitled.txt</translation>
     </message>
 </context>
 <context>
@@ -129,7 +129,7 @@
     <message>
         <location filename="../src/MainPage/editor/editormanager.cpp" line="277"/>
         <source>Untitled</source>
-        <translation>未命名</translation>
+        <translation>untitled</translation>
     </message>
 </context>
 <context>
@@ -672,7 +672,7 @@
     <message>
         <location filename="../src/MainPage/mainwindow.cpp" line="823"/>
         <source>Untitled</source>
-        <translation>未命名</translation>
+        <translation>untitled</translation>
     </message>
     <message>
         <location filename="../src/MainPage/mainwindow.cpp" line="833"/>
@@ -979,7 +979,7 @@
     <message>
         <location filename="../src/MainPage/editor/spliteditorcoordinator.cpp" line="138"/>
         <source>untitled.txt</source>
-        <translation>未命名.txt</translation>
+        <translation>untitled.txt</translation>
     </message>
 </context>
 </TS>

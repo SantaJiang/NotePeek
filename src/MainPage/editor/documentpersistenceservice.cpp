@@ -162,7 +162,7 @@ QString DocumentPersistenceService::displayNameForSavePrompt(CustomEditor *edito
 {
     if (!editor || editor->filePath().isEmpty())
     {
-        return tr("untitled.txt");
+        return QStringLiteral("untitled.txt");
     }
 
     return QFileInfo(editor->filePath()).fileName();

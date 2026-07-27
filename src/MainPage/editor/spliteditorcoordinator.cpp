@@ -160,7 +160,7 @@ bool SplitEditorCoordinator::closeAllEditors()
 
             const QString filePath = editor->filePath();
             const QString displayName = filePath.isEmpty()
-                                            ? tr("untitled.txt")
+                                            ? QStringLiteral("untitled.txt")
                                             : QFileInfo(filePath).fileName();
             modifiedFiles.insert(editor, displayName);
             editorOwners.insert(editor, controller);
