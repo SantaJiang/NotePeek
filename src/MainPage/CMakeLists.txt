@@ -187,6 +187,7 @@ if(WIN32)
     target_sources(notepeek PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/app.rc)
 elseif(APPLE)
     set_target_properties(notepeek PROPERTIES
+        OUTPUT_NAME "NotePeek"
         MACOSX_BUNDLE ON
         MACOSX_BUNDLE_INFO_PLIST ${CMAKE_SOURCE_DIR}/deploy/mac/Info.plist
         MACOSX_BUNDLE_ICON_FILE notepeek.icns

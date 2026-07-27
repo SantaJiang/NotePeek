@@ -105,8 +105,8 @@ endif()
 if(APPLE)
     install(TARGETS qscintilla2
         EXPORT NotePeekTargets
-        LIBRARY DESTINATION notepeek.app/Contents/Frameworks
-        RUNTIME DESTINATION notepeek.app/Contents/MacOS
+        LIBRARY DESTINATION NotePeek.app/Contents/Frameworks
+        RUNTIME DESTINATION NotePeek.app/Contents/MacOS
         ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
     )
 elseif(UNIX)
