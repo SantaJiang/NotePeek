@@ -8,6 +8,7 @@ project(NotePeek
 )
 
 set(NOTEPEEK_APP_ID "com.santa.notepeek" CACHE STRING "Reverse-DNS application identifier")
+set(NOTEPEEK_PACKAGE_SUFFIX "" CACHE STRING "Optional architecture-aware suffix for CPack output files")
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -87,6 +88,10 @@ set(CPACK_PACKAGE_VENDOR "Santa")
 set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_SOURCE_DIR}/LICENSE")
 set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "A modern code/text editor")
 set(CPACK_PACKAGE_HOMEPAGE_URL "https://github.com/SantaSpeeds/NotePeek")
+
+if(NOTEPEEK_PACKAGE_SUFFIX)
+    set(CPACK_PACKAGE_FILE_NAME "${CPACK_PACKAGE_NAME}-${CPACK_PACKAGE_VERSION}-${NOTEPEEK_PACKAGE_SUFFIX}")
+endif()
 
 if(APPLE)
     set(CPACK_GENERATOR "DragNDrop")
