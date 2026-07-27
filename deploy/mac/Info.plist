@@ -7,12 +7,14 @@
     <key>CFBundleDevelopmentRegion</key>
     <string>en</string>
     <key>CFBundleExecutable</key>
-    <string>notepeek</string>
+    <string>NotePeek</string>
     <key>CFBundleIconFile</key>
     <string>notepeek.icns</string>
     <key>CFBundleIdentifier</key>
     <string>${NOTEPEEK_APP_ID}</string>
     <key>CFBundleName</key>
+    <string>${MACOSX_BUNDLE_BUNDLE_NAME}</string>
+    <key>CFBundleDisplayName</key>
     <string>${MACOSX_BUNDLE_BUNDLE_NAME}</string>
     <key>CFBundleShortVersionString</key>
     <string>${MACOSX_BUNDLE_SHORT_VERSION_STRING}</string>

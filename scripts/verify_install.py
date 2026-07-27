@@ -24,11 +24,11 @@ def main() -> None:
     prefix = args.prefix.resolve()
 
     if args.system == "Darwin":
-        executable = prefix / "notepeek.app" / "Contents" / "MacOS" / "notepeek"
+        executable = prefix / "NotePeek.app" / "Contents" / "MacOS" / "NotePeek"
         require_file(executable)
-        require_file(prefix / "notepeek.app" / "Contents" / "Resources" / "THIRD_PARTY_NOTICES.md")
-        require_file(prefix / "notepeek.app" / "Contents" / "Resources" / "dependency-policy.md")
-        libraries = list((prefix / "notepeek.app" / "Contents" / "Frameworks").glob("libqscintilla2*.dylib"))
+        require_file(prefix / "NotePeek.app" / "Contents" / "Resources" / "THIRD_PARTY_NOTICES.md")
+        require_file(prefix / "NotePeek.app" / "Contents" / "Resources" / "dependency-policy.md")
+        libraries = list((prefix / "NotePeek.app" / "Contents" / "Frameworks").glob("libqscintilla2*.dylib"))
     elif args.system == "Windows":
         executable = prefix / "bin" / "notepeek.exe"
         require_file(executable)
