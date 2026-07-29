@@ -49,6 +49,7 @@ set_tests_properties(notepeek_performance_test PROPERTIES
 
 add_executable(notepeek_newfeatures_test
     newfeatures_test.cpp
+    ${CMAKE_SOURCE_DIR}/src/MainPage/rec.qrc
 )
 
 target_link_libraries(notepeek_newfeatures_test PRIVATE
