@@ -90,6 +90,7 @@ private slots:
         window.show();
 
         bool foundAboutDialog = false;
+        bool hasIcon = false;
         Qt::WindowModality modality = Qt::NonModal;
         QWidget *dialogParent = nullptr;
         QTimer::singleShot(0, [&]() {
@@ -102,6 +103,7 @@ private slots:
                 }
 
                 foundAboutDialog = true;
+                hasIcon = !messageBox->iconPixmap().isNull();
                 modality = messageBox->windowModality();
                 dialogParent = messageBox->parentWidget();
                 messageBox->accept();
@@ -113,6 +115,7 @@ private slots:
                                           "on_action_about_triggered",
                                           Qt::DirectConnection));
         QVERIFY(foundAboutDialog);
+        QVERIFY(hasIcon);
         QCOMPARE(modality, Qt::WindowModal);
         QCOMPARE(dialogParent, static_cast<QWidget *>(&window));
     }

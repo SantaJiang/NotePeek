@@ -9,6 +9,7 @@
 #include <QDir>
 #include <QScrollBar>
 #include <QMessageBox>
+#include <QIcon>
 #include <QCloseEvent>
 #include <QEvent>
 #include <QCoreApplication>
@@ -522,6 +523,11 @@ void MainWindow::on_action_about_triggered()
                                   tr("For Yueyue")),
                          QMessageBox::Ok,
                          this);
+    const QIcon appIcon(QStringLiteral(":/resource/notepeek.svg"));
+    if (!appIcon.isNull())
+    {
+        aboutBox.setIconPixmap(appIcon.pixmap(QSize(96, 96)));
+    }
     aboutBox.setWindowModality(Qt::WindowModal);
     aboutBox.exec();
 }
