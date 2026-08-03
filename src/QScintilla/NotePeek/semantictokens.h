@@ -25,6 +25,17 @@ struct QSCINTILLA_EXPORT SemanticToken
     SyntaxRole role = SyntaxRole::Default;
 };
 
+// Lexical state that is open at a line boundary.  A viewport snapshot usually
+// starts in the middle of a file, so the caller must say whether that first
+// line begins inside a block comment or a multi-line string.  Without it the
+// analyzer would treat prose inside a long comment as code and colour it.
+enum class SemanticEntryState : quint8
+{
+    Code,
+    BlockComment,
+    MultiLineString
+};
+
 struct QSCINTILLA_EXPORT SemanticDocument
 {
     QString uri;
@@ -32,6 +43,7 @@ struct QSCINTILLA_EXPORT SemanticDocument
     QString text;
     quint64 revision = 0;
     int firstLine = 0;
+    SemanticEntryState entryState = SemanticEntryState::Code;
 };
 
 struct QSCINTILLA_EXPORT SemanticAnalysisControl
@@ -46,6 +58,9 @@ struct QSCINTILLA_EXPORT SemanticAnalysisResult
     int firstLine = 0;
     int lastLine = -1;
     QVector<SemanticToken> tokens;
+    // State still open after the analysed range, so a caller that walks a file
+    // in consecutive windows can feed it back in as the next entryState.
+    SemanticEntryState exitState = SemanticEntryState::Code;
     qint64 elapsedNanoseconds = 0;
     bool canceled = false;
     bool budgetExceeded = false;

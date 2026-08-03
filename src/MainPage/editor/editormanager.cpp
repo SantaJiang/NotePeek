@@ -239,7 +239,13 @@ private:
             cancel(state);
             return;
         }
-        state->timer.start(delayMs);
+        // A single keystroke raises both SCN_MODIFIED (kEditDebounceMs) and
+        // KeyRelease (kScrollDebounceMs). Restarting the timer unconditionally
+        // would let the shorter scroll debounce overwrite the edit debounce, so
+        // the deadline is never pulled earlier than one already pending.
+        if (state->timer.isActive())
+            delayMs = qMax(delayMs, state->timer.remainingTime());
+        state->timer.start(qMax(0, delayMs));
     }
 
     void cancel(State *state)
@@ -251,6 +257,32 @@ private:
         {
             const int count = state->editor->property("semanticCanceledRequestCount").toInt();
             state->editor->setProperty("semanticCanceledRequestCount", count + 1);
+        }
+    }
+
+    // A viewport snapshot normally starts in the middle of the file. Ask the
+    // lexer what is still open at that first character, otherwise the analyzer
+    // restarts in the Code state and paints the inside of a long block comment
+    // or multi-line string as if it were code.
+    static NotePeek::SemanticEntryState entryStateForLine(CustomEditor *editor, int line)
+    {
+        QsciLexer *lexer = editor ? editor->lexer() : nullptr;
+        if (!lexer || line <= 0)
+            return NotePeek::SemanticEntryState::Code;
+        const long position = editor->SendScintilla(QsciScintillaBase::SCI_POSITIONFROMLINE, line);
+        const int style = int(editor->SendScintilla(QsciScintillaBase::SCI_GETSTYLEAT, position));
+        switch (NotePeek::SyntaxStyler::roleForStyle(lexer, style))
+        {
+        case NotePeek::SyntaxRole::Comment:
+        case NotePeek::SyntaxRole::Documentation:
+            return NotePeek::SemanticEntryState::BlockComment;
+        case NotePeek::SyntaxRole::String:
+            return NotePeek::SemanticEntryState::MultiLineString;
+        default:
+            // Includes the case where Scintilla has not styled this position
+            // yet and reports style 0; treating that as code matches the
+            // lexical fallback the editor is already showing.
+            return NotePeek::SemanticEntryState::Code;
         }
     }
 
@@ -298,6 +330,7 @@ private:
         document.languageId = LexerFactory::languageName(language);
         document.revision = editor->documentRevision();
         document.firstLine = firstLine;
+        document.entryState = entryStateForLine(editor, firstLine);
         document.text = viewportText(editor, firstLine, lastLine);
         editor->setProperty("semanticSnapshotBytes", document.text.size() * int(sizeof(QChar)));
 
@@ -322,19 +355,26 @@ private:
                 return;
             State *state = guardedState;
             state->inFlight = false;
-            if (requestId != state->requestId)
-                return;
             if (state->editor)
             {
                 state->editor->setProperty("semanticAnalysisInFlight", false);
                 state->editor->setProperty("semanticWorkerNanoseconds", result.elapsedNanoseconds);
             }
-            if (state->editor && state->editor->isVisible() && !result.canceled
+            // requestId can only differ if a second request was started while
+            // this one was in flight, which start() currently prevents. Keep
+            // the guard for future providers that allow overlap, but fall
+            // through to the rerun check so a queued refresh is never dropped.
+            if (requestId == state->requestId && state->editor && state->editor->isVisible()
+                && !result.canceled
                 && result.revision == state->editor->documentRevision()
                 && result.lastLine >= result.firstLine)
             {
+                // Evicting only the lines furthest from this window keeps the
+                // visible region styled; clearing everything would briefly drop
+                // the whole viewport back to lexical colours.
                 if (state->editor->semanticTokenCount() + result.tokens.size() > kMaxCachedTokens)
-                    state->editor->clearSemanticTokens();
+                    state->editor->evictSemanticTokensOutside(result.firstLine, result.lastLine,
+                                                              kMaxCachedTokens - result.tokens.size());
                 QElapsedTimer applyTimer;
                 applyTimer.start();
                 state->editor->applySemanticTokenDelta(result.revision,
@@ -359,7 +399,9 @@ private:
 
 EditorManager::EditorManager(QObject *parent)
     : QObject(parent)
-    , m_semanticEngine(std::make_unique<SemanticHighlightingEngine>(this))
+    // Owned solely by the unique_ptr; giving it a QObject parent as well would
+    // put two independent lifetimes on the same object.
+    , m_semanticEngine(std::make_unique<SemanticHighlightingEngine>())
 {
 }
 

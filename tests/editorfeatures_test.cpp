@@ -559,6 +559,65 @@ private slots:
             verifyMarkersAfterResize(QSize(640 + frame * 30, 360 + frame * 30));
     }
 
+    void scrollBarMarkersAppearWhenAttachedToAnAlreadyVisibleEditor()
+    {
+        CustomEditor editor;
+        QString text;
+        for (int line = 0; line < 500; ++line)
+            text.append(QStringLiteral("line %1\n").arg(line));
+        editor.setText(text);
+        editor.resize(800, 500);
+        editor.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&editor));
+
+        // Attaching after the first show() is the case that silently produced
+        // an invisible marker layer: a widget created under an already-visible
+        // parent stays hidden until it is shown explicitly.
+        HighlightedScrollBarDecorator decorator(&editor);
+        QApplication::processEvents();
+
+        HighlightedScrollBar *scrollBar = decorator.getScrollBar();
+        QVERIFY(scrollBar);
+        QTRY_VERIFY_WITH_TIMEOUT(scrollBar->isVisible(), 500);
+        QCOMPARE(scrollBar->size(), editor.verticalScrollBar()->size());
+    }
+
+    void evictsSemanticTokensFurthestFromTheRetainedWindow()
+    {
+        CustomEditor editor;
+        QString text;
+        for (int line = 0; line < 300; ++line)
+            text.append(QStringLiteral("alpha bravo charlie\n"));
+        editor.setText(text);
+
+        NotePeek::SyntaxPalette colors;
+        colors.insert(NotePeek::SyntaxRole::Function, QColor(QStringLiteral("#12AB34")));
+        editor.setSemanticTokenColors(colors);
+
+        QVector<NotePeek::SemanticToken> tokens;
+        for (int line = 0; line < 300; ++line)
+            tokens.append({line, 0, 5, NotePeek::SyntaxRole::Function});
+        QVERIFY(editor.setSemanticTokens(editor.documentRevision(), tokens));
+        QCOMPARE(editor.semanticTokenCount(), 300);
+
+        editor.evictSemanticTokensOutside(140, 160, 40);
+        QVERIFY(editor.semanticTokenCount() <= 40);
+        QVERIFY(editor.semanticTokenCount() > 0);
+
+        // The retained window must survive; only distant lines are dropped.
+        bool keptWindowStart = false;
+        bool keptWindowEnd = false;
+        for (const NotePeek::SemanticToken &token : editor.semanticTokens())
+        {
+            keptWindowStart |= token.line == 140;
+            keptWindowEnd |= token.line == 160;
+            QVERIFY(token.line > 100);
+            QVERIFY(token.line < 200);
+        }
+        QVERIFY(keptWindowStart);
+        QVERIFY(keptWindowEnd);
+    }
+
     void editorManagerRefreshesSemanticHighlightingAfterEdits()
     {
         EditorManager manager;

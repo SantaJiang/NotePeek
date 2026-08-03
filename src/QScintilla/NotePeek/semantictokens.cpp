@@ -10,27 +10,64 @@
 
 namespace {
 
-void appendMatches(QVector<NotePeek::SemanticToken> &tokens, int lineNumber,
-                   const QString &line, const QRegularExpression &pattern,
-                   int capture, NotePeek::SyntaxRole role,
-                   const QSet<QString> &excluded = {})
+using NotePeek::SemanticEntryState;
+
+// Syntax that a language uses for comments and multi-line strings.  Python and
+// Starlark share `#` line comments and triple-quoted strings; the C family
+// shares `//` line comments and `/* */` blocks.  Mixing the two sets silently
+// corrupts the mask: `total = a // b` in Python is a division, not a comment.
+struct MaskDialect
 {
-    QRegularExpressionMatchIterator matches = pattern.globalMatch(line);
-    while (matches.hasNext())
+    bool hashLineComments = false;
+    bool slashLineComments = false;
+    bool slashStarBlockComments = false;
+    bool tripleQuotedStrings = false;
+    bool backtickStrings = false;
+};
+
+// Compared character by character rather than through QStringView::mid so the
+// same source builds against both Qt 5.15 and Qt 6.
+bool matchesAt(const QString &line, int index, QLatin1String needle)
+{
+    if (index < 0 || index + needle.size() > line.size())
+        return false;
+    for (int i = 0; i < needle.size(); ++i)
+        if (line.at(index + i) != QLatin1Char(needle.data()[i]))
+            return false;
+    return true;
+}
+
+void blankRange(QString &masked, int from, int count)
+{
+    for (int i = from; i < from + count && i < masked.size(); ++i)
+        masked[i] = QLatin1Char(' ');
+}
+
+// Closes a window that began inside a multi-line string.  The caller can only
+// tell us that "a string was open here", not which flavour, so both triple
+// quotes are accepted.  `)"` is only a terminator where raw strings exist:
+// accepting it in Python would end a docstring early on text like
+// `"""call(x)" is a thing"""`.
+bool closesMultiLineString(const QString &line, int index, const MaskDialect &dialect, int *width)
+{
+    if (dialect.tripleQuotedStrings
+        && (matchesAt(line, index, QLatin1String("\"\"\"")) || matchesAt(line, index, QLatin1String("'''"))))
     {
-        const QRegularExpressionMatch match = matches.next();
-        const QString value = match.captured(capture);
-        if (excluded.contains(value))
-            continue;
-        tokens.append({lineNumber, int(match.capturedStart(capture)),
-                       int(match.capturedLength(capture)), role});
+        *width = 3;
+        return true;
     }
+    if (!dialect.tripleQuotedStrings && matchesAt(line, index, QLatin1String(")\"")))
+    {
+        *width = 2;
+        return true;
+    }
+    return false;
 }
 
 // Hide strings and comments while preserving UTF-16 offsets. This classifier
 // is deliberately conservative: lexical styles remain the fallback whenever
 // a name cannot be identified safely.
-QString maskNonCode(const QString &line, bool hashComments, bool &inBlockComment)
+QString maskNonCode(const QString &line, const MaskDialect &dialect, SemanticEntryState &state)
 {
     QString masked = line;
     QChar quote;
@@ -39,13 +76,29 @@ QString maskNonCode(const QString &line, bool hashComments, bool &inBlockComment
     {
         const QChar current = line.at(i);
         const QChar next = i + 1 < line.size() ? line.at(i + 1) : QChar();
-        if (inBlockComment)
+
+        if (state == SemanticEntryState::BlockComment)
         {
             masked[i] = QLatin1Char(' ');
             if (current == QLatin1Char('*') && next == QLatin1Char('/'))
             {
                 masked[++i] = QLatin1Char(' ');
-                inBlockComment = false;
+                state = SemanticEntryState::Code;
+            }
+            continue;
+        }
+        if (state == SemanticEntryState::MultiLineString)
+        {
+            int width = 0;
+            if (closesMultiLineString(line, i, dialect, &width))
+            {
+                blankRange(masked, i, width);
+                i += width - 1;
+                state = SemanticEntryState::Code;
+            }
+            else
+            {
+                masked[i] = QLatin1Char(' ');
             }
             continue;
         }
@@ -55,36 +108,83 @@ QString maskNonCode(const QString &line, bool hashComments, bool &inBlockComment
             if (!escaped && current == quote)
                 quote = QChar();
             escaped = !escaped && current == QLatin1Char('\\');
-            if (current != QLatin1Char('\\'))
-                escaped = false;
             continue;
         }
-        if (current == QLatin1Char('/') && next == QLatin1Char('*'))
+
+        if (dialect.tripleQuotedStrings
+            && (matchesAt(line, i, QLatin1String("\"\"\"")) || matchesAt(line, i, QLatin1String("'''"))))
         {
-            masked[i] = masked[i + 1] = QLatin1Char(' ');
+            blankRange(masked, i, 3);
+            i += 2;
+            state = SemanticEntryState::MultiLineString;
+        }
+        else if (dialect.slashStarBlockComments && current == QLatin1Char('/') && next == QLatin1Char('*'))
+        {
+            blankRange(masked, i, 2);
             ++i;
-            inBlockComment = true;
+            state = SemanticEntryState::BlockComment;
         }
-        else if (current == QLatin1Char('/') && next == QLatin1Char('/'))
+        else if (dialect.slashLineComments && current == QLatin1Char('/') && next == QLatin1Char('/'))
         {
-            for (int j = i; j < masked.size(); ++j)
-                masked[j] = QLatin1Char(' ');
+            blankRange(masked, i, masked.size() - i);
             break;
         }
-        else if (hashComments && current == QLatin1Char('#'))
+        else if (dialect.hashLineComments && current == QLatin1Char('#'))
         {
-            for (int j = i; j < masked.size(); ++j)
-                masked[j] = QLatin1Char(' ');
+            blankRange(masked, i, masked.size() - i);
             break;
         }
-        else if (current == QLatin1Char('\'') || current == QLatin1Char('"') || current == QLatin1Char('`'))
+        else if (current == QLatin1Char('\'') || current == QLatin1Char('"')
+                 || (dialect.backtickStrings && current == QLatin1Char('`')))
         {
             quote = current;
             masked[i] = QLatin1Char(' ');
             escaped = false;
         }
     }
+    // An unterminated single-line string does not leak into the next line;
+    // only the explicit multi-line states do.
     return masked;
+}
+
+// Several patterns match the same name.  Resolving that by letting whichever
+// indicator is filled last win makes the palette depend on statement order in
+// this file, so overlaps are resolved explicitly instead: the first rule to
+// claim a column keeps it, and rules are tried most-specific first.
+struct PatternRule
+{
+    const QRegularExpression *pattern;
+    NotePeek::SyntaxRole role;
+    const QSet<QString> *excluded;
+};
+
+void collectLineTokens(QVector<NotePeek::SemanticToken> &tokens, int lineNumber,
+                       const QString &line, const QVector<PatternRule> &rules,
+                       QVector<bool> &claimed)
+{
+    claimed.fill(false, line.size());
+    for (const PatternRule &rule : rules)
+    {
+        QRegularExpressionMatchIterator matches = rule.pattern->globalMatch(line);
+        while (matches.hasNext())
+        {
+            const QRegularExpressionMatch match = matches.next();
+            const int start = int(match.capturedStart(1));
+            const int length = int(match.capturedLength(1));
+            if (start < 0 || length <= 0)
+                continue;
+            if (rule.excluded && rule.excluded->contains(match.captured(1)))
+                continue;
+            bool overlaps = false;
+            for (int i = start; i < start + length && i < claimed.size(); ++i)
+                overlaps = overlaps || claimed.at(i);
+            if (overlaps)
+                continue;
+            for (int i = start; i < start + length && i < claimed.size(); ++i)
+                claimed[i] = true;
+            tokens.append({lineNumber, start, length, rule.role});
+        }
+    }
 }
 
 } // namespace
@@ -97,6 +197,7 @@ SemanticAnalysisResult BasicSemanticTokenProvider::analyze(
     SemanticAnalysisResult result;
     result.revision = document.revision;
     result.firstLine = document.firstLine;
+    result.exitState = document.entryState;
     QElapsedTimer timer;
     timer.start();
     if (document.text.size() > 2 * 1024 * 1024)
@@ -104,14 +205,24 @@ SemanticAnalysisResult BasicSemanticTokenProvider::analyze(
 
     const bool pythonLike = document.languageId.compare(QLatin1String("Python"), Qt::CaseInsensitive) == 0
                             || document.languageId.compare(QLatin1String("Starlark"), Qt::CaseInsensitive) == 0;
-    const bool codeLike = pythonLike || document.languageId == QLatin1String("C++")
+    const bool scriptLike = document.languageId == QLatin1String("JavaScript")
+                            || document.languageId == QLatin1String("QML");
+    const bool codeLike = pythonLike || scriptLike || document.languageId == QLatin1String("C++")
                           || document.languageId == QLatin1String("C#")
                           || document.languageId == QLatin1String("Java")
-                          || document.languageId == QLatin1String("JavaScript")
-                          || document.languageId == QLatin1String("Rust")
-                          || document.languageId == QLatin1String("QML");
+                          || document.languageId == QLatin1String("Rust");
     if (!codeLike)
         return result;
+
+    MaskDialect dialect;
+    dialect.hashLineComments = pythonLike;
+    dialect.tripleQuotedStrings = pythonLike;
+    // `//` is a line comment in the C family but floor division in Python and
+    // Starlark, where treating it as a comment would blank the rest of the line
+    // and silently drop every token after an integer division.
+    dialect.slashLineComments = !pythonLike;
+    dialect.slashStarBlockComments = !pythonLike;
+    dialect.backtickStrings = scriptLike;
 
     static const QSet<QString> controlWords = {
         QStringLiteral("if"), QStringLiteral("for"), QStringLiteral("while"),
@@ -129,7 +240,24 @@ SemanticAnalysisResult BasicSemanticTokenProvider::analyze(
     static const QRegularExpression decoratorPattern(QStringLiteral(R"(@([A-Za-z_][A-Za-z0-9_]*))"));
     static const QRegularExpression macroPattern(QStringLiteral(R"(\b([A-Z][A-Z0-9_]{2,})\b)"));
 
-    bool inBlockComment = false;
+    // Ordered most-specific first.  An explicit declaration (`def name`) beats
+    // a generic shape (`name` followed by a parenthesis), which in turn beats
+    // the weakest signal (any capitalised word).  See PatternRule.
+    QVector<PatternRule> rules;
+    if (pythonLike)
+    {
+        rules.append({&pythonFunctionPattern, SyntaxRole::Function, nullptr});
+        rules.append({&pythonClassPattern, SyntaxRole::Type, nullptr});
+        rules.append({&decoratorPattern, SyntaxRole::Attribute, nullptr});
+    }
+    rules.append({&macroPattern, SyntaxRole::Builtin, nullptr});
+    rules.append({&variablePattern, SyntaxRole::Variable, nullptr});
+    rules.append({&typePattern, SyntaxRole::Type, nullptr});
+    rules.append({&functionPattern, SyntaxRole::Function, &controlWords});
+    rules.append({&propertyPattern, SyntaxRole::Property, nullptr});
+
+    SemanticEntryState state = document.entryState;
+    QVector<bool> claimed;
     const QStringList lines = document.text.split(QLatin1Char('\n'));
     for (int lineNumber = 0; lineNumber < lines.size(); ++lineNumber)
     {
@@ -144,20 +272,11 @@ SemanticAnalysisResult BasicSemanticTokenProvider::analyze(
             result.budgetExceeded = true;
             break;
         }
-        const QString code = maskNonCode(lines.at(lineNumber), pythonLike, inBlockComment);
+        const QString code = maskNonCode(lines.at(lineNumber), dialect, state);
         const int absoluteLine = document.firstLine + lineNumber;
-        appendMatches(result.tokens, absoluteLine, code, propertyPattern, 1, SyntaxRole::Property);
-        appendMatches(result.tokens, absoluteLine, code, functionPattern, 1, SyntaxRole::Function, controlWords);
-        appendMatches(result.tokens, absoluteLine, code, typePattern, 1, SyntaxRole::Type);
-        appendMatches(result.tokens, absoluteLine, code, variablePattern, 1, SyntaxRole::Variable);
-        appendMatches(result.tokens, absoluteLine, code, macroPattern, 1, SyntaxRole::Builtin);
-        if (pythonLike)
-        {
-            appendMatches(result.tokens, absoluteLine, code, pythonFunctionPattern, 1, SyntaxRole::Function);
-            appendMatches(result.tokens, absoluteLine, code, pythonClassPattern, 1, SyntaxRole::Type);
-            appendMatches(result.tokens, absoluteLine, code, decoratorPattern, 1, SyntaxRole::Attribute);
-        }
+        collectLineTokens(result.tokens, absoluteLine, code, rules, claimed);
         result.lastLine = absoluteLine;
+        result.exitState = state;
     }
     result.elapsedNanoseconds = timer.nsecsElapsed();
     return result;

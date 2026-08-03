@@ -18,7 +18,10 @@ class HighlightedScrollBar : public QWidget
     Q_OBJECT
 
 public:
-    explicit HighlightedScrollBar(QsciScintilla *editor, Qt::Orientation orientation, QWidget *parent = nullptr);
+    // The layer only ever tracks the editor's vertical scrollbar, so it takes
+    // no orientation: accepting one would let callers ask for a horizontal
+    // layer that silently behaves as a vertical one.
+    explicit HighlightedScrollBar(QsciScintilla *editor, QWidget *parent = nullptr);
     ~HighlightedScrollBar();
 
     void setSearchIndicator(int indicator) { searchIndicator = indicator; }
@@ -45,9 +48,12 @@ private:
     void drawTickMark(QPainter &p, int y, int height, const QColor &color);
     void rebuildStaticMarkerLayer();
     void syncToNativeScrollBar();
-    int posToScrollBarY(int pos) const;
     int lineToScrollBarY(int line) const;
-    int scrollbarArrowHeight() const;
+    // The track the slider actually travels in, taken from the style rather
+    // than assumed to be the widget minus two square arrow buttons: macOS
+    // overlay scrollbars have no arrows, so that assumption shrank the usable
+    // range by twice the scrollbar width and pushed every marker off target.
+    QRect grooveRect() const;
 
     QsciScintilla *editor;
     QPointer<QWidget> m_nativeScrollBar;

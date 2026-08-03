@@ -6,7 +6,33 @@
 
 #include <QKeyEvent>
 
+#include <algorithm>
+
 namespace {
+
+// UTF-16 index -> UTF-8 byte offset for one line.  Building the whole table in
+// a single pass costs O(line length) and replaces the two QString::toUtf8()
+// conversions that would otherwise run for every token on the line.
+QVector<int> buildUtf8Offsets(const QString &line)
+{
+    QVector<int> offsets(line.size() + 1, 0);
+    int bytes = 0;
+    for (int i = 0; i < line.size(); ++i)
+    {
+        offsets[i] = bytes;
+        const char16_t unit = line.at(i).unicode();
+        if (unit < 0x80)
+            bytes += 1;
+        else if (unit < 0x800 || QChar::isSurrogate(unit))
+            // A surrogate pair is two UTF-16 units and four UTF-8 bytes, so
+            // each half contributes two.
+            bytes += 2;
+        else
+            bytes += 3;
+    }
+    offsets[line.size()] = bytes;
+    return offsets;
+}
 
 char matchingCloseCharacter(const QString &text)
 {
@@ -33,8 +59,11 @@ namespace NotePeek {
 Editor::Editor(QWidget *parent)
     : QsciScintilla(parent)
 {
-    indicatorDefine(TextColorIndicator, m_semanticIndicator);
-    SendScintilla(SCI_INDICSETFLAGS, m_semanticIndicator, 1L); // SC_INDICFLAG_VALUEFORE
+    // indicatorDefine() returns -1 when every indicator is already taken; the
+    // semantic layer then stays inert rather than writing to indicator -1.
+    m_semanticIndicator = indicatorDefine(TextColorIndicator);
+    if (m_semanticIndicator >= 0)
+        SendScintilla(SCI_INDICSETFLAGS, m_semanticIndicator, 1L); // SC_INDICFLAG_VALUEFORE
     connect(this, &QsciScintilla::textChanged, this, [this]() {
         ++m_documentRevision;
     });
@@ -77,12 +106,19 @@ bool Editor::documentCompletionEnabled() const
 
 void Editor::toggleCurrentFold()
 {
-    recolor();
-
     int line = 0;
     int index = 0;
     getCursorPosition(&line, &index);
     Q_UNUSED(index);
+
+    // Fold levels only exist for text the lexer has already styled. Recolouring
+    // the whole document here stalled the fold shortcut for as long as a full
+    // re-lex took on a large file; styling just the not-yet-styled gap up to
+    // the cursor gives the same fold information.
+    const long lineEnd = SendScintilla(SCI_GETLINEENDPOSITION, line);
+    const long styled = SendScintilla(SCI_GETENDSTYLED);
+    if (styled < lineEnd)
+        recolor(styled, lineEnd);
 
     const int level = int(SendScintilla(SCI_GETFOLDLEVEL, line));
     if ((level & SC_FOLDLEVELHEADERFLAG) == 0)
@@ -120,6 +156,7 @@ bool Editor::setSemanticTokens(quint64 revision, const QVector<SemanticToken> &t
         return false;
     clearSemanticTokens();
     m_semanticTokens = tokens;
+    sortSemanticTokens();
     renderSemanticTokens();
     return true;
 }
@@ -130,24 +167,79 @@ bool Editor::applySemanticTokenDelta(quint64 revision, int firstLine, int lastLi
     if (revision != m_documentRevision || firstLine < 0 || lastLine < firstLine)
         return false;
     lastLine = qMin(lastLine, lines() - 1);
+    if (lastLine < firstLine)
+        return false;
     clearSemanticIndicatorLines(firstLine, lastLine);
-    for (int i = m_semanticTokens.size() - 1; i >= 0; --i)
-    {
-        if (m_semanticTokens.at(i).line >= firstLine && m_semanticTokens.at(i).line <= lastLine)
-            m_semanticTokens.removeAt(i);
-    }
+
+    // The cache is sorted by line, so the replaced window is one contiguous
+    // run: erase it in a single splice instead of removing element by element.
+    const auto byLine = [](const SemanticToken &token, int line) { return token.line < line; };
+    const auto lineFirst = [](int line, const SemanticToken &token) { return line < token.line; };
+    const auto begin = std::lower_bound(m_semanticTokens.begin(), m_semanticTokens.end(),
+                                        firstLine, byLine);
+    const auto end = std::upper_bound(begin, m_semanticTokens.end(), lastLine, lineFirst);
+    const int insertAt = int(begin - m_semanticTokens.begin());
+    m_semanticTokens.erase(begin, end);
+
+    QVector<SemanticToken> accepted;
+    accepted.reserve(tokens.size());
     for (const SemanticToken &token : tokens)
     {
-        if (token.line < firstLine || token.line > lastLine)
-            continue;
-        m_semanticTokens.append(token);
-        renderSemanticToken(token);
+        if (token.line >= firstLine && token.line <= lastLine)
+            accepted.append(token);
     }
+    std::stable_sort(accepted.begin(), accepted.end(),
+                     [](const SemanticToken &a, const SemanticToken &b) { return a.line < b.line; });
+    // Make room once and fill it: inserting one at a time would shift the whole
+    // tail per token, which is quadratic in the size of the cache.
+    m_semanticTokens.insert(insertAt, accepted.size(), SemanticToken());
+    for (int i = 0; i < accepted.size(); ++i)
+        m_semanticTokens[insertAt + i] = accepted.at(i);
+    renderTokenRange(insertAt, insertAt + accepted.size() - 1);
     return true;
+}
+
+void Editor::evictSemanticTokensOutside(int keepFirstLine, int keepLastLine, int maxTokens)
+{
+    if (maxTokens < 0)
+        maxTokens = 0;
+    if (m_semanticTokens.size() <= maxTokens)
+        return;
+
+    // Drop whole lines, furthest from the retained window first, so the region
+    // the user is looking at keeps its colours.
+    while (m_semanticTokens.size() > maxTokens && !m_semanticTokens.isEmpty())
+    {
+        const int frontLine = m_semanticTokens.first().line;
+        const int backLine = m_semanticTokens.last().line;
+        if (frontLine >= keepFirstLine && backLine <= keepLastLine)
+            break;
+        const int frontDistance = keepFirstLine - frontLine;
+        const int backDistance = backLine - keepLastLine;
+        const int victimLine = frontDistance >= backDistance ? frontLine : backLine;
+        clearSemanticIndicatorLines(victimLine, victimLine);
+        if (victimLine == frontLine)
+        {
+            int count = 0;
+            while (count < m_semanticTokens.size() && m_semanticTokens.at(count).line == victimLine)
+                ++count;
+            m_semanticTokens.remove(0, count);
+        }
+        else
+        {
+            while (!m_semanticTokens.isEmpty() && m_semanticTokens.last().line == victimLine)
+                m_semanticTokens.removeLast();
+        }
+    }
 }
 
 void Editor::clearSemanticTokens()
 {
+    if (m_semanticIndicator < 0)
+    {
+        m_semanticTokens.clear();
+        return;
+    }
     SendScintilla(SCI_SETINDICATORCURRENT, m_semanticIndicator);
     SendScintilla(SCI_INDICATORCLEARRANGE, 0, SendScintilla(SCI_GETLENGTH));
     m_semanticTokens.clear();
@@ -171,36 +263,66 @@ int Editor::semanticTokenCount() const
     return m_semanticTokens.size();
 }
 
-void Editor::renderSemanticTokens()
+void Editor::sortSemanticTokens()
 {
-    SendScintilla(SCI_SETINDICATORCURRENT, m_semanticIndicator);
-    SendScintilla(SCI_INDICATORCLEARRANGE, 0, SendScintilla(SCI_GETLENGTH));
-    for (const SemanticToken &token : m_semanticTokens)
-        renderSemanticToken(token);
+    std::stable_sort(m_semanticTokens.begin(), m_semanticTokens.end(),
+                     [](const SemanticToken &a, const SemanticToken &b) { return a.line < b.line; });
 }
 
-void Editor::renderSemanticToken(const SemanticToken &token)
+void Editor::renderSemanticTokens()
 {
-    if (token.line < 0 || token.line >= lines() || token.utf16Column < 0 || token.utf16Length <= 0)
+    if (m_semanticIndicator < 0)
         return;
-    const QString lineText = text(token.line);
-    if (token.utf16Column + token.utf16Length > lineText.size())
-        return;
-    const QColor color = m_semanticColors.value(token.role);
-    if (!color.isValid())
-        return;
-    const long lineStart = SendScintilla(SCI_POSITIONFROMLINE, token.line);
-    const long byteStart = lineStart + lineText.left(token.utf16Column).toUtf8().size();
-    const long byteLength = lineText.mid(token.utf16Column, token.utf16Length).toUtf8().size();
-    const long scintillaColor = (color.blue() << 16) | (color.green() << 8) | color.red();
     SendScintilla(SCI_SETINDICATORCURRENT, m_semanticIndicator);
-    SendScintilla(SCI_SETINDICATORVALUE, SC_INDICVALUEBIT | scintillaColor);
-    SendScintilla(SCI_INDICATORFILLRANGE, byteStart, byteLength);
+    SendScintilla(SCI_INDICATORCLEARRANGE, 0, SendScintilla(SCI_GETLENGTH));
+    renderTokenRange(0, m_semanticTokens.size() - 1);
+}
+
+void Editor::renderTokenRange(int fromIndex, int toIndex)
+{
+    fromIndex = qMax(0, fromIndex);
+    toIndex = qMin(toIndex, m_semanticTokens.size() - 1);
+    int index = fromIndex;
+    while (index <= toIndex)
+    {
+        const int line = m_semanticTokens.at(index).line;
+        int runEnd = index;
+        while (runEnd + 1 <= toIndex && m_semanticTokens.at(runEnd + 1).line == line)
+            ++runEnd;
+        renderSemanticTokensForLine(line, index, runEnd);
+        index = runEnd + 1;
+    }
+}
+
+void Editor::renderSemanticTokensForLine(int line, int fromIndex, int toIndex)
+{
+    if (m_semanticIndicator < 0 || line < 0 || line >= lines())
+        return;
+    const QString lineText = text(line);
+    const QVector<int> byteOffsets = buildUtf8Offsets(lineText);
+    const long lineStart = SendScintilla(SCI_POSITIONFROMLINE, line);
+    SendScintilla(SCI_SETINDICATORCURRENT, m_semanticIndicator);
+    for (int i = fromIndex; i <= toIndex; ++i)
+    {
+        const SemanticToken &token = m_semanticTokens.at(i);
+        if (token.utf16Column < 0 || token.utf16Length <= 0)
+            continue;
+        if (token.utf16Column + token.utf16Length > lineText.size())
+            continue;
+        const QColor color = m_semanticColors.value(token.role);
+        if (!color.isValid())
+            continue;
+        const int startByte = byteOffsets.at(token.utf16Column);
+        const int endByte = byteOffsets.at(token.utf16Column + token.utf16Length);
+        const long scintillaColor = (color.blue() << 16) | (color.green() << 8) | color.red();
+        SendScintilla(SCI_SETINDICATORVALUE, SC_INDICVALUEBIT | scintillaColor);
+        SendScintilla(SCI_INDICATORFILLRANGE, lineStart + startByte, long(endByte - startByte));
+    }
 }
 
 void Editor::clearSemanticIndicatorLines(int firstLine, int lastLine)
 {
-    if (lines() <= 0)
+    if (m_semanticIndicator < 0 || lines() <= 0)
         return;
     firstLine = qBound(0, firstLine, lines() - 1);
     lastLine = qBound(firstLine, lastLine, lines() - 1);
