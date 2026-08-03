@@ -3,7 +3,7 @@
 #include "editor/customeditor.h"
 #include "editor/documentio.h"
 #include "editor/documentsavecoordinator.h"
-#include "editor/lexerfactory.h"
+#include <NotePeek/lexerfactory.h>
 #include "editor/performanceconstants.h"
 
 #include <QFileDialog>

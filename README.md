@@ -11,6 +11,8 @@
 ### 📝 Core Editing
 - **Multi-tab editing** – Open multiple files in tabs, with drag‑and‑drop reordering
 - **Syntax highlighting** – Supports **50+ programming/markup/configuration languages and file formats** (see list below)
+- **Rich syntax themes** – Eight built-in light/dark themes with 22 stable syntax roles and optional function/type/member/variable semantic colours
+- **Incremental highlighting** – Visible-range, cancellable background analysis keeps scrolling and typing on the native QScintilla path
 - **Find & Replace** – Full‑featured search with scroll‑bar result markers
 - **Find in Files** – Project‑wide search (`Ctrl+Shift+F`) with a grouped result list and jump‑to‑match
 - **Encoding control** – Auto‑detects UTF‑8/UTF‑16, and lets you reopen or convert with an explicit encoding
@@ -114,7 +116,7 @@ NotePeek/
         ├── CMakeLists.txt      # Build, link, package, deploy
         ├── main.cpp            # Entry point (high‑DPI, style, translation, font)
         ├── mainwindow.h/.cpp/.ui  # Main window
-        ├── editor/             # Editor core (CustomEditor, EditorPane, DocumentController, LexerFactory…)
+        ├── editor/             # App editor state/UI (CustomEditor, EditorPane, DocumentController…)
         ├── find/               # Find‑replace manager & widget
         ├── decorators/         # Scroll‑bar result markers
         ├── widgets/            # Status‑bar components

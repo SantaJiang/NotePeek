@@ -1,4 +1,5 @@
 #include <QMenu>
+#include <QComboBox>
 #include <QDockWidget>
 #include <QMainWindow>
 #include <QMessageBox>
@@ -9,16 +10,25 @@
 #include <QTreeWidget>
 #include <QtTest>
 
+#include "apppreferences.h"
 #include "editor/customeditor.h"
 #include "editor/documentcontroller.h"
 #include "editor/documentformat.h"
 #include "editor/documentsavecoordinator.h"
 #include "editor/editorpane.h"
+#include "editor/editormanager.h"
 #include "editor/externalfilewatcher.h"
-#include "editor/lexerfactory.h"
+#include <NotePeek/lexerfactory.h>
+#include <NotePeek/semantictokens.h>
+#include <NotePeek/syntaxstyler.h>
+#include <NotePeek/syntaxtheme.h>
+#include <Qsci/qscilexercpp.h>
+#include <Qsci/qscilexerjson.h>
+#include <Qsci/qscilexerpython.h>
 #include "find/filesearcher.h"
 #include "find/findreplacemanager.h"
 #include "mainwindow.h"
+#include "preferencesdialog.h"
 #include "tool/cpp/headersourcemanager.h"
 #include "widgets/searchresultsdock.h"
 
@@ -383,6 +393,200 @@ private slots:
         QCOMPARE(LexerFactory::languageFromFilePath(QStringLiteral("/x/Dockerfile")), LexerFactory::DOCKERFILE);
         QCOMPARE(LexerFactory::languageFromFilePath(QStringLiteral("/x/CMakeLists.txt")), LexerFactory::CMAKE);
         QCOMPARE(LexerFactory::languageFromFilePath(QStringLiteral("/x/unknown.zzz")), LexerFactory::Unknown);
+    }
+
+    void mapsLexerStylesThroughCustomizedLibraryRoles()
+    {
+        QsciLexerCPP cpp;
+        QCOMPARE(NotePeek::SyntaxStyler::roleForStyle(&cpp, QsciLexerCPP::Keyword),
+                 NotePeek::SyntaxRole::Keyword);
+        QCOMPARE(NotePeek::SyntaxStyler::roleForStyle(&cpp, QsciLexerCPP::GlobalClass),
+                 NotePeek::SyntaxRole::Type);
+        QCOMPARE(NotePeek::SyntaxStyler::roleForStyle(&cpp, QsciLexerCPP::Identifier),
+                 NotePeek::SyntaxRole::Default);
+
+        QsciLexerPython python;
+        QCOMPARE(NotePeek::SyntaxStyler::roleForStyle(&python, QsciLexerPython::FunctionMethodName),
+                 NotePeek::SyntaxRole::Function);
+        QCOMPARE(NotePeek::SyntaxStyler::roleForStyle(&python, QsciLexerPython::Decorator),
+                 NotePeek::SyntaxRole::Attribute);
+
+        QsciLexerJSON json;
+        QCOMPARE(NotePeek::SyntaxStyler::roleForStyle(&json, QsciLexerJSON::Property),
+                 NotePeek::SyntaxRole::Property);
+        QCOMPARE(NotePeek::SyntaxStyler::roleForStyle(&json, QsciLexerJSON::EscapeSequence),
+                 NotePeek::SyntaxRole::Escape);
+    }
+
+    void cppIncludeDirectivesSeparateDirectiveAndHeaderStyles()
+    {
+        QsciScintilla editor;
+        QsciLexer *lexer = LexerFactory::createLexer(LexerFactory::CPP);
+        QVERIFY(lexer);
+        auto *cpp = qobject_cast<QsciLexerCPP *>(lexer);
+        QVERIFY(cpp);
+        QVERIFY(cpp->stylePreprocessor());
+        lexer->setParent(&editor);
+        editor.setLexer(lexer);
+
+        const QString source = QStringLiteral(
+            "#include \"editor/documentformat.h\"\n"
+            "#include <QDir>\n");
+        editor.setText(source);
+        editor.SendScintilla(QsciScintillaBase::SCI_COLOURISE, 0L, -1L);
+
+        const auto styleAt = [&](int position) {
+            return int(editor.SendScintilla(QsciScintillaBase::SCI_GETSTYLEAT,
+                                            position));
+        };
+        const int quotedDelimiter = source.indexOf(QLatin1Char('"'));
+        const int quotedPath = source.indexOf(QStringLiteral("editor/documentformat.h"));
+        const int angleDelimiter = source.indexOf(QLatin1Char('<'));
+        const int anglePath = source.indexOf(QStringLiteral("QDir"));
+
+        QCOMPARE(styleAt(0), int(QsciLexerCPP::PreProcessor));
+        QCOMPARE(styleAt(source.indexOf(QStringLiteral("#include"), 1)),
+                 int(QsciLexerCPP::PreProcessor));
+        QCOMPARE(styleAt(quotedDelimiter), int(QsciLexerCPP::DoubleQuotedString));
+        QCOMPARE(styleAt(quotedPath), int(QsciLexerCPP::DoubleQuotedString));
+        QCOMPARE(styleAt(angleDelimiter), int(QsciLexerCPP::DoubleQuotedString));
+        QCOMPARE(styleAt(anglePath), int(QsciLexerCPP::DoubleQuotedString));
+        QCOMPARE(NotePeek::SyntaxStyler::roleForStyle(lexer, styleAt(0)),
+                 NotePeek::SyntaxRole::Preprocessor);
+        QCOMPARE(NotePeek::SyntaxStyler::roleForStyle(lexer, styleAt(quotedPath)),
+                 NotePeek::SyntaxRole::String);
+        QCOMPARE(NotePeek::SyntaxStyler::roleForStyle(lexer, styleAt(anglePath)),
+                 NotePeek::SyntaxRole::String);
+    }
+
+    void loadsCompleteBuiltInSyntaxThemesFromJson()
+    {
+        const QVector<NotePeek::SyntaxTheme> themes = NotePeek::SyntaxThemeCatalog::builtInThemes();
+        QCOMPARE(themes.size(), 8);
+        int darkCount = 0;
+        int lightCount = 0;
+        QSet<QString> ids;
+        for (const NotePeek::SyntaxTheme &theme : themes)
+        {
+            QVERIFY2(theme.isValid(), qPrintable(theme.id));
+            QVERIFY(!ids.contains(theme.id));
+            ids.insert(theme.id);
+            theme.dark ? ++darkCount : ++lightCount;
+            QCOMPARE(theme.syntaxColors.size(), 22);
+            QVERIFY(theme.editorColor(QStringLiteral("background")).isValid());
+        }
+        QCOMPARE(darkCount, 4);
+        QCOMPARE(lightCount, 4);
+        QCOMPARE(NotePeek::SyntaxThemeCatalog::theme(QStringLiteral("auto"), true).id,
+                 QStringLiteral("notepeek-dark-modern"));
+        QCOMPARE(NotePeek::SyntaxThemeCatalog::theme(QStringLiteral("auto"), false).id,
+                 QStringLiteral("notepeek-light-modern"));
+    }
+
+    void rejectsIncompleteSyntaxThemeJson()
+    {
+        QString error;
+        const NotePeek::SyntaxTheme theme = NotePeek::SyntaxThemeCatalog::fromJson(
+            QByteArrayLiteral("{\"id\":\"broken\",\"name\":\"Broken\",\"appearance\":\"dark\"}"),
+            &error);
+        QVERIFY(!theme.isValid());
+        QVERIFY(!error.isEmpty());
+    }
+
+    void appliesSelectedSyntaxThemeToAnEditor()
+    {
+        AppPreferences &preferences = AppPreferences::instance();
+        const QString previousTheme = preferences.syntaxThemeId();
+        preferences.setSyntaxThemeId(QStringLiteral("notepeek-midnight-blue"));
+
+        EditorManager manager;
+        CustomEditor *editor = manager.createEditor();
+        manager.updateEditorSyntax(editor, QStringLiteral("sample.py"));
+        auto *python = qobject_cast<QsciLexerPython *>(editor->lexer());
+        QVERIFY(python);
+        const NotePeek::SyntaxTheme midnight = NotePeek::SyntaxThemeCatalog::theme(
+            QStringLiteral("notepeek-midnight-blue"), true);
+        QCOMPARE(python->color(QsciLexerPython::FunctionMethodName),
+                 midnight.syntaxColors.value(NotePeek::SyntaxRole::Function));
+        QCOMPARE(python->paper(QsciLexerPython::Default),
+                 midnight.editorColor(QStringLiteral("background")));
+
+        preferences.setSyntaxThemeId(QStringLiteral("notepeek-light-modern"));
+        manager.reapplyThemeToAllEditors();
+        const NotePeek::SyntaxTheme light = NotePeek::SyntaxThemeCatalog::theme(
+            QStringLiteral("notepeek-light-modern"), false);
+        QCOMPARE(python->color(QsciLexerPython::FunctionMethodName),
+                 light.syntaxColors.value(NotePeek::SyntaxRole::Function));
+
+        preferences.setSyntaxThemeId(previousTheme);
+    }
+
+    void exposesAllSyntaxThemesInPreferences()
+    {
+        PreferencesDialog dialog;
+        QComboBox *themeCombo = dialog.findChild<QComboBox *>(QStringLiteral("syntaxThemeCombo"));
+        QVERIFY(themeCombo);
+        QCOMPARE(themeCombo->count(), 9); // automatic + eight built-ins
+        QCOMPARE(themeCombo->itemData(0).toString(), QStringLiteral("auto"));
+    }
+
+    void classifiesRepresentativeSemanticNames()
+    {
+        NotePeek::BasicSemanticTokenProvider provider;
+        NotePeek::SemanticDocument document;
+        document.languageId = QStringLiteral("C++");
+        document.text = QStringLiteral(
+            "Widget buildWidget(int count) { object.title = makeTitle(count); }\n"
+            "// IgnoredCall(CommentType)\n"
+            "const char *text = \"IgnoredString(Call)\";\n");
+        const QVector<NotePeek::SemanticToken> tokens = provider.tokensForDocument(document);
+
+        bool foundType = false;
+        bool foundFunction = false;
+        bool foundProperty = false;
+        for (const NotePeek::SemanticToken &token : tokens)
+        {
+            const QString line = document.text.split(QLatin1Char('\n')).value(token.line);
+            const QString value = line.mid(token.utf16Column, token.utf16Length);
+            foundType |= value == QLatin1String("Widget") && token.role == NotePeek::SyntaxRole::Type;
+            foundFunction |= value == QLatin1String("makeTitle") && token.role == NotePeek::SyntaxRole::Function;
+            foundProperty |= value == QLatin1String("title") && token.role == NotePeek::SyntaxRole::Property;
+            QVERIFY(value != QLatin1String("IgnoredCall"));
+            QVERIFY(value != QLatin1String("IgnoredString"));
+        }
+        QVERIFY(foundType);
+        QVERIFY(foundFunction);
+        QVERIFY(foundProperty);
+    }
+
+    void semanticAnalysisHonorsViewportOffsetsCancellationAndBudgets()
+    {
+        NotePeek::BasicSemanticTokenProvider provider;
+        NotePeek::SemanticDocument document;
+        document.languageId = QStringLiteral("C++");
+        document.firstLine = 400;
+        document.revision = 17;
+        document.text = QStringLiteral("Widget buildWidget() { return object.title; }\n");
+
+        const NotePeek::SemanticAnalysisResult offsetResult = provider.analyze(document);
+        QCOMPARE(offsetResult.revision, quint64(17));
+        QCOMPARE(offsetResult.firstLine, 400);
+        QCOMPARE(offsetResult.lastLine, 401);
+        QVERIFY(!offsetResult.tokens.isEmpty());
+        for (const NotePeek::SemanticToken &token : offsetResult.tokens)
+            QVERIFY(token.line >= 400);
+
+        NotePeek::SemanticAnalysisControl canceledControl;
+        canceledControl.cancellation = std::make_shared<std::atomic_bool>(true);
+        const NotePeek::SemanticAnalysisResult canceled = provider.analyze(document, canceledControl);
+        QVERIFY(canceled.canceled);
+        QVERIFY(canceled.tokens.isEmpty());
+
+        NotePeek::SemanticAnalysisControl boundedControl;
+        boundedControl.budgetNanoseconds = 1;
+        const NotePeek::SemanticAnalysisResult bounded = provider.analyze(document, boundedControl);
+        QVERIFY(bounded.budgetExceeded);
+        QVERIFY(bounded.elapsedNanoseconds > 0);
     }
 
     void findsHeaderSourceCounterparts()

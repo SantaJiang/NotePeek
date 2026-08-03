@@ -1,0 +1,5 @@
+{
+  "id": "notepeek-graphite", "name": "NotePeek Graphite", "appearance": "dark",
+  "editor": {"background":"#202124","foreground":"#E8EAED","marginBackground":"#17181A","marginForeground":"#80868B","caret":"#FFFFFF","caretLine":"#292A2D","indentGuide":"#3C4043","foldMarker":"#9AA0A6","matchedBraceForeground":"#8AB4F8","matchedBraceBackground":"#3C4043"},
+  "tokens": {"default":"#E8EAED","comment":"#9AA0A6","documentation":"#A8B0B8","keyword":"#C58AF9","type":"#78D9EC","builtin":"#FDD663","function":"#F28B82","variable":"#AECBFA","property":"#8AB4F8","string":"#81C995","escape":"#FDD663","number":"#FCAD70","operator":"#E8EAED","preprocessor":"#D7AEFB","regex":"#F6AEA9","attribute":"#F6AEA9","tag":"#8AB4F8","link":"#78D9EC","added":"#81C995","removed":"#F28B82","changed":"#FDD663","error":"#FF6D6D"}
+}

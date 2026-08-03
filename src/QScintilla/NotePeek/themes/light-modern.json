@@ -1,0 +1,5 @@
+{
+  "id": "notepeek-light-modern", "name": "NotePeek Light Modern", "appearance": "light",
+  "editor": {"background":"#FFFFFF","foreground":"#1F1F1F","marginBackground":"#F3F3F3","marginForeground":"#616161","caret":"#000000","caretLine":"#F5F8FF","indentGuide":"#D3D3D3","foldMarker":"#6B6B6B","matchedBraceForeground":"#0066B8","matchedBraceBackground":"#E6F2FF"},
+  "tokens": {"default":"#1F1F1F","comment":"#008000","documentation":"#3F7F5F","keyword":"#AF00DB","type":"#267F99","builtin":"#795E26","function":"#795E26","variable":"#001080","property":"#881000","string":"#A31515","escape":"#EE0000","number":"#098658","operator":"#1F1F1F","preprocessor":"#AF00DB","regex":"#811F3F","attribute":"#991F66","tag":"#800000","link":"#0000EE","added":"#09810A","removed":"#C72E0F","changed":"#9A6700","error":"#E51400"}
+}

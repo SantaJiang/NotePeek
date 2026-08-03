@@ -1,0 +1,15 @@
+QScintilla is licensed under the GNU General Public License version 3.0.
+
+The complete, unmodified GNU GPL version 3 license text is distributed at
+../../LICENSE.  That file applies to this QScintilla fork.  Copyright and
+license notices in the individual QScintilla source files remain in force.
+
+The bundled Scintilla engine has its own permissive license in:
+
+  scintilla/include/License.txt
+  scintilla/lexers/License.txt
+  scintilla/lexlib/License.txt
+  scintilla/src/License.txt
+
+Commercial QScintilla licensing is available separately from Riverbank
+Computing and is not granted by this repository.

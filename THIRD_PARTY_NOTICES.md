@@ -5,7 +5,7 @@ Their original license texts remain in the referenced source directories.
 
 | Dependency | Bundled version | Upstream | Purpose | License location |
 |---|---:|---|---|---|
-| QScintilla | 2.14.1 | `riverbankcomputing.com/software/qscintilla` | Text editing component | `src/QScintilla/Qsci/qsciglobal.h` and Scintilla `License.txt` files |
+| QScintilla (NotePeek fork 1.0.0) | 2.14.1 | `riverbankcomputing.com/software/qscintilla` | Text editing component | `src/QScintilla/LICENSE`, `src/QScintilla/UPSTREAM.md`, and `src/QScintilla/PATCHES.md` |
 | Scintilla | Bundled with QScintilla 2.14.1 | `scintilla.org` | Editing engine and lexers | `src/QScintilla/scintilla/**/License.txt` |
 | cmark-gfm | 0.29.0.gfm.13 | `github.com/github/cmark-gfm` | GitHub-Flavored Markdown parsing | `src/third_party/cmark-gfm/COPYING` |
 | qlitehtml | Qt vendored snapshot | `code.qt.io/cgit/qt/qlitehtml.git` | Qt HTML preview widget | `src/third_party/qlitehtml/LICENSES/` |

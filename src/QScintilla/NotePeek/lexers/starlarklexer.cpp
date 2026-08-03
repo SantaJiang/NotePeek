@@ -1,4 +1,4 @@
-#include "editor/lexers/starlarklexer.h"
+#include "NotePeek/lexers/starlarklexer.h"
 
 StarlarkLexer::StarlarkLexer(QObject *parent)
     : QsciLexerPython(parent)

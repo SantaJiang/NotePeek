@@ -6,11 +6,16 @@
 #include "editor/editormanager.h"
 #include "editor/externalfilewatcher.h"
 #include "editor/spliteditorcoordinator.h"
+#include "decorators/highlightedscrollbar.h"
+#include "decorators/highlightedscrollbardecorator.h"
 #include "find/findreplacemanager.h"
 #include "tool/markdown/markdownpreviewer.h"
 #include "apppreferences.h"
+#include <NotePeek/semantictokens.h>
 
 #include <QFile>
+#include <QKeyEvent>
+#include <QScrollBar>
 #include <QTemporaryDir>
 #include <QSplitter>
 #include <QtTest>
@@ -27,6 +32,7 @@ private slots:
         prefs.setBracketAssistanceEnabled(true);
         prefs.setSmartIndentationEnabled(true);
         prefs.setDocumentCompletionEnabled(true);
+        prefs.setSemanticHighlightingEnabled(true);
     }
 
     void cleanup()
@@ -36,6 +42,7 @@ private slots:
         prefs.setBracketAssistanceEnabled(false);
         prefs.setSmartIndentationEnabled(true);
         prefs.setDocumentCompletionEnabled(false);
+        prefs.setSemanticHighlightingEnabled(true);
     }
 
     void autoClosesAndSkipsBrackets()
@@ -391,6 +398,193 @@ private slots:
         QTRY_VERIFY_WITH_TIMEOUT(!renderedHtml.isEmpty(), 3000);
         QVERIFY(!renderedHtml.contains(QStringLiteral("<script"), Qt::CaseInsensitive));
         QVERIFY(!renderedHtml.contains(QStringLiteral("javascript:"), Qt::CaseInsensitive));
+    }
+
+    void rendersSemanticTokensAtUtf16PositionsAndRejectsStaleResults()
+    {
+        CustomEditor editor;
+        editor.setText(QStringLiteral("éfoo()\n"));
+        NotePeek::SyntaxPalette colors;
+        colors.insert(NotePeek::SyntaxRole::Function, QColor(QStringLiteral("#12AB34")));
+        editor.setSemanticTokenColors(colors);
+        const quint64 revision = editor.documentRevision();
+        QVERIFY(editor.setSemanticTokens(revision, {{0, 1, 3, NotePeek::SyntaxRole::Function}}));
+        QCOMPARE(editor.semanticTokens().size(), 1);
+
+        // 'é' occupies one UTF-16 code unit but two UTF-8 bytes in Scintilla.
+        const long value = editor.SendScintilla(QsciScintillaBase::SCI_INDICATORVALUEAT, 8, 2);
+        QVERIFY((value & QsciScintillaBase::SC_INDICVALUEBIT) != 0);
+        QCOMPARE(value & QsciScintillaBase::SC_INDICVALUEMASK, 0x34AB12L);
+
+        editor.append(QStringLiteral("changed"));
+        QVERIFY(editor.semanticTokens().isEmpty());
+        QVERIFY(!editor.setSemanticTokens(revision, {{0, 1, 3, NotePeek::SyntaxRole::Function}}));
+    }
+
+    void shiftsCachedSemanticTokensIncrementallyAfterLineInsertion()
+    {
+        CustomEditor editor;
+        editor.setText(QStringLiteral("first\nsecond\nthird\n"));
+        const quint64 revision = editor.documentRevision();
+        QVERIFY(editor.setSemanticTokens(revision, {
+            {0, 0, 5, NotePeek::SyntaxRole::Function},
+            {1, 0, 6, NotePeek::SyntaxRole::Variable},
+            {2, 0, 5, NotePeek::SyntaxRole::Property}
+        }));
+
+        editor.setCursorPosition(0, 0);
+        editor.insert(QStringLiteral("new\n"));
+
+        const QVector<NotePeek::SemanticToken> shifted = editor.semanticTokens();
+        QCOMPARE(shifted.size(), 2);
+        QCOMPARE(shifted.at(0).line, 2);
+        QCOMPARE(shifted.at(1).line, 3);
+        QCOMPARE(shifted.at(0).role, NotePeek::SyntaxRole::Variable);
+        QCOMPARE(shifted.at(1).role, NotePeek::SyntaxRole::Property);
+    }
+
+    void semanticServiceIsIdleForHiddenEditorsAndCoalescesNavigation()
+    {
+        EditorManager manager;
+        CustomEditor *editor = manager.createEditor();
+        editor->resize(800, 600);
+        editor->setText(QStringLiteral("Widget createWidget() { return object.title; }\n"));
+        manager.updateEditorSyntax(editor, QStringLiteral("idle.cpp"));
+
+        QTest::qWait(180);
+        QCOMPARE(editor->property("semanticStartedRequestCount").toInt(), 0);
+        QCOMPARE(editor->semanticTokenCount(), 0);
+
+        editor->show();
+        QTRY_VERIFY_WITH_TIMEOUT(editor->property("semanticStartedRequestCount").toInt() > 0, 1000);
+        QTRY_VERIFY_WITH_TIMEOUT(!editor->property("semanticAnalysisInFlight").toBool(), 1000);
+        const int beforeNavigation = editor->property("semanticStartedRequestCount").toInt();
+
+        for (int i = 0; i < 100; ++i)
+        {
+            QKeyEvent keyRelease(QEvent::KeyRelease, Qt::Key_Down, Qt::NoModifier);
+            QApplication::sendEvent(editor->viewport(), &keyRelease);
+        }
+        QCOMPARE(editor->property("semanticStartedRequestCount").toInt(), beforeNavigation);
+        QTRY_COMPARE_WITH_TIMEOUT(editor->property("semanticStartedRequestCount").toInt(),
+                                  beforeNavigation + 1, 1000);
+
+        editor->hide();
+        const int beforeHiddenEdit = editor->property("semanticStartedRequestCount").toInt();
+        editor->append(QStringLiteral("int hiddenEdit = 1;\n"));
+        QTest::qWait(180);
+        QCOMPARE(editor->property("semanticStartedRequestCount").toInt(), beforeHiddenEdit);
+    }
+
+    void semanticHighlightingCanBeDisabledWithoutBackgroundWork()
+    {
+        EditorManager manager;
+        CustomEditor *editor = manager.createEditor();
+        editor->resize(800, 600);
+        editor->show();
+        editor->setText(QStringLiteral("Widget createWidget() { return object.title; }\n"));
+        manager.updateEditorSyntax(editor, QStringLiteral("disabled.cpp"));
+        QTRY_VERIFY_WITH_TIMEOUT(editor->semanticTokenCount() > 0, 1000);
+
+        AppPreferences::instance().setSemanticHighlightingEnabled(false);
+        manager.reapplyThemeToAllEditors();
+        QCOMPARE(editor->semanticTokenCount(), 0);
+        const int started = editor->property("semanticStartedRequestCount").toInt();
+        editor->append(QStringLiteral("int noWorker = 1;\n"));
+        QTest::qWait(180);
+        QCOMPARE(editor->property("semanticStartedRequestCount").toInt(), started);
+        QVERIFY(!editor->property("semanticAnalysisInFlight").toBool());
+    }
+
+    void scrollBarMarkersPreserveNativeQScintillaInteraction()
+    {
+        CustomEditor editor;
+        QString text;
+        for (int line = 0; line < 500; ++line)
+            text.append(QStringLiteral("line %1\n").arg(line));
+        editor.setText(text);
+        editor.resize(800, 500);
+        HighlightedScrollBarDecorator decorator(&editor);
+        editor.show();
+        QApplication::processEvents();
+
+        HighlightedScrollBar *scrollBar = decorator.getScrollBar();
+        QVERIFY(scrollBar);
+        QCOMPARE(scrollBar->parentWidget(),
+                 static_cast<QWidget *>(editor.verticalScrollBar()));
+        QVERIFY(scrollBar->isVisible());
+        QCOMPARE(scrollBar->geometry().topLeft(), QPoint(0, 0));
+        QCOMPARE(scrollBar->size(), editor.verticalScrollBar()->size());
+        QCOMPARE(scrollBar->mapTo(&editor, QPoint(0, 0)),
+                 editor.verticalScrollBar()->mapTo(&editor, QPoint(0, 0)));
+        QVERIFY(scrollBar->testAttribute(Qt::WA_TransparentForMouseEvents));
+        editor.verticalScrollBar()->setValue(100);
+        QCOMPARE(editor.SendScintilla(QsciScintillaBase::SCI_GETFIRSTVISIBLELINE), 100L);
+
+        editor.SendScintilla(QsciScintillaBase::SCI_SETFIRSTVISIBLELINE, 50L);
+        QCOMPARE(editor.verticalScrollBar()->value(), 50);
+
+        const int position = int(editor.SendScintilla(QsciScintillaBase::SCI_POSITIONFROMLINE, 25L));
+        editor.SendScintilla(QsciScintillaBase::SCI_SETINDICATORCURRENT,
+                             decorator.getSearchIndicator());
+        editor.SendScintilla(QsciScintillaBase::SCI_INDICATORFILLRANGE, position, 4L);
+        editor.markerAdd(30, decorator.getBookmarkMarker());
+        editor.setCursorPosition(40, 0);
+        decorator.notify();
+
+        QCOMPARE(scrollBar->searchMarkerCount(), 1);
+        QCOMPARE(scrollBar->bookmarkMarkerCount(), 1);
+        QCOMPARE(scrollBar->searchMarkerLines(), QVector<int>({25}));
+        QCOMPARE(scrollBar->bookmarkMarkerLines(), QVector<int>({30}));
+        QTRY_COMPARE_WITH_TIMEOUT(scrollBar->currentLine(), 40, 500);
+
+        const auto verifyMarkersAfterResize = [&](const QSize &size) {
+            editor.resize(size);
+            QApplication::processEvents();
+            QCOMPARE(scrollBar->geometry().topLeft(), QPoint(0, 0));
+            QTRY_COMPARE_WITH_TIMEOUT(scrollBar->size(),
+                                      editor.verticalScrollBar()->size(), 500);
+            QCOMPARE(scrollBar->mapTo(&editor, QPoint(0, 0)),
+                     editor.verticalScrollBar()->mapTo(&editor, QPoint(0, 0)));
+            QTRY_VERIFY_WITH_TIMEOUT(scrollBar->isVisible(), 500);
+            QCOMPARE(scrollBar->searchMarkerLines(), QVector<int>({25}));
+            QCOMPARE(scrollBar->bookmarkMarkerLines(), QVector<int>({30}));
+            QCOMPARE(scrollBar->currentLine(), 40);
+        };
+        // Exercise intermediate frames instead of validating only the final
+        // geometry. This models interactive resize and macOS zoom animations.
+        for (int frame = 0; frame <= 12; ++frame)
+            verifyMarkersAfterResize(QSize(640 + frame * 30, 360 + frame * 30));
+        for (int frame = 12; frame >= 0; --frame)
+            verifyMarkersAfterResize(QSize(640 + frame * 30, 360 + frame * 30));
+    }
+
+    void editorManagerRefreshesSemanticHighlightingAfterEdits()
+    {
+        EditorManager manager;
+        CustomEditor *editor = manager.createEditor();
+        editor->resize(800, 600);
+        editor->show();
+        manager.updateEditorSyntax(editor, QStringLiteral("semantic.cpp"));
+        editor->setText(QStringLiteral("Widget createWidget() { return object.title; }\n"));
+        QTRY_VERIFY_WITH_TIMEOUT(!editor->semanticTokens().isEmpty(), 1000);
+
+        bool hasFunction = false;
+        bool hasProperty = false;
+        for (const NotePeek::SemanticToken &token : editor->semanticTokens())
+        {
+            const QString value = editor->text(token.line).mid(token.utf16Column, token.utf16Length);
+            hasFunction |= value == QLatin1String("createWidget")
+                           && token.role == NotePeek::SyntaxRole::Function;
+            hasProperty |= value == QLatin1String("title")
+                           && token.role == NotePeek::SyntaxRole::Property;
+        }
+        QVERIFY(hasFunction);
+        QVERIFY(hasProperty);
+
+        editor->setText(QStringLiteral("int renamedVariable = 1;\n"));
+        QVERIFY(editor->semanticTokens().isEmpty());
+        QTRY_VERIFY_WITH_TIMEOUT(!editor->semanticTokens().isEmpty(), 1000);
     }
 };
 

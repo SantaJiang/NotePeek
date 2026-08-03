@@ -1,4 +1,4 @@
-#include "editor/lexers/qmakelexer.h"
+#include "NotePeek/lexers/qmakelexer.h"
 
 QMakeLexer::QMakeLexer(QObject *parent)
     : SimpleSyntaxLexer("qmake",

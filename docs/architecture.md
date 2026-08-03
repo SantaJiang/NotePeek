@@ -76,7 +76,25 @@ Application-scoped FIFO and generation tracker. It serializes writes per normali
 
 ### `editor/EditorManager`
 
-Creates and configures `CustomEditor` instances, applies fonts, syntax lexers, theme colors, and editor decorators.
+Creates and configures `CustomEditor` instances, applies fonts, asks the
+exported language registry for syntax lexers, schedules semantic-token refresh,
+and owns application-only editor decorators. Reusable editing and rendering
+mechanics live in the NotePeekScintilla fork.
+
+Semantic refresh is a visible-range incremental service: the UI thread copies
+only 40 lines behind and 80 lines ahead of the viewport, then a single
+low-priority worker analyzes that bounded snapshot with cancellation and a 2 ms
+budget. Edits are debounced for 120 ms, completed navigation for 45 ms, hidden
+editors schedule no work, and stale revisions never reach the widget. Results
+replace only their analyzed line range and the token cache is capped at 12,000
+entries. Dynamic diagnostic properties on each editor expose snapshot size,
+worker/apply time, in-flight state and request/cancellation counts to tests.
+
+The search/bookmark/current-line scrollbar markers are a mouse-transparent
+overlay on QScintilla's original scrollbar. The overlay preserves the existing
+document-position markers while leaving scrolling and thumb dragging on the
+native QScintilla connection; replacing the scrollbar is intentionally avoided
+because it forces a much slower repaint path on macOS.
 
 ### `editor/DocumentPersistenceService`
 
@@ -96,13 +114,35 @@ Synchronizes the pane `DocumentController`s (active pane tracking, mirroring ope
 
 Disk reads for externally changed files happen here, off the UI thread; controllers only apply already-loaded content. One read per path is in flight at a time and further change events coalesce into a single re-run.
 
-### `editor/LexerFactory` and `editor/lexers/`
+### `QScintilla/NotePeek/LexerFactory` and custom lexers
 
-`LexerFactory` maps languages, extensions, and file names to QScintilla lexers through two declarative tables; adding a language is a one-line table entry. Custom lexers (Dockerfile, qmake, Starlark, ...) live one-per-file under `editor/lexers/`.
+The NotePeek QScintilla fork owns `LexerFactory`, maps languages, extensions,
+and file names to QScintilla lexers through two declarative tables, and ships
+the Dockerfile, qmake, Starlark, Meson, Groovy, and ignore-file lexers. MainPage
+consumes the exported registry through `<NotePeek/lexerfactory.h>`.
+
+### `QScintilla/NotePeek` editor kit
+
+`NotePeek::Editor` exports bracket assistance, folding, document completion and
+an LSP-compatible UTF-16 semantic-token overlay. `SyntaxStyler` translates
+lexer-specific styles into 22 stable roles. `SemanticTokenProvider` is the
+replaceable language-service boundary; the bundled lightweight provider gives
+immediate function/type/member distinctions while allowing a future clangd or
+other LSP client to provide more precise tokens without changing the widget.
+`SemanticDocument`, `SemanticAnalysisControl`, and `SemanticAnalysisResult`
+carry revision/range metadata, cancellation and execution budgets so providers
+can be hosted asynchronously without coupling worker threads to QWidget state.
+
+`SyntaxThemeCatalog` validates JSON themes embedded in the library. Four dark
+and four light themes ship with the fork, and MainPage persists either a theme
+id or automatic system-appearance selection.
 
 ### `themecolors.h`
 
-All themable colours live in one data table (`roleColors()`) keyed by `ColorRole`, with a light and a dark value per role. The per-widget namespaces (`Editor`, `Lexer`, `FileTree`, ...) are thin accessors over it, so a future user-selectable theme only needs to replace the table lookup rather than the call sites. Theme selection currently follows the OS colour scheme.
+Application chrome colours live in one data table (`roleColors()`) keyed by
+`ColorRole`. Syntax-editor colours come from the selected JSON theme in
+NotePeekScintilla; `themecolors.h` remains the automatic-theme fallback and the
+source of non-editor widget colours.
 
 ## Dependency Direction
 
@@ -122,4 +162,7 @@ Third-party code is intentionally isolated:
 - `src/third_party/cmark-gfm`
 - `src/third_party/qlitehtml`
 
-Local changes to third-party code should be minimized and documented in the commit or pull request.
+The QScintilla directory is an intentional GPLv3 NotePeek fork. Its upstream
+identity and local changes are documented in `UPSTREAM.md` and `PATCHES.md`.
+Changes to the other third-party directories should be minimized and documented
+in the commit or pull request.

@@ -1,12 +1,13 @@
 #ifndef LEXERFACTORY_H
 #define LEXERFACTORY_H
 
+#include <Qsci/qsciglobal.h>
 #include <Qsci/qscilexer.h>
 #include <QString>
 #include <QStringList>
 #include <QHash>
 
-class LexerFactory
+class QSCINTILLA_EXPORT LexerFactory
 {
 public:
     enum Language {

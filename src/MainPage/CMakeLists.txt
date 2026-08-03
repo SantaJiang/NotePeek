@@ -22,22 +22,6 @@ add_library(notepeek_core STATIC
     editor/documentpersistenceservice.h
     editor/documentregistry.cpp
     editor/documentregistry.h
-    editor/lexerfactory.cpp
-    editor/lexerfactory.h
-    editor/lexers/simplesyntaxlexer.cpp
-    editor/lexers/simplesyntaxlexer.h
-    editor/lexers/dockerfilelexer.cpp
-    editor/lexers/dockerfilelexer.h
-    editor/lexers/qmakelexer.cpp
-    editor/lexers/qmakelexer.h
-    editor/lexers/ignorefilelexer.cpp
-    editor/lexers/ignorefilelexer.h
-    editor/lexers/groovylexer.cpp
-    editor/lexers/groovylexer.h
-    editor/lexers/starlarklexer.cpp
-    editor/lexers/starlarklexer.h
-    editor/lexers/mesonlexer.cpp
-    editor/lexers/mesonlexer.h
     editor/supportedfilepolicy.cpp
     editor/supportedfilepolicy.h
     find/filesearcher.cpp

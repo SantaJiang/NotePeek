@@ -31,12 +31,14 @@ private:
     QComboBox *m_textFontSize;
     QFontComboBox *m_codeFontCombo;
     QComboBox *m_codeFontSize;
+    QComboBox *m_syntaxThemeCombo;
     QCheckBox *m_showFileTree;
     QCheckBox *m_markdownSidePreview;
     QCheckBox *m_codeFolding;
     QCheckBox *m_bracketAssistance;
     QCheckBox *m_smartIndentation;
     QCheckBox *m_documentCompletion;
+    QCheckBox *m_semanticHighlighting;
     QComboBox *m_languageCombo;
 };
 

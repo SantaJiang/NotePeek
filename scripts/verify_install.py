@@ -28,21 +28,21 @@ def main() -> None:
         require_file(executable)
         require_file(prefix / "NotePeek.app" / "Contents" / "Resources" / "THIRD_PARTY_NOTICES.md")
         require_file(prefix / "NotePeek.app" / "Contents" / "Resources" / "dependency-policy.md")
-        libraries = list((prefix / "NotePeek.app" / "Contents" / "Frameworks").glob("libqscintilla2*.dylib"))
+        libraries = list((prefix / "NotePeek.app" / "Contents" / "Frameworks").glob("libNotePeekScintilla*.dylib"))
     elif args.system == "Windows":
         executable = prefix / "bin" / "notepeek.exe"
         require_file(executable)
         require_file(prefix / "share" / "notepeek" / "THIRD_PARTY_NOTICES.md")
         require_file(prefix / "share" / "notepeek" / "dependency-policy.md")
-        libraries = list((prefix / "bin").glob("qscintilla2*.dll"))
-        libraries += list((prefix / "bin").glob("libqscintilla2*.dll"))
+        libraries = list((prefix / "bin").glob("NotePeekScintilla*.dll"))
+        libraries += list((prefix / "bin").glob("libNotePeekScintilla*.dll"))
     else:
         executable = prefix / "bin" / "notepeek"
         require_file(executable)
         require_file(prefix / "share" / "notepeek" / "THIRD_PARTY_NOTICES.md")
         require_file(prefix / "share" / "notepeek" / "dependency-policy.md")
-        libraries = list((prefix / "lib" / "notepeek").glob("libqscintilla2.so*"))
-        libraries += list((prefix / "lib64" / "notepeek").glob("libqscintilla2.so*"))
+        libraries = list((prefix / "lib" / "notepeek").glob("libNotePeekScintilla.so*"))
+        libraries += list((prefix / "lib64" / "notepeek").glob("libNotePeekScintilla.so*"))
 
     if not any(path.is_file() and path.stat().st_size > 0 for path in libraries):
         raise SystemExit("The installed QScintilla runtime was not found")

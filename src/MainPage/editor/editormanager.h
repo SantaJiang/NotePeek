@@ -7,8 +7,10 @@
 #include <QFont>
 #include <QUrl>
 #include <QtGlobal>
+#include <memory>
 
 class CustomEditor;
+class SemanticHighlightingEngine;
 class EditorManager : public QObject
 {
     Q_OBJECT
@@ -56,6 +58,7 @@ private:
     void applyBaseEditorColors(CustomEditor *editor);
 
     QList<QPointer<CustomEditor>> m_editors;
+    std::unique_ptr<SemanticHighlightingEngine> m_semanticEngine;
 };
 
 #endif // EDITORMANAGER_H

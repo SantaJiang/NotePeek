@@ -1,10 +1,10 @@
-#include "editor/lexerfactory.h"
-#include "editor/lexers/dockerfilelexer.h"
-#include "editor/lexers/groovylexer.h"
-#include "editor/lexers/ignorefilelexer.h"
-#include "editor/lexers/mesonlexer.h"
-#include "editor/lexers/qmakelexer.h"
-#include "editor/lexers/starlarklexer.h"
+#include "NotePeek/lexerfactory.h"
+#include "NotePeek/lexers/dockerfilelexer.h"
+#include "NotePeek/lexers/groovylexer.h"
+#include "NotePeek/lexers/ignorefilelexer.h"
+#include "NotePeek/lexers/mesonlexer.h"
+#include "NotePeek/lexers/qmakelexer.h"
+#include "NotePeek/lexers/starlarklexer.h"
 #include <Qsci/qscilexeravs.h>
 #include <Qsci/qscilexerbash.h>
 #include <Qsci/qscilexerbatch.h>
@@ -60,6 +60,17 @@ QsciLexer *make()
     return new T;
 }
 
+QsciLexer *makeCPlusPlus()
+{
+    auto *lexer = new QsciLexerCPP;
+    // Keep the directive itself in the preprocessor style while allowing the
+    // normal C++ lexer to classify the rest of the line.  In particular,
+    // quoted and angle-bracket include paths then receive the string style
+    // instead of inheriting the colour of #include.
+    lexer->setStylePreprocessor(true);
+    return lexer;
+}
+
 // One row per language: display name, lexer constructor and the
 // space-separated, lowercase extension list (compound suffixes such as
 // "cmake.in" are allowed). Adding a language means adding a row here and,
@@ -74,7 +85,7 @@ struct LanguageSpec
 
 const LanguageSpec kLanguages[] = {
     {LexerFactory::Python, "Python", make<QsciLexerPython>, "py"},
-    {LexerFactory::CPP, "C++", make<QsciLexerCPP>, "c cpp cc cxx h hpp hxx hh ipp inl"},
+    {LexerFactory::CPP, "C++", makeCPlusPlus, "c cpp cc cxx h hpp hxx hh ipp inl"},
     {LexerFactory::Java, "Java", make<QsciLexerJava>, "java"},
     {LexerFactory::JavaScript, "JavaScript", make<QsciLexerJavaScript>, "js mjs cjs jsx"},
     {LexerFactory::HTML, "HTML", make<QsciLexerHTML>, "html htm xhtml"},

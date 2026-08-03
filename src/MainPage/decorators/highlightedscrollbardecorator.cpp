@@ -2,6 +2,7 @@
 #include "decorators/highlightedscrollbar.h"
 #include "themecolors.h"
 #include <QTimer>
+#include <QScrollBar>
 #include <Qsci/qsciscintilla.h>
 
 HighlightedScrollBarDecorator::HighlightedScrollBarDecorator(QsciScintilla *editor)
@@ -17,16 +18,10 @@ HighlightedScrollBarDecorator::HighlightedScrollBarDecorator(QsciScintilla *edit
     m_scrollBar->setSearchIndicator(m_searchIndicator);
     m_scrollBar->setBookmarkMarker(m_bookmarkMarker);
 
-    editor->setVerticalScrollBar(m_scrollBar);
-
     connect(editor, SIGNAL(textChanged()),
             this, SLOT(handleTextChanged()));
     connect(editor, SIGNAL(cursorPositionChanged(int, int)),
             this, SLOT(handleCursorPositionChanged(int, int)));
-    connect(editor, SIGNAL(selectionChanged()),
-            this, SLOT(handleSelectionChanged()));
-    connect(m_scrollBar, &QScrollBar::valueChanged,
-            this, &HighlightedScrollBarDecorator::handleScroll);
 }
 
 void HighlightedScrollBarDecorator::notify(const void *notificationData)
@@ -51,6 +46,7 @@ void HighlightedScrollBarDecorator::applyThemeColors()
     m_editor->setIndicatorForegroundColor(searchHighlightColor, m_searchIndicator);
     m_editor->setMarkerBackgroundColor(ThemeColors::ScrollBar::bookmark(), m_bookmarkMarker);
     m_editor->setMarkerForegroundColor(Qt::white, m_bookmarkMarker);
+    m_scrollBar->applyThemeColors();
 
     updateScrollBar();
 }
@@ -62,20 +58,9 @@ void HighlightedScrollBarDecorator::handleTextChanged()
 
 void HighlightedScrollBarDecorator::handleCursorPositionChanged(int line, int index)
 {
-    Q_UNUSED(line)
     Q_UNUSED(index)
-    updateScrollBar();
-}
-
-void HighlightedScrollBarDecorator::handleSelectionChanged()
-{
-    updateScrollBar();
-}
-
-void HighlightedScrollBarDecorator::handleScroll(int value)
-{
-    Q_UNUSED(value)
-    updateScrollBar();
+    if (m_scrollBar)
+        m_scrollBar->setCurrentLine(line);
 }
 
 void HighlightedScrollBarDecorator::updateScrollBar()

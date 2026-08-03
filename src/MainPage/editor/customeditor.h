@@ -4,12 +4,12 @@
 #include <QObject>
 #include <QDragEnterEvent>
 #include <QDropEvent>
-#include <Qsci/qsciscintilla.h>
+#include <Qsci/notepeekeditor.h>
 #include <QSharedPointer>
 
 #include "editor/documentsession.h"
 
-class CustomEditor : public QsciScintilla
+class CustomEditor : public NotePeek::Editor
 {
     Q_OBJECT
 public:
@@ -35,31 +35,16 @@ public:
     void finishEncodingConversion(bool success);
     quint64 beginEncodingReload();
     bool isCurrentEncodingReload(quint64 generation) const;
-    void setCodeEditingFeaturesEnabled(bool enabled);
-    bool codeEditingFeaturesEnabled() const;
-    void setBracketAssistanceEnabled(bool enabled);
-    bool bracketAssistanceEnabled() const;
-    void setDocumentCompletionEnabled(bool enabled);
-    bool documentCompletionEnabled() const;
-    void toggleCurrentFold();
-    void toggleAllFolds();
-    void goToMatchingBrace();
-    void completeWordFromDocument();
-
 signals:
     void filesDropped(const QList<QUrl> &urls);
 
 protected:
     void dragEnterEvent(QDragEnterEvent  *e) override;
     void dropEvent(QDropEvent *e) override;
-    void keyPressEvent(QKeyEvent *e) override;
 
 private:
     QString m_filePath;
     QSharedPointer<DocumentSession> m_documentSession = QSharedPointer<DocumentSession>::create();
-    bool m_codeEditingFeaturesEnabled = false;
-    bool m_bracketAssistanceEnabled = false;
-    bool m_documentCompletionEnabled = false;
 };
 
 #endif // CUSTOMEDITOR_H
