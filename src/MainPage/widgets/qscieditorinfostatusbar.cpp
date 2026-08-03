@@ -21,6 +21,7 @@
 #include "themecolors.h"
 #include <QMainWindow>
 #include <QFrame>
+#include <QTimer>
 #include <Qsci/qsciscintilla.h>
 #include <Qsci/qsciscintillabase.h>
 #include <Qsci/qscilexer.h>
@@ -158,7 +159,7 @@ void QsciEditorInfoStatusBar::applyChromeTheme()
 {
     using namespace ThemeColors::EditorTopBar;
 
-    setStyleSheet(QStringLiteral(
+    const QString styleSheet = QStringLiteral(
         "QStatusBar {"
         "  background-color: %1;"
         "  border-top: 1px solid %2;"
@@ -169,7 +170,15 @@ void QsciEditorInfoStatusBar::applyChromeTheme()
         "  border: none;"
         "}"
     ).arg(background().name(QColor::HexRgb),
-          border().name(QColor::HexRgb)));
+          border().name(QColor::HexRgb));
+
+    // setStyleSheet() repolishes the widget and can synchronously emit another
+    // PaletteChange. Avoid reapplying an identical sheet so that theme changes
+    // remain safe on both Qt 5 and Qt 6.
+    if (this->styleSheet() != styleSheet)
+    {
+        setStyleSheet(styleSheet);
+    }
 }
 
 void QsciEditorInfoStatusBar::changeEvent(QEvent *event)
@@ -178,7 +187,9 @@ void QsciEditorInfoStatusBar::changeEvent(QEvent *event)
 
     if (event->type() == QEvent::PaletteChange)
     {
-        applyChromeTheme();
+        // Let QApplication finish installing the platform palette before QSS
+        // repolishes this widget and its children.
+        QTimer::singleShot(0, this, &QsciEditorInfoStatusBar::applyChromeTheme);
     }
 }
 

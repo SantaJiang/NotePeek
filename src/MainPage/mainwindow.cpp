@@ -16,6 +16,8 @@
 #include <QStyleHints>
 #include <QApplication>
 #include <QProcess>
+#include <QScopedValueRollback>
+#include <QTimer>
 #include <QDockWidget>
 #include <QMenu>
 #include <QSplitter>
@@ -51,14 +53,18 @@ void applyEditorSplitterStyle(QSplitter *splitter)
     }
 
     splitter->setHandleWidth(1);
-    splitter->setStyleSheet(QStringLiteral(
+    const QString styleSheet = QStringLiteral(
                                 "QSplitter::handle:horizontal {"
                                 "  width: 1px;"
                                 "  background-color: %1;"
                                 "  border: 0;"
                                 "  margin: 0;"
                                 "  padding: 0;"
-                                "}").arg(ThemeColors::EditorTopBar::border().name()));
+                                "}").arg(ThemeColors::EditorTopBar::border().name());
+    if (splitter->styleSheet() != styleSheet)
+    {
+        splitter->setStyleSheet(styleSheet);
+    }
 }
 
 void applyMainWindowSeparatorStyle(QMainWindow *window)
@@ -69,7 +75,7 @@ void applyMainWindowSeparatorStyle(QMainWindow *window)
     }
 
     const QString separatorColor = ThemeColors::EditorTopBar::border().name();
-    window->setStyleSheet(QStringLiteral(
+    const QString styleSheet = QStringLiteral(
                               "QMainWindow::separator {"
                               "  background-color: %1;"
                               "  width: 1px;"
@@ -81,7 +87,11 @@ void applyMainWindowSeparatorStyle(QMainWindow *window)
                               "QMainWindow::separator:hover {"
                               "  background-color: %1;"
                               "}")
-                              .arg(separatorColor));
+                              .arg(separatorColor);
+    if (window->styleSheet() != styleSheet)
+    {
+        window->setStyleSheet(styleSheet);
+    }
 }
 
 } // namespace
@@ -265,10 +275,7 @@ MainWindow::MainWindow(QWidget *parent,
 #if QT_VERSION >= QT_VERSION_CHECK(6, 5, 0)
     connect(QGuiApplication::styleHints(), &QStyleHints::colorSchemeChanged,
             this, [this]() {
-                applyEditorSplitterStyle(ui->editorSplitter);
-                applyMainWindowSeparatorStyle(this);
-                m_editorCoordinator->reapplyThemeToEditorPanes();
-                m_editorCoordinator->refreshVisibleMarkdownPreviews();
+                scheduleChromeThemeRefresh();
             });
 #endif
 
@@ -392,12 +399,37 @@ void MainWindow::changeEvent(QEvent *event)
 
     if (event->type() == QEvent::PaletteChange)
     {
-        applyEditorSplitterStyle(ui->editorSplitter);
-        applyMainWindowSeparatorStyle(this);
-        m_fileExplorerDock->reapplyTheme();
-        m_editorCoordinator->reapplyThemeToEditorPanes();
-        m_editorCoordinator->refreshVisibleMarkdownPreviews();
+        scheduleChromeThemeRefresh();
     }
+}
+
+void MainWindow::scheduleChromeThemeRefresh()
+{
+    if (m_chromeThemeRefreshPending)
+    {
+        return;
+    }
+
+    m_chromeThemeRefreshPending = true;
+    QTimer::singleShot(0, this, [this]() {
+        reapplyChromeTheme();
+        m_chromeThemeRefreshPending = false;
+    });
+}
+
+void MainWindow::reapplyChromeTheme()
+{
+    if (m_reapplyingChromeTheme)
+    {
+        return;
+    }
+
+    const QScopedValueRollback<bool> guard(m_reapplyingChromeTheme, true);
+    applyEditorSplitterStyle(ui->editorSplitter);
+    applyMainWindowSeparatorStyle(this);
+    m_fileExplorerDock->reapplyTheme();
+    m_editorCoordinator->reapplyThemeToEditorPanes();
+    m_editorCoordinator->refreshVisibleMarkdownPreviews();
 }
 
 void MainWindow::refreshHighlights()
