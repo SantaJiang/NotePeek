@@ -1,0 +1,52 @@
+# NotePeek Changes to QScintilla 2.14.1
+
+All entries below are modifications maintained by the NotePeek project and are
+distributed under GNU GPL version 3.0 when they form part of QScintilla.
+
+## Build and identity
+
+- Replaced the upstream qmake-only library build with the project CMake target.
+- Renamed the shipped binary to `NotePeekScintilla` and assigned an independent
+  fork version and ABI.
+- Added Qt 5/6 and cross-platform packaging integration.
+
+## Lexer wrappers
+
+- Added QML and Rust QScintilla wrapper classes for bundled Scintilla lexers.
+- Moved the NotePeek language registry and Dockerfile, qmake, ignore-file,
+  Groovy, Starlark, and Meson lexers into the fork library.
+
+## Public NotePeek editor API
+
+- Added `NotePeek::Editor`, an exported QScintilla subclass that owns reusable
+  bracket assistance, folding commands, matching-brace navigation and
+  document-word completion without depending on MainPage document state.
+- Added an LSP-compatible semantic-token model, replaceable provider boundary,
+  a lightweight built-in classifier and theme-aware semantic colour overlay.
+- Added revisioned range deltas, cancellation and analysis budgets so clients
+  can run providers asynchronously and apply only valid viewport results.
+
+## Syntax themes
+
+- Added semantic lexer-role mapping and a validated JSON theme engine.
+- Added four dark and four light NotePeek syntax themes, plus automatic
+  system-appearance selection.
+
+## Rendering changes
+
+- Centred line numbers in number margins used by NotePeek.
+- Prevented word wrapping from splitting Markdown list-marker prefixes.
+
+These rendering changes predate the formal fork interface.  They will be
+converted into opt-in public configuration while the NotePeek editor API is
+introduced, so non-NotePeek QScintilla behavior is not changed globally.
+
+## Performance contract
+
+- Semantic results update only their requested line range; edits shift or
+  invalidate cached tokens incrementally instead of clearing the document.
+- Reapplying an unchanged semantic palette is a no-op.
+- MainPage Release performance tests require same-feature scrolling to stay
+  within 5% of native QScintilla and keep worker and UI-apply phases below 2 ms
+  for the 1 MiB C++ fixture. Debug builds retain a 10% diagnostic guard for
+  unoptimized Scintilla decoration traversal.

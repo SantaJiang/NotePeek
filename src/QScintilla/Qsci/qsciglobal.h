@@ -1,4 +1,7 @@
 // This module defines various things common to all of the Scintilla Qt port.
+// Modified by the NotePeek project, 2026-08-03.  The upstream version macros
+// are retained for source compatibility; NOTEPEEK_QSCINTILLA_* identifies the
+// maintained fork that contains the shipped implementation.
 //
 // Copyright (c) 2023 Riverbank Computing Limited <info@riverbankcomputing.com>
 // 
@@ -26,6 +29,10 @@
 
 #define QSCINTILLA_VERSION      0x020e01
 #define QSCINTILLA_VERSION_STR  "2.14.1"
+
+#define NOTEPEEK_QSCINTILLA_VERSION      0x010000
+#define NOTEPEEK_QSCINTILLA_VERSION_STR  "1.0.0"
+#define NOTEPEEK_QSCINTILLA_UPSTREAM_STR QSCINTILLA_VERSION_STR
 
 
 // We only support Qt v5.11 and later.

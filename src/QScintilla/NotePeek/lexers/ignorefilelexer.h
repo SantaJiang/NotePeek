@@ -1,7 +1,7 @@
 #ifndef IGNOREFILELEXER_H
 #define IGNOREFILELEXER_H
 
-#include "editor/lexers/simplesyntaxlexer.h"
+#include "NotePeek/lexers/simplesyntaxlexer.h"
 
 class IgnoreFileLexer final : public SimpleSyntaxLexer
 {

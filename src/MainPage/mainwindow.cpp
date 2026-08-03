@@ -552,6 +552,7 @@ void MainWindow::applyPreferences()
     // to files opened afterwards, as before.
     m_editorCoordinator->applyFontPreferencesToEditors();
     m_editorCoordinator->applyCodeFeaturePreferencesToEditors();
+    m_editorCoordinator->reapplyThemeToEditorPanes();
     m_editorCoordinator->refreshVisibleMarkdownPreviews();
     if (CustomEditor *editor = activeController()->currentEditor())
     {

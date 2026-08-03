@@ -1,7 +1,7 @@
 #ifndef QMAKELEXER_H
 #define QMAKELEXER_H
 
-#include "editor/lexers/simplesyntaxlexer.h"
+#include "NotePeek/lexers/simplesyntaxlexer.h"
 
 class QMakeLexer final : public SimpleSyntaxLexer
 {

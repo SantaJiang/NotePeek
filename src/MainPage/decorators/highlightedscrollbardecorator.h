@@ -18,6 +18,7 @@ public:
 
     HighlightedScrollBar *getScrollBar() const { return m_scrollBar; }
     int getSearchIndicator() const { return m_searchIndicator; }
+    int getBookmarkMarker() const { return m_bookmarkMarker; }
 
 public slots:
     void updateScrollBar();
@@ -25,8 +26,6 @@ public slots:
 private slots:
     void handleTextChanged();
     void handleCursorPositionChanged(int line, int index);
-    void handleSelectionChanged();
-    void handleScroll(int value);
 
 private:
     QsciScintilla *m_editor;

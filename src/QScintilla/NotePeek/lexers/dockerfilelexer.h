@@ -1,7 +1,7 @@
 #ifndef DOCKERFILELEXER_H
 #define DOCKERFILELEXER_H
 
-#include "editor/lexers/simplesyntaxlexer.h"
+#include "NotePeek/lexers/simplesyntaxlexer.h"
 
 class DockerfileLexer final : public SimpleSyntaxLexer
 {

@@ -2,6 +2,7 @@
 
 #include "apppreferences.h"
 #include "themecolors.h"
+#include <NotePeek/syntaxtheme.h>
 
 #include <QAbstractItemView>
 #include <QCheckBox>
@@ -226,12 +227,14 @@ PreferencesDialog::PreferencesDialog(QWidget *parent)
     , m_textFontSize(new QComboBox(this))
     , m_codeFontCombo(new QFontComboBox(this))
     , m_codeFontSize(new QComboBox(this))
+    , m_syntaxThemeCombo(new QComboBox(this))
     , m_showFileTree(new QCheckBox(tr("Show file tree on startup"), this))
     , m_markdownSidePreview(new QCheckBox(tr("Open with side preview"), this))
     , m_codeFolding(new QCheckBox(tr("Show folding controls"), this))
     , m_bracketAssistance(new QCheckBox(tr("Match and auto-close brackets"), this))
     , m_smartIndentation(new QCheckBox(tr("Indent guides and smart Tab/Backspace"), this))
     , m_documentCompletion(new QCheckBox(tr("Suggest words from the current document"), this))
+    , m_semanticHighlighting(new QCheckBox(tr("Add function, type, member and variable colors"), this))
     , m_languageCombo(new QComboBox(this))
 {
     setWindowTitle(tr("Preferences"));
@@ -250,6 +253,17 @@ PreferencesDialog::PreferencesDialog(QWidget *parent)
     auto *fontsLayout = qobject_cast<QVBoxLayout *>(fontsSection->layout());
     fontsLayout->addLayout(makeSettingsRow(tr("Text font"), makeFontRow(m_textFontCombo, m_textFontSize, fontsSection), fontsSection));
     fontsLayout->addLayout(makeSettingsRow(tr("Code font"), makeFontRow(m_codeFontCombo, m_codeFontSize, fontsSection), fontsSection));
+
+    m_syntaxThemeCombo->addItem(tr("Automatic (system appearance)"), QStringLiteral("auto"));
+    m_syntaxThemeCombo->setObjectName(QStringLiteral("syntaxThemeCombo"));
+    const QVector<NotePeek::SyntaxTheme> syntaxThemes = NotePeek::SyntaxThemeCatalog::builtInThemes();
+    for (const NotePeek::SyntaxTheme &theme : syntaxThemes)
+        m_syntaxThemeCombo->addItem(theme.name, theme.id);
+    m_syntaxThemeCombo->setToolTip(tr("Applies immediately to syntax editors."));
+
+    auto *appearanceSection = makeSection(tr("Editor Appearance"), this);
+    auto *appearanceLayout = qobject_cast<QVBoxLayout *>(appearanceSection->layout());
+    appearanceLayout->addLayout(makeSettingsRow(tr("Syntax theme"), m_syntaxThemeCombo, appearanceSection));
 
     // Language names stay untranslated so each entry is readable in the
     // language it selects. Takes effect after a restart.
@@ -270,6 +284,7 @@ PreferencesDialog::PreferencesDialog(QWidget *parent)
     codeLayout->addLayout(makeSettingsRow(tr("Brackets"), m_bracketAssistance, codeSection));
     codeLayout->addLayout(makeSettingsRow(tr("Indentation"), m_smartIndentation, codeSection));
     codeLayout->addLayout(makeSettingsRow(tr("Completion"), m_documentCompletion, codeSection));
+    codeLayout->addLayout(makeSettingsRow(tr("Semantic highlighting"), m_semanticHighlighting, codeSection));
 
     auto *buttons = new QDialogButtonBox(QDialogButtonBox::Ok
                                              | QDialogButtonBox::Apply
@@ -280,6 +295,7 @@ PreferencesDialog::PreferencesDialog(QWidget *parent)
     layout->setContentsMargins(20, 20, 20, 18);
     layout->setSpacing(14);
     layout->addWidget(fontsSection);
+    layout->addWidget(appearanceSection);
     layout->addWidget(generalSection);
     layout->addWidget(codeSection);
     layout->addStretch();
@@ -309,12 +325,15 @@ void PreferencesDialog::loadFromPreferences()
     setCurrentFontSize(m_textFontSize, prefs.textFontSize());
     m_codeFontCombo->setCurrentFont(QFont(prefs.codeFontFamily()));
     setCurrentFontSize(m_codeFontSize, prefs.codeFontSize());
+    const int themeIndex = m_syntaxThemeCombo->findData(prefs.syntaxThemeId());
+    m_syntaxThemeCombo->setCurrentIndex(themeIndex >= 0 ? themeIndex : 0);
     m_showFileTree->setChecked(prefs.showFileTreeOnStartup());
     m_markdownSidePreview->setChecked(prefs.markdownDefaultPreview());
     m_codeFolding->setChecked(prefs.codeFoldingEnabled());
     m_bracketAssistance->setChecked(prefs.bracketAssistanceEnabled());
     m_smartIndentation->setChecked(prefs.smartIndentationEnabled());
     m_documentCompletion->setChecked(prefs.documentCompletionEnabled());
+    m_semanticHighlighting->setChecked(prefs.semanticHighlightingEnabled());
 
     const int languageIndex = m_languageCombo->findData(prefs.language());
     m_languageCombo->setCurrentIndex(languageIndex >= 0 ? languageIndex : 0);
@@ -326,12 +345,14 @@ void PreferencesDialog::commit()
 
     prefs.setTextFont(m_textFontCombo->currentFont().family(), currentFontSize(m_textFontSize));
     prefs.setCodeFont(m_codeFontCombo->currentFont().family(), currentFontSize(m_codeFontSize));
+    prefs.setSyntaxThemeId(m_syntaxThemeCombo->currentData().toString());
     prefs.setShowFileTreeOnStartup(m_showFileTree->isChecked());
     prefs.setMarkdownDefaultPreview(m_markdownSidePreview->isChecked());
     prefs.setCodeFoldingEnabled(m_codeFolding->isChecked());
     prefs.setBracketAssistanceEnabled(m_bracketAssistance->isChecked());
     prefs.setSmartIndentationEnabled(m_smartIndentation->isChecked());
     prefs.setDocumentCompletionEnabled(m_documentCompletion->isChecked());
+    prefs.setSemanticHighlightingEnabled(m_semanticHighlighting->isChecked());
     prefs.setLanguage(m_languageCombo->currentData().toString());
 
     prefs.save();

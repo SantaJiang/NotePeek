@@ -12,7 +12,7 @@
 #include "editor/editormanager.h"
 #include "editor/externalfilewatcher.h"
 #include "editor/filesavedialog.h"
-#include "editor/lexerfactory.h"
+#include <NotePeek/lexerfactory.h>
 #include "editor/editorpane.h"
 #include "find/findreplacemanager.h"
 

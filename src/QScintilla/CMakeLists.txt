@@ -1,10 +1,19 @@
 file(GLOB QSCINTILLA_SOURCES_TOP CONFIGURE_DEPENDS
     ${CMAKE_CURRENT_SOURCE_DIR}/*.cpp
 )
+file(GLOB_RECURSE NOTEPEEK_EDITOR_KIT_SOURCES CONFIGURE_DEPENDS
+    ${CMAKE_CURRENT_SOURCE_DIR}/NotePeek/*.cpp
+)
+file(GLOB_RECURSE NOTEPEEK_EDITOR_KIT_HEADERS CONFIGURE_DEPENDS
+    ${CMAKE_CURRENT_SOURCE_DIR}/NotePeek/*.h
+)
 
-# Keep the bundled library's own version independent from the NotePeek release
-# version. The public ABI number remains QScintilla's SOVERSION 15.
-set(NOTEPEEK_QSCINTILLA_VERSION 2.14.1)
+# This is a NotePeek-maintained fork of QScintilla 2.14.1.  Keep the upstream
+# version available for attribution and compatibility diagnostics, but give the
+# shipped binary its own name and ABI so it cannot be mistaken for, or collide
+# with, a system QScintilla installation.
+set(NOTEPEEK_QSCINTILLA_UPSTREAM_VERSION 2.14.1)
+set(NOTEPEEK_QSCINTILLA_FORK_VERSION 1.0.0)
 file(GLOB QSCINTILLA_LEXERS CONFIGURE_DEPENDS
     ${CMAKE_CURRENT_SOURCE_DIR}/scintilla/lexers/*.cpp
 )
@@ -34,9 +43,12 @@ file(GLOB QSCINTILLA_SRC_HEADERS CONFIGURE_DEPENDS
 
 add_library(qscintilla2 SHARED
     ${QSCINTILLA_SOURCES_TOP}
+    ${NOTEPEEK_EDITOR_KIT_SOURCES}
+    ${NOTEPEEK_EDITOR_KIT_HEADERS}
     ${QSCINTILLA_LEXERS}
     ${QSCINTILLA_LEXLIB_SOURCES}
     ${QSCINTILLA_SRC_SOURCES}
+    ${CMAKE_CURRENT_SOURCE_DIR}/NotePeek/notepeekthemes.qrc
 )
 
 target_sources(qscintilla2 PRIVATE
@@ -90,10 +102,11 @@ else()
 endif()
 
 set_target_properties(qscintilla2 PROPERTIES
+    OUTPUT_NAME NotePeekScintilla
     CXX_VISIBILITY_PRESET hidden
     VISIBILITY_INLINES_HIDDEN ON
-    VERSION ${NOTEPEEK_QSCINTILLA_VERSION}
-    SOVERSION 15
+    VERSION ${NOTEPEEK_QSCINTILLA_FORK_VERSION}
+    SOVERSION 1
     MACOSX_RPATH ON
     INSTALL_NAME_DIR "@rpath"
 )

@@ -3,6 +3,7 @@
 #include <QFontDatabase>
 #include <QSettings>
 #include <QtGlobal>
+#include <NotePeek/syntaxtheme.h>
 
 namespace {
 
@@ -77,12 +78,14 @@ AppPreferences::AppPreferences()
     , m_textFontSize(defaultFontSize())
     , m_codeFontFamily(defaultCodeFontFamily())
     , m_codeFontSize(defaultFontSize())
+    , m_syntaxThemeId(QStringLiteral("auto"))
     , m_showFileTreeOnStartup(false)
     , m_markdownDefaultPreview(false)
     , m_codeFoldingEnabled(false)
     , m_bracketAssistanceEnabled(false)
     , m_smartIndentationEnabled(true)
     , m_documentCompletionEnabled(false)
+    , m_semanticHighlightingEnabled(true)
 {
 }
 
@@ -139,6 +142,7 @@ void AppPreferences::load()
     m_codeFontFamily = codeFamily;
     m_codeFontSize = clampFontSize(
         settings.value(QStringLiteral("codeFontSize"), defaultFontSize()).toInt());
+    setSyntaxThemeId(settings.value(QStringLiteral("syntaxTheme"), QStringLiteral("auto")).toString());
 
     m_showFileTreeOnStartup =
         settings.value(QStringLiteral("showFileTreeOnStartup"), false).toBool();
@@ -152,6 +156,8 @@ void AppPreferences::load()
         settings.value(QStringLiteral("smartIndentationEnabled"), true).toBool();
     m_documentCompletionEnabled =
         settings.value(QStringLiteral("documentCompletionEnabled"), false).toBool();
+    m_semanticHighlightingEnabled =
+        settings.value(QStringLiteral("semanticHighlightingEnabled"), true).toBool();
     m_language = settings.value(QStringLiteral("language"), QString()).toString();
 
     settings.endGroup();
@@ -166,12 +172,14 @@ void AppPreferences::save() const
     settings.setValue(QStringLiteral("textFontSize"), m_textFontSize);
     settings.setValue(QStringLiteral("codeFontFamily"), m_codeFontFamily);
     settings.setValue(QStringLiteral("codeFontSize"), m_codeFontSize);
+    settings.setValue(QStringLiteral("syntaxTheme"), m_syntaxThemeId);
     settings.setValue(QStringLiteral("showFileTreeOnStartup"), m_showFileTreeOnStartup);
     settings.setValue(QStringLiteral("markdownDefaultPreview"), m_markdownDefaultPreview);
     settings.setValue(QStringLiteral("codeFoldingEnabled"), m_codeFoldingEnabled);
     settings.setValue(QStringLiteral("bracketAssistanceEnabled"), m_bracketAssistanceEnabled);
     settings.setValue(QStringLiteral("smartIndentationEnabled"), m_smartIndentationEnabled);
     settings.setValue(QStringLiteral("documentCompletionEnabled"), m_documentCompletionEnabled);
+    settings.setValue(QStringLiteral("semanticHighlightingEnabled"), m_semanticHighlightingEnabled);
     settings.setValue(QStringLiteral("language"), m_language);
 
     settings.endGroup();
@@ -197,4 +205,12 @@ void AppPreferences::setCodeFont(const QString &family, int pointSize)
 {
     m_codeFontFamily = validatedFamily(family, defaultCodeFontFamily());
     m_codeFontSize = clampFontSize(pointSize);
+}
+
+void AppPreferences::setSyntaxThemeId(const QString &themeId)
+{
+    const QString normalized = themeId.isEmpty() ? QStringLiteral("auto") : themeId;
+    m_syntaxThemeId = normalized == QLatin1String("auto")
+        || NotePeek::SyntaxThemeCatalog::builtInThemeIds().contains(normalized)
+        ? normalized : QStringLiteral("auto");
 }

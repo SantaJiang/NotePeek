@@ -1,4 +1,4 @@
-#include "editor/lexers/simplesyntaxlexer.h"
+#include "NotePeek/lexers/simplesyntaxlexer.h"
 
 #include <Qsci/qsciscintillabase.h>
 #include <Qsci/qsciscintilla.h>

@@ -1,4 +1,4 @@
-#include "editor/lexers/ignorefilelexer.h"
+#include "NotePeek/lexers/ignorefilelexer.h"
 
 IgnoreFileLexer::IgnoreFileLexer(QObject *parent)
     : SimpleSyntaxLexer("Ignore file",

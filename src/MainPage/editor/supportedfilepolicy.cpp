@@ -1,6 +1,6 @@
 #include "editor/supportedfilepolicy.h"
 
-#include "editor/lexerfactory.h"
+#include <NotePeek/lexerfactory.h>
 
 #include <QFile>
 #include <QFileInfo>

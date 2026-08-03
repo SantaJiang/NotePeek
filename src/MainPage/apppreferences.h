@@ -28,6 +28,11 @@ public:
     void setTextFont(const QString &family, int pointSize);
     void setCodeFont(const QString &family, int pointSize);
 
+    // Syntax colour theme id exported by NotePeekScintilla. "auto" follows
+    // the operating-system light/dark appearance.
+    QString syntaxThemeId() const { return m_syntaxThemeId; }
+    void setSyntaxThemeId(const QString &themeId);
+
     // Show the left file-tree dock when the application starts.  This only
     // seeds the initial state; the user's manual toggles during a session are
     // never overwritten by applying preferences.
@@ -47,6 +52,8 @@ public:
     void setSmartIndentationEnabled(bool enabled) { m_smartIndentationEnabled = enabled; }
     bool documentCompletionEnabled() const { return m_documentCompletionEnabled; }
     void setDocumentCompletionEnabled(bool enabled) { m_documentCompletionEnabled = enabled; }
+    bool semanticHighlightingEnabled() const { return m_semanticHighlightingEnabled; }
+    void setSemanticHighlightingEnabled(bool enabled) { m_semanticHighlightingEnabled = enabled; }
 
     // UI language as a locale name ("en", "zh_CN"); empty follows the system
     // locale. Applied at the next launch.
@@ -69,12 +76,14 @@ private:
     int m_textFontSize;
     QString m_codeFontFamily;
     int m_codeFontSize;
+    QString m_syntaxThemeId;
     bool m_showFileTreeOnStartup;
     bool m_markdownDefaultPreview;
     bool m_codeFoldingEnabled;
     bool m_bracketAssistanceEnabled;
     bool m_smartIndentationEnabled;
     bool m_documentCompletionEnabled;
+    bool m_semanticHighlightingEnabled;
     QString m_language;
 };
 

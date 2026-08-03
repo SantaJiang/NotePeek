@@ -1,0 +1,5 @@
+{
+  "id": "notepeek-solar-light", "name": "NotePeek Solar Light", "appearance": "light",
+  "editor": {"background":"#FDF6E3","foreground":"#586E75","marginBackground":"#EEE8D5","marginForeground":"#93A1A1","caret":"#002B36","caretLine":"#F4EEDC","indentGuide":"#D8D2BF","foldMarker":"#657B83","matchedBraceForeground":"#268BD2","matchedBraceBackground":"#E1ECED"},
+  "tokens": {"default":"#586E75","comment":"#93A1A1","documentation":"#839496","keyword":"#859900","type":"#2AA198","builtin":"#B58900","function":"#268BD2","variable":"#657B83","property":"#268BD2","string":"#2AA198","escape":"#CB4B16","number":"#D33682","operator":"#586E75","preprocessor":"#6C71C4","regex":"#DC322F","attribute":"#6C71C4","tag":"#268BD2","link":"#2AA198","added":"#859900","removed":"#DC322F","changed":"#B58900","error":"#DC322F"}
+}

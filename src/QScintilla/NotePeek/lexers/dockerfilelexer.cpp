@@ -1,4 +1,4 @@
-#include "editor/lexers/dockerfilelexer.h"
+#include "NotePeek/lexers/dockerfilelexer.h"
 
 DockerfileLexer::DockerfileLexer(QObject *parent)
     : SimpleSyntaxLexer("Dockerfile",

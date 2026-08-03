@@ -1,0 +1,12 @@
+<RCC>
+    <qresource prefix="/notepeek/themes">
+        <file alias="dark-modern.json">themes/dark-modern.json</file>
+        <file alias="midnight-blue.json">themes/midnight-blue.json</file>
+        <file alias="graphite.json">themes/graphite.json</file>
+        <file alias="forest-night.json">themes/forest-night.json</file>
+        <file alias="light-modern.json">themes/light-modern.json</file>
+        <file alias="quiet-paper.json">themes/quiet-paper.json</file>
+        <file alias="solar-light.json">themes/solar-light.json</file>
+        <file alias="rose-dawn.json">themes/rose-dawn.json</file>
+    </qresource>
+</RCC>

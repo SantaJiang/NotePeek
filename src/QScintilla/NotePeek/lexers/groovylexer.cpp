@@ -1,4 +1,4 @@
-#include "editor/lexers/groovylexer.h"
+#include "NotePeek/lexers/groovylexer.h"
 
 GroovyLexer::GroovyLexer(QObject *parent)
     : QsciLexerJava(parent)

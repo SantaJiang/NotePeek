@@ -1,4 +1,4 @@
-#include "editor/lexers/mesonlexer.h"
+#include "NotePeek/lexers/mesonlexer.h"
 
 MesonLexer::MesonLexer(QObject *parent)
     : QsciLexerPython(parent)

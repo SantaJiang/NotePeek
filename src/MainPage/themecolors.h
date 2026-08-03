@@ -5,6 +5,7 @@
 #include <QPalette>
 #include <QGuiApplication>
 #include <QtGlobal>
+#include <NotePeek/syntaxstyler.h>
 
 #if QT_VERSION >= QT_VERSION_CHECK(6, 5, 0)
 #include <QStyleHints>
@@ -265,30 +266,7 @@ namespace Editor {
 // ---------- lexer syntax highlighting ----------
 
 namespace Lexer {
-    enum class Role {
-        Default,
-        Comment,
-        Documentation,
-        Keyword,
-        Type,
-        Builtin,
-        Function,
-        Variable,
-        Property,
-        String,
-        Escape,
-        Number,
-        Operator,
-        Preprocessor,
-        Regex,
-        Attribute,
-        Tag,
-        Link,
-        Added,
-        Removed,
-        Changed,
-        Error
-    };
+    using Role = NotePeek::SyntaxRole;
 
     inline QColor defaultPaper()       { return color(ColorRole::LexerDefaultPaper); }
     inline QColor defaultColor()       { return color(ColorRole::LexerDefaultColor); }

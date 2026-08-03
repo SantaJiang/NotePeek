@@ -5,201 +5,29 @@
 #include <QFontDatabase>
 #include <QSet>
 #include <QTimer>
+#include <QThreadPool>
+#include <QThread>
+#include <QFutureWatcher>
+#include <QScrollBar>
+#include <QEvent>
+#include <QtConcurrent>
 #include <Qsci/qscilexer.h>
-#include <Qsci/qscilexercpp.h>
-#include <Qsci/qscilexerdiff.h>
-#include <Qsci/qscilexerjson.h>
-#include <Qsci/qscilexermarkdown.h>
-#include <Qsci/qscilexerpython.h>
-#include <Qsci/qscilexerrust.h>
 #include <memory>
 
 #include "decorators/highlightedscrollbardecorator.h"
 #include "editor/customeditor.h"
 #include "editor/documentregistry.h"
-#include "editor/lexerfactory.h"
+#include <NotePeek/lexerfactory.h>
+#include <NotePeek/syntaxstyler.h>
+#include <NotePeek/syntaxtheme.h>
+#include <NotePeek/semantictokens.h>
 #include "editor/performanceconstants.h"
 
 namespace {
-
-using SyntaxRole = ThemeColors::Lexer::Role;
-
-SyntaxRole roleFromDescription(QString description)
+NotePeek::SyntaxTheme currentSyntaxTheme()
 {
-    description = description.toLower();
-
-    if (description.contains(QStringLiteral("error")) || description.contains(QStringLiteral("unknown"))
-        || description.contains(QStringLiteral("unclosed")) || description.contains(QStringLiteral("bad")))
-        return SyntaxRole::Error;
-    if (description.contains(QStringLiteral("comment")) || description.contains(QStringLiteral("remark")))
-        return description.contains(QStringLiteral("doc")) ? SyntaxRole::Documentation : SyntaxRole::Comment;
-    if (description.contains(QStringLiteral("escape")) || description.contains(QStringLiteral("entity")))
-        return SyntaxRole::Escape;
-    if (description.contains(QStringLiteral("regex")) || description.contains(QStringLiteral("regular expression")))
-        return SyntaxRole::Regex;
-    if (description.contains(QStringLiteral("string")) || description.contains(QStringLiteral("character"))
-        || description.contains(QStringLiteral("quoted")))
-        return SyntaxRole::String;
-    if (description.contains(QStringLiteral("number")) || description.contains(QStringLiteral("numeric")))
-        return SyntaxRole::Number;
-    if (description.contains(QStringLiteral("preprocessor")) || description.contains(QStringLiteral("directive"))
-        || description.contains(QStringLiteral("@-rule")))
-        return SyntaxRole::Preprocessor;
-    if (description.contains(QStringLiteral("operator")) || description.contains(QStringLiteral("delimiter")))
-        return SyntaxRole::Operator;
-    if (description.contains(QStringLiteral("function")) || description.contains(QStringLiteral("method"))
-        || description.contains(QStringLiteral("command")) || description.contains(QStringLiteral("target"))
-        || description.contains(QStringLiteral("label")))
-        return SyntaxRole::Function;
-    if (description.contains(QStringLiteral("class name")) || description.contains(QStringLiteral("type"))
-        || description.contains(QStringLiteral("lifetime")))
-        return SyntaxRole::Type;
-    if (description.contains(QStringLiteral("builtin")) || description.contains(QStringLiteral("built-in"))
-        || description.contains(QStringLiteral("macro")))
-        return SyntaxRole::Builtin;
-    if (description.contains(QStringLiteral("property")) || description.contains(QStringLiteral("key"))
-        || description.contains(QStringLiteral("section")))
-        return SyntaxRole::Property;
-    if (description.contains(QStringLiteral("attribute")) || description.contains(QStringLiteral("decorator")))
-        return SyntaxRole::Attribute;
-    if (description.contains(QStringLiteral("tag")) || description.contains(QStringLiteral("heading")))
-        return SyntaxRole::Tag;
-    if (description.contains(QStringLiteral("link")) || description.contains(QStringLiteral("url"))
-        || description.contains(QStringLiteral("iri")))
-        return SyntaxRole::Link;
-    if (description.contains(QStringLiteral("keyword")) || description.contains(QStringLiteral("reserved")))
-        return SyntaxRole::Keyword;
-    if (description.contains(QStringLiteral("variable")) || description.contains(QStringLiteral("parameter"))
-        || description.contains(QStringLiteral("reference")))
-        return SyntaxRole::Variable;
-    // Most lexical scanners cannot distinguish a function/member/type use
-    // from a plain identifier.  VS Code's TextMate fallback deliberately keeps
-    // these at the editor foreground colour until semantic tokens are present.
-    if (description.contains(QStringLiteral("identifier")) || description.contains(QStringLiteral("word")))
-        return SyntaxRole::Default;
-    return SyntaxRole::Default;
-}
-
-SyntaxRole roleForStyle(QsciLexer *lexer, int style)
-{
-    if (dynamic_cast<QsciLexerDiff *>(lexer)) {
-        switch (style) {
-        case QsciLexerDiff::Comment: return SyntaxRole::Comment;
-        case QsciLexerDiff::Command: case QsciLexerDiff::Header: return SyntaxRole::Keyword;
-        case QsciLexerDiff::Position: return SyntaxRole::Link;
-        case QsciLexerDiff::LineAdded: case QsciLexerDiff::AddingPatchAdded:
-        case QsciLexerDiff::RemovingPatchAdded: return SyntaxRole::Added;
-        case QsciLexerDiff::LineRemoved: case QsciLexerDiff::AddingPatchRemoved:
-        case QsciLexerDiff::RemovingPatchRemoved: return SyntaxRole::Removed;
-        case QsciLexerDiff::LineChanged: return SyntaxRole::Changed;
-        default: break;
-        }
-    }
-    if (dynamic_cast<QsciLexerMarkdown *>(lexer)) {
-        switch (style) {
-        case QsciLexerMarkdown::StrongEmphasisAsterisks:
-        case QsciLexerMarkdown::StrongEmphasisUnderscores: return SyntaxRole::Keyword;
-        case QsciLexerMarkdown::EmphasisAsterisks:
-        case QsciLexerMarkdown::EmphasisUnderscores:
-        case QsciLexerMarkdown::StrikeOut: return SyntaxRole::Attribute;
-        case QsciLexerMarkdown::Header1: case QsciLexerMarkdown::Header2:
-        case QsciLexerMarkdown::Header3: case QsciLexerMarkdown::Header4:
-        case QsciLexerMarkdown::Header5: case QsciLexerMarkdown::Header6: return SyntaxRole::Tag;
-        case QsciLexerMarkdown::UnorderedListItem: case QsciLexerMarkdown::OrderedListItem:
-        case QsciLexerMarkdown::HorizontalRule: return SyntaxRole::Operator;
-        case QsciLexerMarkdown::BlockQuote: return SyntaxRole::Documentation;
-        case QsciLexerMarkdown::Link: return SyntaxRole::Link;
-        case QsciLexerMarkdown::CodeBackticks: case QsciLexerMarkdown::CodeDoubleBackticks:
-        case QsciLexerMarkdown::CodeBlock: return SyntaxRole::String;
-        default: break;
-        }
-    }
-    if (dynamic_cast<QsciLexerPython *>(lexer)) {
-        switch (style) {
-        case QsciLexerPython::Comment: case QsciLexerPython::CommentBlock: return SyntaxRole::Comment;
-        case QsciLexerPython::Number: return SyntaxRole::Number;
-        case QsciLexerPython::DoubleQuotedString: case QsciLexerPython::SingleQuotedString:
-        case QsciLexerPython::TripleSingleQuotedString: case QsciLexerPython::TripleDoubleQuotedString:
-        case QsciLexerPython::DoubleQuotedFString: case QsciLexerPython::SingleQuotedFString:
-        case QsciLexerPython::TripleSingleQuotedFString: case QsciLexerPython::TripleDoubleQuotedFString:
-            return SyntaxRole::String;
-        case QsciLexerPython::Keyword: return SyntaxRole::Keyword;
-        case QsciLexerPython::ClassName: return SyntaxRole::Type;
-        case QsciLexerPython::FunctionMethodName: return SyntaxRole::Function;
-        case QsciLexerPython::Operator: return SyntaxRole::Operator;
-        case QsciLexerPython::Identifier: return SyntaxRole::Variable;
-        case QsciLexerPython::HighlightedIdentifier: return SyntaxRole::Builtin;
-        case QsciLexerPython::Decorator: return SyntaxRole::Attribute;
-        case QsciLexerPython::UnclosedString: return SyntaxRole::Error;
-        default: break;
-        }
-    }
-    if (dynamic_cast<QsciLexerRust *>(lexer)) {
-        switch (style) {
-        case QsciLexerRust::CommentBlock: case QsciLexerRust::CommentLine: return SyntaxRole::Comment;
-        case QsciLexerRust::CommentBlockDoc: case QsciLexerRust::CommentLineDoc: return SyntaxRole::Documentation;
-        case QsciLexerRust::Number: return SyntaxRole::Number;
-        case QsciLexerRust::Keyword: case QsciLexerRust::KeywordSet3: case QsciLexerRust::KeywordSet4:
-        case QsciLexerRust::KeywordSet5: case QsciLexerRust::KeywordSet6: case QsciLexerRust::KeywordSet7:
-            return SyntaxRole::Keyword;
-        case QsciLexerRust::BuiltInType: return SyntaxRole::Type;
-        case QsciLexerRust::String: case QsciLexerRust::RawString: case QsciLexerRust::Character:
-        case QsciLexerRust::ByteString: case QsciLexerRust::RawByteString: case QsciLexerRust::ByteCharacter:
-            return SyntaxRole::String;
-        case QsciLexerRust::Operator: return SyntaxRole::Operator;
-        case QsciLexerRust::Identifier: return SyntaxRole::Variable;
-        case QsciLexerRust::Lifetime: return SyntaxRole::Type;
-        case QsciLexerRust::Macro: return SyntaxRole::Builtin;
-        case QsciLexerRust::LexingError: return SyntaxRole::Error;
-        default: break;
-        }
-    }
-    if (dynamic_cast<QsciLexerJSON *>(lexer)) {
-        switch (style) {
-        case QsciLexerJSON::Number: return SyntaxRole::Number;
-        case QsciLexerJSON::String: return SyntaxRole::String;
-        case QsciLexerJSON::Property: return SyntaxRole::Property;
-        case QsciLexerJSON::EscapeSequence: return SyntaxRole::Escape;
-        case QsciLexerJSON::CommentLine: case QsciLexerJSON::CommentBlock: return SyntaxRole::Comment;
-        case QsciLexerJSON::Operator: return SyntaxRole::Operator;
-        case QsciLexerJSON::IRI: case QsciLexerJSON::IRICompact: return SyntaxRole::Link;
-        case QsciLexerJSON::Keyword: case QsciLexerJSON::KeywordLD: return SyntaxRole::Keyword;
-        case QsciLexerJSON::UnclosedString: case QsciLexerJSON::Error: return SyntaxRole::Error;
-        default: break;
-        }
-    }
-    if (dynamic_cast<QsciLexerCPP *>(lexer)) {
-        const int activeStyle = style >= 64 ? style - 64 : style;
-        switch (activeStyle) {
-        case QsciLexerCPP::Comment: case QsciLexerCPP::CommentLine: return SyntaxRole::Comment;
-        case QsciLexerCPP::CommentDoc: case QsciLexerCPP::CommentLineDoc:
-        case QsciLexerCPP::CommentDocKeyword: case QsciLexerCPP::TaskMarker: return SyntaxRole::Documentation;
-        case QsciLexerCPP::CommentDocKeywordError: return SyntaxRole::Error;
-        case QsciLexerCPP::Number: return SyntaxRole::Number;
-        case QsciLexerCPP::Keyword: return SyntaxRole::Keyword;
-        case QsciLexerCPP::KeywordSet2: case QsciLexerCPP::GlobalClass: return SyntaxRole::Type;
-        case QsciLexerCPP::DoubleQuotedString: case QsciLexerCPP::SingleQuotedString:
-        case QsciLexerCPP::VerbatimString: case QsciLexerCPP::RawString:
-        case QsciLexerCPP::TripleQuotedVerbatimString: case QsciLexerCPP::HashQuotedString:
-        case QsciLexerCPP::UserLiteral: return SyntaxRole::String;
-        case QsciLexerCPP::EscapeSequence: return SyntaxRole::Escape;
-        case QsciLexerCPP::Regex: return SyntaxRole::Regex;
-        case QsciLexerCPP::PreProcessor: return SyntaxRole::Preprocessor;
-        case QsciLexerCPP::PreProcessorComment: return SyntaxRole::Comment;
-        case QsciLexerCPP::PreProcessorCommentLineDoc: return SyntaxRole::Documentation;
-        case QsciLexerCPP::Operator: return SyntaxRole::Operator;
-        // LexCPP uses Identifier for virtually every non-keyword name.  Giving
-        // it a dedicated variable colour paints functions, members and local
-        // variables alike, producing large monochrome regions.  Dark+ keeps
-        // lexical-only identifiers at the normal foreground colour; richer
-        // distinctions require semantic tokens rather than a lexer palette.
-        case QsciLexerCPP::Identifier: return SyntaxRole::Default;
-        case QsciLexerCPP::UnclosedString: return SyntaxRole::Error;
-        default: break;
-        }
-    }
-
-    return roleFromDescription(lexer->description(style));
+    return NotePeek::SyntaxThemeCatalog::theme(AppPreferences::instance().syntaxThemeId(),
+                                               ThemeColors::isDarkMode());
 }
 
 long toScintillaColor(const QColor &color)
@@ -254,7 +82,284 @@ bool shouldUseSoftWrap(const QString &filePath, LexerFactory::Language lang)
 
 } // namespace
 
-EditorManager::EditorManager(QObject *parent) : QObject(parent)
+class SemanticHighlightingEngine final : public QObject
+{
+public:
+    explicit SemanticHighlightingEngine(QObject *parent = nullptr)
+        : QObject(parent)
+        , m_provider(std::make_shared<NotePeek::BasicSemanticTokenProvider>())
+    {
+        // A single low-priority worker keeps CPU and memory bounded. Requests
+        // are viewport-sized, so parallelism would add contention without
+        // improving perceived latency.
+        m_pool.setMaxThreadCount(1);
+        m_pool.setExpiryTimeout(5000);
+        m_pool.setThreadPriority(QThread::LowPriority);
+    }
+
+    ~SemanticHighlightingEngine() override
+    {
+        for (State *state : std::as_const(m_states))
+            cancel(state);
+        m_pool.clear();
+        m_pool.waitForDone();
+    }
+
+    void attach(CustomEditor *editor)
+    {
+        if (!editor || m_states.contains(editor))
+            return;
+        auto *state = new State(this);
+        state->editor = editor;
+        state->timer.setSingleShot(true);
+        state->timer.setInterval(kEditDebounceMs);
+        m_states.insert(editor, state);
+        m_eventTargets.insert(editor, state);
+        m_eventTargets.insert(editor->viewport(), state);
+        m_eventTargets.insert(editor->verticalScrollBar(), state);
+        editor->installEventFilter(this);
+        editor->viewport()->installEventFilter(this);
+        editor->verticalScrollBar()->installEventFilter(this);
+        editor->setProperty("semanticStartedRequestCount", 0);
+        editor->setProperty("semanticCanceledRequestCount", 0);
+
+        connect(&state->timer, &QTimer::timeout, this, [this, state]() {
+            start(state);
+        });
+        connect(editor, &QsciScintillaBase::SCN_MODIFIED, this,
+                [this, state](int, int modificationType, const char *, int, int,
+                              int, int, int, int, int) {
+            if (modificationType & (QsciScintillaBase::SC_MOD_INSERTTEXT
+                                    | QsciScintillaBase::SC_MOD_DELETETEXT))
+                schedule(state, kEditDebounceMs);
+        });
+        connect(editor, &QObject::destroyed, this, [this, editor, state]() {
+            cancel(state);
+            m_eventTargets.remove(editor);
+            m_states.remove(editor);
+            state->deleteLater();
+        });
+        const auto removeEventTarget = [this](QObject *target) {
+            connect(target, &QObject::destroyed, this,
+                    [this, target]() { m_eventTargets.remove(target); });
+        };
+        removeEventTarget(editor->viewport());
+        removeEventTarget(editor->verticalScrollBar());
+    }
+
+    void setPath(CustomEditor *editor, const QString &path)
+    {
+        if (State *state = m_states.value(editor))
+        {
+            state->path = path;
+            schedule(state, 0);
+        }
+    }
+
+    void refreshTheme(CustomEditor *editor)
+    {
+        if (!editor)
+            return;
+        if (!AppPreferences::instance().semanticHighlightingEnabled())
+        {
+            editor->clearSemanticTokens();
+            if (State *state = m_states.value(editor))
+                cancel(state);
+            return;
+        }
+        editor->setSemanticTokenColors(currentSyntaxTheme().syntaxColors);
+        if (State *state = m_states.value(editor))
+            schedule(state, 0);
+    }
+
+protected:
+    bool eventFilter(QObject *watched, QEvent *event) override
+    {
+        const QEvent::Type type = event->type();
+        if (type != QEvent::Show && type != QEvent::Hide
+            && type != QEvent::Wheel && type != QEvent::KeyRelease
+            && type != QEvent::MouseButtonRelease)
+            return QObject::eventFilter(watched, event);
+
+        State *state = m_eventTargets.value(watched);
+        if (state && type == QEvent::Show)
+            schedule(state, 0);
+        else if (state && type == QEvent::Hide)
+        {
+            state->timer.stop();
+            cancel(state);
+        }
+        else if (state && (type == QEvent::Wheel || type == QEvent::KeyRelease
+                           || type == QEvent::MouseButtonRelease))
+        {
+            // One request per input event or completed scroll-bar drag. Never
+            // subscribe to valueChanged: pixel/kinetic scrolling can emit it
+            // dozens of times for a single gesture and measurably hurts paint.
+            schedule(state, kScrollDebounceMs);
+        }
+        return QObject::eventFilter(watched, event);
+    }
+
+private:
+    struct State : QObject
+    {
+        explicit State(QObject *parent) : QObject(parent), timer(this) {}
+        QPointer<CustomEditor> editor;
+        QTimer timer;
+        QString path;
+        quint64 requestId = 0;
+        bool inFlight = false;
+        bool rerun = false;
+        std::shared_ptr<std::atomic_bool> cancellation;
+    };
+
+    static constexpr int kEditDebounceMs = 120;
+    static constexpr int kScrollDebounceMs = 45;
+    static constexpr int kLookBehindLines = 40;
+    static constexpr int kLookAheadLines = 80;
+    static constexpr int kMaxCachedTokens = 12000;
+    static constexpr qint64 kWorkerBudgetNs = 2 * 1000 * 1000;
+
+    void schedule(State *state, int delayMs)
+    {
+        if (!state || !state->editor)
+            return;
+        if (!AppPreferences::instance().semanticHighlightingEnabled())
+        {
+            state->timer.stop();
+            cancel(state);
+            state->editor->clearSemanticTokens();
+            return;
+        }
+        if (!state->editor->isVisible())
+            return;
+        if (state->inFlight)
+        {
+            state->rerun = true;
+            cancel(state);
+            return;
+        }
+        state->timer.start(delayMs);
+    }
+
+    void cancel(State *state)
+    {
+        if (!state || !state->cancellation)
+            return;
+        const bool wasCanceled = state->cancellation->exchange(true, std::memory_order_relaxed);
+        if (!wasCanceled && state->editor)
+        {
+            const int count = state->editor->property("semanticCanceledRequestCount").toInt();
+            state->editor->setProperty("semanticCanceledRequestCount", count + 1);
+        }
+    }
+
+    static QString viewportText(CustomEditor *editor, int firstLine, int lastLine)
+    {
+        QString snapshot;
+        for (int line = firstLine; line <= lastLine; ++line)
+        {
+            const QString lineText = editor->text(line);
+            snapshot.append(lineText);
+            if (line < lastLine && !lineText.endsWith(QLatin1Char('\n')))
+                snapshot.append(QLatin1Char('\n'));
+        }
+        return snapshot;
+    }
+
+    void start(State *state)
+    {
+        if (!state || !state->editor || !state->editor->isVisible() || state->inFlight)
+            return;
+        if (!AppPreferences::instance().semanticHighlightingEnabled())
+        {
+            state->editor->clearSemanticTokens();
+            return;
+        }
+        CustomEditor *editor = state->editor;
+        const LexerFactory::Language language = LexerFactory::languageFromFilePath(state->path);
+        if (language == LexerFactory::Unknown || !editor->lexer())
+        {
+            editor->clearSemanticTokens();
+            return;
+        }
+
+        const int firstVisible = int(editor->SendScintilla(QsciScintillaBase::SCI_GETFIRSTVISIBLELINE));
+        const int visibleLines = qMax(1, int(editor->SendScintilla(QsciScintillaBase::SCI_LINESONSCREEN)));
+        const int firstLine = qMax(0, firstVisible - kLookBehindLines);
+        const int lastLine = qMin(editor->lines() - 1,
+                                  firstVisible + visibleLines + kLookAheadLines);
+        if (lastLine < firstLine)
+            return;
+
+        editor->setSemanticTokenColors(currentSyntaxTheme().syntaxColors);
+        NotePeek::SemanticDocument document;
+        document.uri = state->path;
+        document.languageId = LexerFactory::languageName(language);
+        document.revision = editor->documentRevision();
+        document.firstLine = firstLine;
+        document.text = viewportText(editor, firstLine, lastLine);
+        editor->setProperty("semanticSnapshotBytes", document.text.size() * int(sizeof(QChar)));
+
+        state->inFlight = true;
+        editor->setProperty("semanticAnalysisInFlight", true);
+        editor->setProperty("semanticStartedRequestCount",
+                            editor->property("semanticStartedRequestCount").toInt() + 1);
+        state->rerun = false;
+        const quint64 requestId = ++state->requestId;
+        state->cancellation = std::make_shared<std::atomic_bool>(false);
+        NotePeek::SemanticAnalysisControl control;
+        control.cancellation = state->cancellation;
+        control.budgetNanoseconds = kWorkerBudgetNs;
+        const auto provider = m_provider;
+        QPointer<State> guardedState(state);
+        auto *watcher = new QFutureWatcher<NotePeek::SemanticAnalysisResult>(this);
+        connect(watcher, &QFutureWatcher<NotePeek::SemanticAnalysisResult>::finished,
+                this, [this, watcher, guardedState, requestId]() {
+            const NotePeek::SemanticAnalysisResult result = watcher->result();
+            watcher->deleteLater();
+            if (!guardedState)
+                return;
+            State *state = guardedState;
+            state->inFlight = false;
+            if (requestId != state->requestId)
+                return;
+            if (state->editor)
+            {
+                state->editor->setProperty("semanticAnalysisInFlight", false);
+                state->editor->setProperty("semanticWorkerNanoseconds", result.elapsedNanoseconds);
+            }
+            if (state->editor && state->editor->isVisible() && !result.canceled
+                && result.revision == state->editor->documentRevision()
+                && result.lastLine >= result.firstLine)
+            {
+                if (state->editor->semanticTokenCount() + result.tokens.size() > kMaxCachedTokens)
+                    state->editor->clearSemanticTokens();
+                QElapsedTimer applyTimer;
+                applyTimer.start();
+                state->editor->applySemanticTokenDelta(result.revision,
+                                                        result.firstLine,
+                                                        result.lastLine,
+                                                        result.tokens);
+                state->editor->setProperty("semanticApplyNanoseconds", applyTimer.nsecsElapsed());
+            }
+            if (state->rerun && state->editor && state->editor->isVisible())
+                schedule(state, 0);
+        });
+        watcher->setFuture(QtConcurrent::run(&m_pool, [provider, document, control]() {
+            return provider->analyze(document, control);
+        }));
+    }
+
+    QThreadPool m_pool;
+    std::shared_ptr<const NotePeek::SemanticTokenProvider> m_provider;
+    QHash<CustomEditor *, State *> m_states;
+    QHash<QObject *, State *> m_eventTargets;
+};
+
+EditorManager::EditorManager(QObject *parent)
+    : QObject(parent)
+    , m_semanticEngine(std::make_unique<SemanticHighlightingEngine>(this))
 {
 }
 
@@ -431,6 +536,8 @@ void EditorManager::setupEditor(CustomEditor *editor)
         updateLineNumberMarginWidth(editor);
     });
 
+    m_semanticEngine->attach(editor);
+
     updateLineNumberMarginWidth(editor);
     setupScrollBarDecorator(editor);
 }
@@ -503,6 +610,7 @@ void EditorManager::setMarginsFont(CustomEditor *editor, const QFont &font)
 void EditorManager::updateEditorSyntax(CustomEditor *editor, const QString &filePath)
 {
     if (!editor) return;
+    editor->setProperty("semanticFilePath", filePath);
 
     const QFont font = fontForPath(filePath);
 
@@ -551,6 +659,7 @@ void EditorManager::updateEditorSyntax(CustomEditor *editor, const QString &file
     applyDisplayPolicy(editor, filePath);
     // Re-apply margin colors after lexer change (lexer can override margin colors)
     applyEditorColors(editor);
+    m_semanticEngine->setPath(editor, filePath);
 }
 
 void EditorManager::applyDisplayPolicy(CustomEditor *editor, const QString &filePath)
@@ -709,36 +818,43 @@ void EditorManager::reapplyEditorSyntax(CustomEditor *editor)
     {
         // No lexer: color/paper are set by applyEditorColors
     }
+    const NotePeek::SyntaxTheme theme = currentSyntaxTheme();
+    editor->setSemanticTokenColors(theme.syntaxColors);
+    m_semanticEngine->refreshTheme(editor);
 }
 
 void EditorManager::applyEditorColors(CustomEditor *editor)
 {
     if (!editor) return;
 
-    using namespace ThemeColors::Editor;
+    const NotePeek::SyntaxTheme theme = currentSyntaxTheme();
+    const QColor marginBackground = theme.editorColor(QStringLiteral("marginBackground"), ThemeColors::Editor::marginBg());
+    const QColor marginForeground = theme.editorColor(QStringLiteral("marginForeground"), ThemeColors::Editor::marginFg());
+    const QColor background = theme.editorColor(QStringLiteral("background"), ThemeColors::Editor::background());
 
     // setMarginsBackgroundColor() uses STYLE_LINENUMBER (style 33) which is
     // the correct way to set the background of a NumberMargin.  In contrast,
     // setMarginBackgroundColor(margin, ...) uses SCI_SETMARGINBACKN which only
     // works for SC_MARGIN_COLOUR type margins.
-    editor->setMarginsBackgroundColor(marginBg());
-    editor->setMarginsForegroundColor(marginFg());
-    editor->setFoldMarginColors(marginBg(), marginBg());
-    editor->setIndentationGuidesBackgroundColor(background());
-    editor->setIndentationGuidesForegroundColor(indentGuide());
+    editor->setMarginsBackgroundColor(marginBackground);
+    editor->setMarginsForegroundColor(marginForeground);
+    editor->setFoldMarginColors(marginBackground, marginBackground);
+    editor->setIndentationGuidesBackgroundColor(background);
+    editor->setIndentationGuidesForegroundColor(theme.editorColor(QStringLiteral("indentGuide"), ThemeColors::Editor::indentGuide()));
     for (int marker = QsciScintillaBase::SC_MARKNUM_FOLDEREND;
          marker <= static_cast<int>(QsciScintillaBase::SC_MARKNUM_FOLDEROPEN);
          ++marker)
     {
-        editor->setMarkerForegroundColor(marginBg(), marker);
-        editor->setMarkerBackgroundColor(foldMarker(), marker);
+        editor->setMarkerForegroundColor(marginBackground, marker);
+        editor->setMarkerBackgroundColor(theme.editorColor(QStringLiteral("foldMarker"), ThemeColors::Editor::foldMarker()), marker);
     }
-    editor->setCaretForegroundColor(caretFg());
+    const QColor caret = theme.editorColor(QStringLiteral("caret"), ThemeColors::Editor::caretFg());
+    editor->setCaretForegroundColor(caret);
     editor->SendScintilla(QsciScintillaBase::SCI_SETADDITIONALCARETFORE,
-                          toScintillaColor(caretFg()));
-    editor->setCaretLineBackgroundColor(caretLineBg());
-    editor->setMatchedBraceForegroundColor(matchedBraceFg());
-    editor->setMatchedBraceBackgroundColor(matchedBraceBg());
+                          toScintillaColor(caret));
+    editor->setCaretLineBackgroundColor(theme.editorColor(QStringLiteral("caretLine"), ThemeColors::Editor::caretLineBg()));
+    editor->setMatchedBraceForegroundColor(theme.editorColor(QStringLiteral("matchedBraceForeground"), ThemeColors::Editor::matchedBraceFg()));
+    editor->setMatchedBraceBackgroundColor(theme.editorColor(QStringLiteral("matchedBraceBackground"), ThemeColors::Editor::matchedBraceBg()));
     applyBaseEditorColors(editor);
     editor->viewport()->update();
 }
@@ -747,10 +863,11 @@ void EditorManager::applyBaseEditorColors(CustomEditor *editor)
 {
     if (!editor) return;
 
-    const QColor foreground = ThemeColors::Editor::foreground();
-    const QColor background = ThemeColors::Editor::background();
-    const QColor marginForeground = ThemeColors::Editor::marginFg();
-    const QColor marginBackground = ThemeColors::Editor::marginBg();
+    const NotePeek::SyntaxTheme theme = currentSyntaxTheme();
+    const QColor foreground = theme.editorColor(QStringLiteral("foreground"), ThemeColors::Editor::foreground());
+    const QColor background = theme.editorColor(QStringLiteral("background"), ThemeColors::Editor::background());
+    const QColor marginForeground = theme.editorColor(QStringLiteral("marginForeground"), ThemeColors::Editor::marginFg());
+    const QColor marginBackground = theme.editorColor(QStringLiteral("marginBackground"), ThemeColors::Editor::marginBg());
     const long fore = toScintillaColor(foreground);
     const long back = toScintillaColor(background);
     const long marginFore = toScintillaColor(marginForeground);
@@ -768,16 +885,9 @@ void EditorManager::applyLexerTheme(QsciLexer *lexer)
 {
     if (!lexer) return;
 
-    using namespace ThemeColors::Lexer;
-
-    // Style numbers are lexer-specific.  Apply colours only after translating
-    // each style into a semantic role; treating every lexer like C++ causes,
-    // for example, Python strings and JSON properties to receive number colours.
-    lexer->setDefaultPaper(defaultPaper());
-    lexer->setPaper(defaultPaper(), -1);
-    for (int style = 0; style <= QsciScintillaBase::STYLE_MAX; ++style) {
-        if (lexer->description(style).isEmpty())
-            continue;
-        lexer->setColor(color(roleForStyle(lexer, style)), style);
-    }
+    const NotePeek::SyntaxTheme theme = currentSyntaxTheme();
+    NotePeek::SyntaxStyler::applyTheme(
+        lexer, theme.syntaxColors,
+        theme.editorColor(QStringLiteral("background"), ThemeColors::Lexer::defaultPaper()),
+        theme.editorColor(QStringLiteral("foreground"), ThemeColors::Lexer::defaultColor()));
 }
