@@ -113,9 +113,12 @@ void FileExplorerDock::reapplyTheme()
     palette.setColor(QPalette::Text, text());
     palette.setColor(QPalette::Highlight, selectionBg());
     palette.setColor(QPalette::HighlightedText, selectionText());
-    m_treeView->setPalette(palette);
+    if (m_treeView->palette() != palette)
+    {
+        m_treeView->setPalette(palette);
+    }
 
-    m_treeView->setStyleSheet(QStringLiteral(
+    const QString styleSheet = QStringLiteral(
                                   "QTreeView {"
                                   "  background-color: %1;"
                                   "  color: %2;"
@@ -140,7 +143,11 @@ void FileExplorerDock::reapplyTheme()
                                        text().name(QColor::HexRgb),
                                        hoverBg().name(QColor::HexRgb),
                                        selectionBg().name(QColor::HexRgb),
-                                       selectionText().name(QColor::HexRgb)));
+                                       selectionText().name(QColor::HexRgb));
+    if (m_treeView->styleSheet() != styleSheet)
+    {
+        m_treeView->setStyleSheet(styleSheet);
+    }
 }
 
 void FileExplorerDock::setRootDirectory(const QString &dirPath)

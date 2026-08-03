@@ -7,6 +7,7 @@
 #include <QLineEdit>
 #include <QToolButton>
 #include <QFontDatabase>
+#include <QTimer>
 
 FindReplaceWidget::FindReplaceWidget(QWidget *parent)
     : QWidget(parent)
@@ -96,7 +97,10 @@ void FindReplaceWidget::applyChromeTheme()
           hoverBg().name(QColor::HexRgb),
           pressedBg().name(QColor::HexRgb));
 
-    setStyleSheet(style);
+    if (styleSheet() != style)
+    {
+        setStyleSheet(style);
+    }
 }
 
 void FindReplaceWidget::changeEvent(QEvent *event)
@@ -105,7 +109,7 @@ void FindReplaceWidget::changeEvent(QEvent *event)
 
     if (event->type() == QEvent::PaletteChange)
     {
-        applyChromeTheme();
+        QTimer::singleShot(0, this, &FindReplaceWidget::applyChromeTheme);
     }
 }
 

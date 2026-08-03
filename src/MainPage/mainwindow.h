@@ -86,6 +86,12 @@ private:
     // Markdown previews.  Does not touch the file-tree dock (that setting only
     // seeds the next launch) or reopen documents.
     void applyPreferences();
+    // Refreshes all palette-derived chrome without allowing stylesheet
+    // repolishing to recursively start another refresh.
+    void reapplyChromeTheme();
+    // Qt may announce a color-scheme change before its application palette is
+    // finalized. Coalesce refreshes and run them on the next event-loop turn.
+    void scheduleChromeThemeRefresh();
     DocumentController *activeController() const;
     void applyActiveController(DocumentController *controller);
     // Opens the file (if needed) and moves the cursor to the given match,
@@ -121,6 +127,8 @@ private:
     bool m_singleFileWindow;
     QString m_fileExplorerRootDirectory;
     bool m_fileExplorerRootExplicit;
+    bool m_reapplyingChromeTheme = false;
+    bool m_chromeThemeRefreshPending = false;
     FindReplaceManager *m_findReplaceManager;
     HeaderSourceManager *m_headerSourceManager;
     MarkdownPreviewer *m_markdownPreviewer;

@@ -5,6 +5,7 @@
 #include <QMessageBox>
 #include <QPushButton>
 #include <QSignalSpy>
+#include <QScrollBar>
 #include <QTimer>
 #include <QTemporaryDir>
 #include <QTreeWidget>
@@ -31,6 +32,8 @@
 #include "preferencesdialog.h"
 #include "tool/cpp/headersourcemanager.h"
 #include "widgets/searchresultsdock.h"
+#include "widgets/qscieditorinfostatusbar.h"
+#include "find/findreplacewidget.h"
 
 namespace {
 
@@ -72,6 +75,42 @@ private slots:
         fileWindow.show();
         QVERIFY(fileWindow.isVisible());
         QVERIFY(fileWindow.findChild<QMenu *>() != nullptr);
+    }
+
+    void paletteChangeThemeRefreshDoesNotRecurse()
+    {
+        MainWindow window;
+        auto *statusBar = window.findChild<QsciEditorInfoStatusBar *>();
+        auto *findReplace = window.findChild<FindReplaceWidget *>();
+        QVERIFY(statusBar);
+        QVERIFY(findReplace);
+
+        // Force each handler to install a different sheet. The installation
+        // itself may synchronously deliver PaletteChange while Qt repolishes;
+        // the nested event must observe the new sheet and return immediately.
+        window.setStyleSheet(QStringLiteral("QMainWindow { color: red; }"));
+        statusBar->setStyleSheet(QStringLiteral("QStatusBar { color: red; }"));
+        findReplace->setStyleSheet(QStringLiteral("FindReplaceWidget { color: red; }"));
+
+        QEvent windowPaletteChange(QEvent::PaletteChange);
+        QCoreApplication::sendEvent(&window, &windowPaletteChange);
+        QEvent statusPaletteChange(QEvent::PaletteChange);
+        QCoreApplication::sendEvent(statusBar, &statusPaletteChange);
+        QEvent findPaletteChange(QEvent::PaletteChange);
+        QCoreApplication::sendEvent(findReplace, &findPaletteChange);
+
+        QTRY_VERIFY(!window.styleSheet().contains(QStringLiteral("color: red")));
+        QTRY_VERIFY(!statusBar->styleSheet().contains(QStringLiteral("color: red")));
+        QTRY_VERIFY(!findReplace->styleSheet().contains(QStringLiteral("color: red")));
+
+        // The queued repolish must leave native controls resolved from the
+        // final application palette, not the palette from the previous scheme.
+        CustomEditor *editor = window.findChild<CustomEditor *>();
+        QVERIFY(editor);
+        QCOMPARE(editor->verticalScrollBar()->palette().color(QPalette::Button),
+                 QApplication::palette().color(QPalette::Button));
+        QCOMPARE(editor->verticalScrollBar()->palette().color(QPalette::Mid),
+                 QApplication::palette().color(QPalette::Mid));
     }
 
     void usesUntranslatedNameForUntitledDocuments()

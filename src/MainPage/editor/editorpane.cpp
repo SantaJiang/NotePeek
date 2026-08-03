@@ -18,6 +18,7 @@
 #include <QSignalBlocker>
 #include <QStyledItemDelegate>
 #include <QTabBar>
+#include <QTimer>
 
 namespace {
 
@@ -370,7 +371,7 @@ void EditorPane::changeEvent(QEvent *event)
 
     if (event->type() == QEvent::PaletteChange)
     {
-        applyChromeTheme();
+        QTimer::singleShot(0, this, &EditorPane::applyChromeTheme);
     }
 }
 
@@ -536,18 +537,22 @@ void EditorPane::applyTopbarStyleSheet()
         "  color: %3;"
         "}");
 
-    ui->topbar->setStyleSheet(topbarStyle.arg(background().name(QColor::HexRgb),
-                                             border().name(QColor::HexRgb),
-                                             text().name(QColor::HexRgb),
-                                             hoverBg().name(QColor::HexRgb),
-                                             pressedBg().name(QColor::HexRgb),
-                                             mutedText().name(QColor::HexRgb)));
+    const QString resolvedTopbarStyle = topbarStyle.arg(background().name(QColor::HexRgb),
+                                                        border().name(QColor::HexRgb),
+                                                        text().name(QColor::HexRgb),
+                                                        hoverBg().name(QColor::HexRgb),
+                                                        pressedBg().name(QColor::HexRgb),
+                                                        mutedText().name(QColor::HexRgb));
+    if (ui->topbar->styleSheet() != resolvedTopbarStyle)
+    {
+        ui->topbar->setStyleSheet(resolvedTopbarStyle);
+    }
 
     if (QAbstractItemView *view = ui->comboBox_files->view())
     {
         view->setMouseTracking(true);
         view->viewport()->setMouseTracking(true);
-        view->setStyleSheet(QStringLiteral(
+        const QString popupStyle = QStringLiteral(
                                 "QAbstractItemView {"
                                 "  background-color: %1;"
                                 "  color: %2;"
@@ -569,7 +574,11 @@ void EditorPane::applyTopbarStyleSheet()
                                      border().name(QColor::HexRgb),
                                      selectionBg().name(QColor::HexRgb),
                                      selectionText().name(QColor::HexRgb),
-                                     hoverBg().name(QColor::HexRgb)));
+                                     hoverBg().name(QColor::HexRgb));
+        if (view->styleSheet() != popupStyle)
+        {
+            view->setStyleSheet(popupStyle);
+        }
     }
 }
 
