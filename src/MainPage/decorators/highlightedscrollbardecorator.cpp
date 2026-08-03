@@ -8,7 +8,7 @@
 HighlightedScrollBarDecorator::HighlightedScrollBarDecorator(QsciScintilla *editor)
     : QObject(editor)
     , m_editor(editor)
-    , m_scrollBar(new HighlightedScrollBar(editor, Qt::Vertical, editor))
+    , m_scrollBar(new HighlightedScrollBar(editor))
 {
     m_searchIndicator = editor->indicatorDefine(QsciScintilla::RoundBoxIndicator);
     m_bookmarkMarker  = editor->markerDefine(QsciScintilla::Circle);

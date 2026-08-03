@@ -11,6 +11,7 @@
     </description>
     <url type="homepage">https://github.com/SantaSpeeds/NotePeek</url>
     <releases>
+        <release version="1.5.0" date="2026-08-03"/>
         <release version="1.4.2" date="2026-07-29"/>
         <release version="1.4.1" date="2026-07-27"/>
         <release version="1.3.4" date="2026-07-25"/>

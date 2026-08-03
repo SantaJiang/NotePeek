@@ -41,6 +41,9 @@ public:
     bool setSemanticTokens(quint64 revision, const QVector<SemanticToken> &tokens);
     bool applySemanticTokenDelta(quint64 revision, int firstLine, int lastLine,
                                  const QVector<SemanticToken> &tokens);
+    // Drops cached tokens furthest from [keepFirstLine, keepLastLine] until at
+    // most maxTokens remain, so a bounded cache never blanks the visible region.
+    void evictSemanticTokensOutside(int keepFirstLine, int keepLastLine, int maxTokens);
     void clearSemanticTokens();
     void setSemanticTokenColors(const SyntaxPalette &colors);
     QVector<SemanticToken> semanticTokens() const;
@@ -53,13 +56,19 @@ private:
     bool m_codeEditingFeaturesEnabled = false;
     bool m_bracketAssistanceEnabled = false;
     bool m_documentCompletionEnabled = false;
-    int m_semanticIndicator = 8;
+    // Allocated through indicatorDefine() so it can never collide with an
+    // indicator the application defines for search hits or diagnostics.
+    int m_semanticIndicator = -1;
     quint64 m_documentRevision = 0;
     QVector<SemanticToken> m_semanticTokens;
     SyntaxPalette m_semanticColors;
 
+    // m_semanticTokens is kept sorted by line so a delta can locate the range
+    // it replaces, and so rendering can fetch each line's text exactly once.
+    void sortSemanticTokens();
     void renderSemanticTokens();
-    void renderSemanticToken(const SemanticToken &token);
+    void renderTokenRange(int fromIndex, int toIndex);
+    void renderSemanticTokensForLine(int line, int fromIndex, int toIndex);
     void handleSemanticModification(int modificationType, int linesAdded, int line);
     void clearSemanticIndicatorLines(int firstLine, int lastLine);
 };

@@ -598,6 +598,112 @@ private slots:
         QVERIFY(foundProperty);
     }
 
+    void treatsPythonDoubleSlashAsDivisionRatherThanComment()
+    {
+        NotePeek::BasicSemanticTokenProvider provider;
+        NotePeek::SemanticDocument document;
+        document.languageId = QStringLiteral("Python");
+        document.text = QStringLiteral(
+            "total = countItems(rows) // scaleFactor(columns)\n"
+            "# hiddenCall(HiddenType)\n");
+
+        const QStringList lines = document.text.split(QLatin1Char('\n'));
+        bool foundBeforeSlashes = false;
+        bool foundAfterSlashes = false;
+        for (const NotePeek::SemanticToken &token : provider.tokensForDocument(document))
+        {
+            const QString value = lines.value(token.line).mid(token.utf16Column, token.utf16Length);
+            foundBeforeSlashes |= value == QLatin1String("countItems");
+            // `//` is floor division in Python: everything after it is code and
+            // must still be classified.
+            foundAfterSlashes |= value == QLatin1String("scaleFactor");
+            QVERIFY(value != QLatin1String("hiddenCall"));
+            QVERIFY(value != QLatin1String("HiddenType"));
+        }
+        QVERIFY(foundBeforeSlashes);
+        QVERIFY(foundAfterSlashes);
+    }
+
+    void masksPythonTripleQuotedStringsAcrossLines()
+    {
+        NotePeek::BasicSemanticTokenProvider provider;
+        NotePeek::SemanticDocument document;
+        document.languageId = QStringLiteral("Python");
+        document.text = QStringLiteral(
+            "\"\"\"docComment(DocType)\n"
+            "stillInsideDoc(DocType)\n"
+            "\"\"\"\n"
+            "realCall(RealType)\n");
+
+        const QStringList lines = document.text.split(QLatin1Char('\n'));
+        bool foundRealCall = false;
+        for (const NotePeek::SemanticToken &token : provider.tokensForDocument(document))
+        {
+            const QString value = lines.value(token.line).mid(token.utf16Column, token.utf16Length);
+            foundRealCall |= value == QLatin1String("realCall");
+            QVERIFY(value != QLatin1String("docComment"));
+            QVERIFY(value != QLatin1String("stillInsideDoc"));
+        }
+        QVERIFY(foundRealCall);
+    }
+
+    void honorsEntryStateWhenAWindowStartsInsideACommentOrString()
+    {
+        NotePeek::BasicSemanticTokenProvider provider;
+        NotePeek::SemanticDocument document;
+        document.languageId = QStringLiteral("C++");
+        document.firstLine = 500;
+        document.text = QStringLiteral(
+            "stillCommented(CommentedType)\n"
+            "*/ realCall(RealType)\n");
+
+        // Default entry state: the window looks like plain code.
+        bool sawCommentedName = false;
+        for (const NotePeek::SemanticToken &token : provider.analyze(document).tokens)
+        {
+            const QString value = document.text.split(QLatin1Char('\n'))
+                                      .value(token.line - document.firstLine)
+                                      .mid(token.utf16Column, token.utf16Length);
+            sawCommentedName |= value == QLatin1String("stillCommented");
+        }
+        QVERIFY(sawCommentedName);
+
+        // Told that a block comment is open, the same window must suppress
+        // everything up to the closing delimiter.
+        document.entryState = NotePeek::SemanticEntryState::BlockComment;
+        const NotePeek::SemanticAnalysisResult guarded = provider.analyze(document);
+        bool foundRealCall = false;
+        for (const NotePeek::SemanticToken &token : guarded.tokens)
+        {
+            const QString value = document.text.split(QLatin1Char('\n'))
+                                      .value(token.line - document.firstLine)
+                                      .mid(token.utf16Column, token.utf16Length);
+            foundRealCall |= value == QLatin1String("realCall");
+            QVERIFY(value != QLatin1String("stillCommented"));
+            QVERIFY(value != QLatin1String("CommentedType"));
+        }
+        QVERIFY(foundRealCall);
+        QCOMPARE(guarded.exitState, NotePeek::SemanticEntryState::Code);
+    }
+
+    void resolvesOverlappingPatternsByExplicitPriority()
+    {
+        NotePeek::BasicSemanticTokenProvider provider;
+        NotePeek::SemanticDocument document;
+        document.languageId = QStringLiteral("C++");
+        document.text = QStringLiteral("MAX_ITEMS = object.member + Helper(value);\n");
+
+        QMap<QString, NotePeek::SyntaxRole> roles;
+        for (const NotePeek::SemanticToken &token : provider.tokensForDocument(document))
+            roles.insert(document.text.mid(token.utf16Column, token.utf16Length), token.role);
+
+        // An all-caps name matches both the macro and the type pattern; the
+        // macro rule is more specific and wins regardless of rule order.
+        QCOMPARE(roles.value(QStringLiteral("MAX_ITEMS")), NotePeek::SyntaxRole::Builtin);
+        QCOMPARE(roles.value(QStringLiteral("member")), NotePeek::SyntaxRole::Property);
+        QCOMPARE(roles.value(QStringLiteral("Helper")), NotePeek::SyntaxRole::Type);
+    }
+
     void semanticAnalysisHonorsViewportOffsetsCancellationAndBudgets()
     {
         NotePeek::BasicSemanticTokenProvider provider;

@@ -3,18 +3,18 @@
 #include <Qsci/qsciscintilla.h>
 #include <QEvent>
 #include <QScrollBar>
+#include <QStyle>
+#include <QStyleOptionSlider>
 #include <QTimer>
 #include <utility>
 
-HighlightedScrollBar::HighlightedScrollBar(QsciScintilla *editor, Qt::Orientation orientation, QWidget *parent)
+HighlightedScrollBar::HighlightedScrollBar(QsciScintilla *editor, QWidget *parent)
     : QWidget(editor ? static_cast<QWidget *>(editor->verticalScrollBar()) : parent)
     , editor(editor)
     , m_nativeScrollBar(editor ? editor->verticalScrollBar() : nullptr)
 {
-    Q_UNUSED(orientation)
     setAttribute(Qt::WA_TransparentForMouseEvents);
     setAttribute(Qt::WA_NoSystemBackground);
-    setAttribute(Qt::WA_TranslucentBackground);
     if (m_nativeScrollBar)
     {
         m_nativeScrollBar->installEventFilter(this);
@@ -46,15 +46,25 @@ void HighlightedScrollBar::paintEvent(QPaintEvent *event)
 
 bool HighlightedScrollBar::eventFilter(QObject *watched, QEvent *event)
 {
-    if (watched == m_nativeScrollBar
-        && (event->type() == QEvent::Resize || event->type() == QEvent::Show))
+    if (watched != m_nativeScrollBar)
+        return QWidget::eventFilter(watched, event);
+
+    switch (event->type())
     {
+    case QEvent::Resize:
+    case QEvent::Show:
         // The marker layer is a child of the native scrollbar, so movement is
         // inherited every frame during macOS window animations. Only its local
         // size needs updating when the native scrollbar itself is resized.
         syncToNativeScrollBar();
         m_staticMarkerLayerDirty = true;
         update();
+        break;
+    // Hide needs no handling: Qt hides child widgets together with their
+    // parent, and calling hide() here would set the explicit-hide flag that
+    // stops the layer from reappearing when the scrollbar is shown again.
+    default:
+        break;
     }
     return QWidget::eventFilter(watched, event);
 }
@@ -184,43 +194,53 @@ void HighlightedScrollBar::syncToNativeScrollBar()
         return;
     setGeometry(m_nativeScrollBar->rect());
     raise();
+    // A widget created with an already-visible parent stays hidden until it is
+    // shown explicitly, so without this the markers only appear when the
+    // decorator happens to be constructed before the editor's first show().
+    // Only ever show here: calling hide() while the parent is still hidden
+    // would set the explicit-hide flag and stop Qt from showing the layer
+    // together with the scrollbar later on.
+    if (m_nativeScrollBar->isVisible())
+        show();
 }
 
 void HighlightedScrollBar::drawTickMark(QPainter &p, int y, int height, const QColor &color)
 {
-    int arrowHeight = scrollbarArrowHeight();
-    int availableHeight = rect().height() - arrowHeight * 2;
-
-    // Clamp y to the drawable area
-    if (y < 0) y = 0;
-    if (y > availableHeight) y = availableHeight;
+    const QRect groove = grooveRect();
+    const int tickHeight = qMax(1, height);
+    y = qBound(groove.top(), y, qMax(groove.top(), groove.bottom() - tickHeight + 1));
 
     p.fillRect(rect().x() + DEFAULT_TICK_PADDING,
-               y + arrowHeight,
+               y,
                rect().width() - (DEFAULT_TICK_PADDING * 2),
-               qMax(1, height), color);
-}
-
-int HighlightedScrollBar::posToScrollBarY(int pos) const
-{
-    // QScintilla only exposes position-to-line mapping via SendScintilla
-    int line = editor->SendScintilla(QsciScintillaBase::SCI_LINEFROMPOSITION, pos);
-    return lineToScrollBarY(line);
+               tickHeight, color);
 }
 
 int HighlightedScrollBar::lineToScrollBarY(int line) const
 {
     if (m_lineCount <= 0) return 0;
 
-    int arrowHeight = scrollbarArrowHeight();
-    int availableHeight = rect().height() - arrowHeight * 2;
-
-    double ratio = static_cast<double>(line) / m_lineCount;
-    return static_cast<int>(ratio * availableHeight);
+    const QRect groove = grooveRect();
+    const double ratio = qBound(0.0, static_cast<double>(line) / m_lineCount, 1.0);
+    return groove.top() + static_cast<int>(ratio * qMax(0, groove.height() - DEFAULT_TICK_HEIGHT));
 }
 
-int HighlightedScrollBar::scrollbarArrowHeight() const
+QRect HighlightedScrollBar::grooveRect() const
 {
-    // Assume square arrow buttons: height equals the scrollbar width
-    return m_nativeScrollBar ? m_nativeScrollBar->width() : rect().width();
+    auto *bar = qobject_cast<QScrollBar *>(m_nativeScrollBar.data());
+    if (!bar)
+        return rect();
+
+    QStyleOptionSlider option;
+    option.initFrom(bar);
+    option.orientation = Qt::Vertical;
+    option.minimum = bar->minimum();
+    option.maximum = bar->maximum();
+    option.sliderPosition = bar->value();
+    option.sliderValue = bar->value();
+    option.pageStep = bar->pageStep();
+    option.singleStep = bar->singleStep();
+    const QRect groove = bar->style()->subControlRect(QStyle::CC_ScrollBar, &option,
+                                                      QStyle::SC_ScrollBarGroove, bar);
+    return groove.isValid() ? groove : rect();
 }
