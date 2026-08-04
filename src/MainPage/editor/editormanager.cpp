@@ -37,6 +37,14 @@ long toScintillaColor(const QColor &color)
 
 bool shouldUseSoftWrap(const QString &filePath, LexerFactory::Language lang)
 {
+    // A document with no path yet ("untitled") has nothing to infer from, so it
+    // follows the user's configured default: plain text (wrapped, no line
+    // numbers) unless code mode was chosen.
+    if (filePath.isEmpty())
+    {
+        return !AppPreferences::instance().untitledUsesCodeMode();
+    }
+
     switch (lang)
     {
     case LexerFactory::MARKDOWN:

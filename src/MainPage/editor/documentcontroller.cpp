@@ -905,6 +905,9 @@ bool DocumentController::closeFileIfUnmodified(const QString &filePath)
 void DocumentController::createDefaultDocument()
 {
     CustomEditor *editor = m_editorManager->createEditor(QStringLiteral("untitled"));
+    // No file path to infer from: apply the display policy for the empty path so
+    // the untitled document honours the configured text/code default.
+    m_editorManager->updateEditorSyntax(editor, QString());
     DocumentPage *page = createPage(editor, QString());
     const int tabIndex = m_pane->addPage(page, QStringLiteral("untitled"), QString());
     m_pane->setCurrentIndex(tabIndex);

@@ -198,6 +198,41 @@ private slots:
         QCOMPARE(editor->autoCompletionSource(), CustomEditor::AcsNone);
     }
 
+    void untitledDocumentFollowsConfiguredMode()
+    {
+        AppPreferences &prefs = AppPreferences::instance();
+        const bool originalMode = prefs.untitledUsesCodeMode();
+
+        // Text mode is the default: prose-style wrapping, no line-number margin.
+        prefs.setUntitledUsesCodeMode(false);
+        EditorPane textPane;
+        DocumentController textController(&textPane, false);
+        textController.createDefaultDocument();
+        CustomEditor *textEditor = textController.currentEditor();
+        QVERIFY(textEditor);
+        QVERIFY(textEditor->filePath().isEmpty());
+        QCOMPARE(textEditor->wrapMode(), CustomEditor::WrapWord);
+        QCOMPARE(textEditor->marginWidth(0), 0);
+
+        // Code mode keeps line numbers and horizontal scrolling.
+        prefs.setUntitledUsesCodeMode(true);
+        EditorPane codePane;
+        DocumentController codeController(&codePane, false);
+        codeController.createDefaultDocument();
+        CustomEditor *codeEditor = codeController.currentEditor();
+        QVERIFY(codeEditor);
+        QCOMPARE(codeEditor->wrapMode(), CustomEditor::WrapNone);
+        QVERIFY(codeEditor->marginWidth(0) > 0);
+
+        // Changing the preference re-applies to already open untitled documents.
+        prefs.setUntitledUsesCodeMode(false);
+        codeController.editorManager()->applyCodeFeaturePreferences();
+        QCOMPARE(codeEditor->wrapMode(), CustomEditor::WrapWord);
+        QCOMPARE(codeEditor->marginWidth(0), 0);
+
+        prefs.setUntitledUsesCodeMode(originalMode);
+    }
+
     void togglesCurrentCodeFold()
     {
         EditorManager manager;
