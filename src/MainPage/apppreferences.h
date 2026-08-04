@@ -50,6 +50,11 @@ public:
     bool untitledUsesCodeMode() const { return m_untitledUsesCodeMode; }
     void setUntitledUsesCodeMode(bool useCodeMode) { m_untitledUsesCodeMode = useCodeMode; }
 
+    // When true, typing replaces the character ahead of the caret instead of
+    // inserting before it.  Applied to every open editor and to new ones.
+    bool overwriteMode() const { return m_overwriteMode; }
+    void setOverwriteMode(bool overwrite) { m_overwriteMode = overwrite; }
+
     bool codeFoldingEnabled() const { return m_codeFoldingEnabled; }
     void setCodeFoldingEnabled(bool enabled) { m_codeFoldingEnabled = enabled; }
     bool bracketAssistanceEnabled() const { return m_bracketAssistanceEnabled; }
@@ -86,6 +91,7 @@ private:
     bool m_showFileTreeOnStartup;
     bool m_markdownDefaultPreview;
     bool m_untitledUsesCodeMode;
+    bool m_overwriteMode;
     bool m_codeFoldingEnabled;
     bool m_bracketAssistanceEnabled;
     bool m_smartIndentationEnabled;

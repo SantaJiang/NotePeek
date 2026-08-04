@@ -74,6 +74,53 @@ private slots:
         }
     }
 
+    void detectsAndRoundTripsGb18030()
+    {
+        if (!DocumentFormatCodec::legacyEncodingsAvailable())
+        {
+            QSKIP("This build has no legacy text codecs.");
+        }
+
+        QTemporaryDir tempDir;
+        QVERIFY(tempDir.isValid());
+        const QString path = tempDir.filePath(QStringLiteral("comment.c"));
+
+        // "// 中文注释\n" as a Chinese-locale source file would store it.
+        const QByteArray gbBytes("// \xd6\xd0\xce\xc4\xd7\xa2\xca\xcd\n");
+        QFile file(path);
+        QVERIFY(file.open(QIODevice::WriteOnly));
+        QCOMPARE(file.write(gbBytes), qint64(gbBytes.size()));
+        file.close();
+
+        // A file that is not UTF-8 still opens, tagged with the encoding it
+        // was read as, rather than being rejected.
+        QString content;
+        DocumentFormat format;
+        QString error;
+        QVERIFY2(DocumentIO::loadTextFile(path, &content, &format, &error), qPrintable(error));
+        QCOMPARE(content, QStringLiteral("// 中文注释\n"));
+        QCOMPARE(format.encoding, DocumentEncoding::Gb18030);
+
+        // Saving it back must reproduce the original bytes exactly.
+        QVERIFY2(DocumentIO::saveTextFile(path, content, format, &error), qPrintable(error));
+        QVERIFY(file.open(QIODevice::ReadOnly));
+        QCOMPARE(file.readAll(), gbBytes);
+        file.close();
+    }
+
+    void reportsCharactersALegacyEncodingCannotStore()
+    {
+        if (!DocumentFormatCodec::legacyEncodingsAvailable())
+        {
+            QSKIP("This build has no legacy text codecs.");
+        }
+
+        QVERIFY(DocumentFormatCodec::canRepresent(QStringLiteral("中文"), DocumentEncoding::Gb18030));
+        QVERIFY(!DocumentFormatCodec::canRepresent(QStringLiteral("中文"), DocumentEncoding::Latin1));
+        // The UTF encodings always cover the whole of Unicode.
+        QVERIFY(DocumentFormatCodec::canRepresent(QStringLiteral("中文😀"), DocumentEncoding::Utf8));
+    }
+
     void rejectsInvalidTextInsteadOfReplacingBytes()
     {
         QTemporaryDir tempDir;

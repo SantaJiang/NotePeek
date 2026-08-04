@@ -329,30 +329,31 @@ void MainWindow::setupEncodingMenu()
     m_reopenEncodingMenu = m_encodingMenu->addMenu(tr("Reopen with Encoding"));
     m_convertEncodingMenu = m_encodingMenu->addMenu(tr("Convert to Encoding and Save"));
 
-    const struct
+    // Unicode first, then the legacy code pages (only present when this build
+    // has codec support for them), separated so the common choices stay on top.
+    bool separatorPending = false;
+    for (DocumentEncoding encoding : DocumentFormatCodec::supportedEncodings())
     {
-        DocumentEncoding encoding;
-        QString name;
+        if (DocumentFormatCodec::isLegacyEncoding(encoding) && !separatorPending)
+        {
+            separatorPending = true;
+            m_reopenEncodingMenu->addSeparator();
+            m_convertEncodingMenu->addSeparator();
+        }
+
+        const QString name = encoding == DocumentEncoding::Utf8Bom
+                                 ? QStringLiteral("UTF-8 with BOM")
+                                 : DocumentFormatCodec::encodingName(encoding);
         // UTF-8 with BOM reads identically to UTF-8, so it is offered only as a
         // conversion target, not as a way to reopen.
-        bool reopen;
-    } encodingEntries[] = {
-        { DocumentEncoding::Utf8, QStringLiteral("UTF-8"), true },
-        { DocumentEncoding::Utf8Bom, QStringLiteral("UTF-8 with BOM"), false },
-        { DocumentEncoding::Utf16LittleEndian, QStringLiteral("UTF-16 LE"), true },
-        { DocumentEncoding::Utf16BigEndian, QStringLiteral("UTF-16 BE"), true },
-    };
-    for (const auto &entry : encodingEntries)
-    {
-        const DocumentEncoding encoding = entry.encoding;
-        if (entry.reopen)
+        if (encoding != DocumentEncoding::Utf8Bom)
         {
-            m_reopenEncodingMenu->addAction(entry.name, this, [this, encoding]() {
+            m_reopenEncodingMenu->addAction(name, this, [this, encoding]() {
                 activeController()->reopenCurrentWithEncoding(encoding);
             });
         }
 
-        QAction *convertAction = m_convertEncodingMenu->addAction(entry.name, this, [this, encoding]() {
+        QAction *convertAction = m_convertEncodingMenu->addAction(name, this, [this, encoding]() {
             activeController()->convertEncodingAndSave(encoding);
         });
         convertAction->setCheckable(true);
@@ -733,38 +734,6 @@ void MainWindow::jumpToEditorLocation(CustomEditor *editor, int line, int column
     editor->setFocus();
 }
 
-void MainWindow::on_action_foldCurrentBlock_triggered()
-{
-    if (CustomEditor *editor = activeController()->currentEditor())
-    {
-        editor->toggleCurrentFold();
-    }
-}
-
-void MainWindow::on_action_toggleAllFolds_triggered()
-{
-    if (CustomEditor *editor = activeController()->currentEditor())
-    {
-        editor->toggleAllFolds();
-    }
-}
-
-void MainWindow::on_action_goToMatchingBrace_triggered()
-{
-    if (CustomEditor *editor = activeController()->currentEditor())
-    {
-        editor->goToMatchingBrace();
-    }
-}
-
-void MainWindow::on_action_completeWord_triggered()
-{
-    if (CustomEditor *editor = activeController()->currentEditor())
-    {
-        editor->completeWordFromDocument();
-    }
-}
-
 void MainWindow::on_action_formatCode_triggered()
 {
     DocumentController *controller = activeController();
@@ -936,20 +905,12 @@ void MainWindow::updateEditActions(bool available)
     // selection, so text can still be copied out of the preview.
     const bool sourceEditable = editor != nullptr
                                 && !controller->pane()->isCurrentEditorHidden();
-    const bool codeEditable = sourceEditable && editor->codeEditingFeaturesEnabled();
-    const bool foldingAvailable = codeEditable
-                                  && editor->folding() != CustomEditor::NoFoldStyle;
     ui->action_cut->setEnabled(sourceEditable && available);
     ui->action_copy->setEnabled(available);
     ui->action_paste->setEnabled(sourceEditable);
     ui->action_undo->setEnabled(sourceEditable);
     ui->action_redo->setEnabled(sourceEditable);
     ui->action_find->setEnabled(sourceEditable);
-    ui->action_foldCurrentBlock->setEnabled(foldingAvailable);
-    ui->action_toggleAllFolds->setEnabled(foldingAvailable);
-    ui->menuCodeFolding->setEnabled(foldingAvailable);
-    ui->action_goToMatchingBrace->setEnabled(codeEditable && editor->bracketAssistanceEnabled());
-    ui->action_completeWord->setEnabled(codeEditable && editor->documentCompletionEnabled());
 }
 
 void MainWindow::updateWindowTitle(bool modified)

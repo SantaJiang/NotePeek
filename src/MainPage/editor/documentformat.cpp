@@ -5,7 +5,48 @@
 #include <QtEndian>
 #include <QVector>
 
+// Qt 5 ships QTextCodec in QtCore.  Qt 6 moved it to the optional Core5Compat
+// module, so the legacy code pages are only compiled in when the build found
+// it (NOTEPEEK_HAVE_QT5COMPAT, set by CMake).
+#if QT_VERSION < QT_VERSION_CHECK(6, 0, 0) || defined(NOTEPEEK_HAVE_QT5COMPAT)
+#define NOTEPEEK_HAVE_TEXT_CODECS 1
+#include <QTextCodec>
+#endif
+
 namespace {
+
+// Codec names as QTextCodec knows them.  Returns nullptr for the UTF
+// encodings, which are decoded by hand above.
+const char *legacyCodecName(DocumentEncoding encoding)
+{
+    switch (encoding)
+    {
+    case DocumentEncoding::Gb18030:
+        return "GB18030";
+    case DocumentEncoding::Big5:
+        return "Big5";
+    case DocumentEncoding::ShiftJis:
+        return "Shift-JIS";
+    case DocumentEncoding::EucKr:
+        return "EUC-KR";
+    case DocumentEncoding::Latin1:
+        return "ISO-8859-1";
+    case DocumentEncoding::Utf8:
+    case DocumentEncoding::Utf8Bom:
+    case DocumentEncoding::Utf16LittleEndian:
+    case DocumentEncoding::Utf16BigEndian:
+        break;
+    }
+    return nullptr;
+}
+
+#ifdef NOTEPEEK_HAVE_TEXT_CODECS
+QTextCodec *legacyCodec(DocumentEncoding encoding)
+{
+    const char *name = legacyCodecName(encoding);
+    return name ? QTextCodec::codecForName(name) : nullptr;
+}
+#endif
 
 bool isValidUtf8(const QByteArray &bytes)
 {
@@ -153,6 +194,89 @@ QString withLineEnding(const QString &text, DocumentLineEnding lineEnding)
 
 } // namespace
 
+bool DocumentFormatCodec::legacyEncodingsAvailable()
+{
+#ifdef NOTEPEEK_HAVE_TEXT_CODECS
+    return legacyCodec(DocumentEncoding::Gb18030) != nullptr;
+#else
+    return false;
+#endif
+}
+
+bool DocumentFormatCodec::isLegacyEncoding(DocumentEncoding encoding)
+{
+    return legacyCodecName(encoding) != nullptr;
+}
+
+QList<DocumentEncoding> DocumentFormatCodec::supportedEncodings()
+{
+    QList<DocumentEncoding> encodings = {
+        DocumentEncoding::Utf8,
+        DocumentEncoding::Utf8Bom,
+        DocumentEncoding::Utf16LittleEndian,
+        DocumentEncoding::Utf16BigEndian,
+    };
+    if (legacyEncodingsAvailable())
+    {
+        encodings.append({
+            DocumentEncoding::Gb18030,
+            DocumentEncoding::Big5,
+            DocumentEncoding::ShiftJis,
+            DocumentEncoding::EucKr,
+            DocumentEncoding::Latin1,
+        });
+    }
+    return encodings;
+}
+
+QString DocumentFormatCodec::encodingName(DocumentEncoding encoding)
+{
+    switch (encoding)
+    {
+    case DocumentEncoding::Utf8:
+        return QStringLiteral("UTF-8");
+    case DocumentEncoding::Utf8Bom:
+        return QStringLiteral("UTF-8 BOM");
+    case DocumentEncoding::Utf16LittleEndian:
+        return QStringLiteral("UTF-16 LE");
+    case DocumentEncoding::Utf16BigEndian:
+        return QStringLiteral("UTF-16 BE");
+    case DocumentEncoding::Gb18030:
+        return QStringLiteral("GB18030");
+    case DocumentEncoding::Big5:
+        return QStringLiteral("Big5");
+    case DocumentEncoding::ShiftJis:
+        return QStringLiteral("Shift-JIS");
+    case DocumentEncoding::EucKr:
+        return QStringLiteral("EUC-KR");
+    case DocumentEncoding::Latin1:
+        return QStringLiteral("ISO-8859-1");
+    }
+    return QStringLiteral("UTF-8");
+}
+
+bool DocumentFormatCodec::canRepresent(const QString &text, DocumentEncoding encoding)
+{
+    if (!isLegacyEncoding(encoding))
+    {
+        // The UTF encodings cover the whole of Unicode.
+        return true;
+    }
+#ifdef NOTEPEEK_HAVE_TEXT_CODECS
+    QTextCodec *codec = legacyCodec(encoding);
+    if (!codec)
+    {
+        return false;
+    }
+    QTextCodec::ConverterState state;
+    codec->fromUnicode(text.constData(), int(text.size()), &state);
+    return state.invalidChars == 0;
+#else
+    Q_UNUSED(text);
+    return false;
+#endif
+}
+
 DocumentFormat DocumentFormatCodec::defaultFormat()
 {
     DocumentFormat format;
@@ -213,16 +337,38 @@ bool DocumentFormatCodec::decode(const QByteArray &bytes,
             return false;
         }
     }
+    else if (isValidUtf8(bytes))
+    {
+        detected.encoding = DocumentEncoding::Utf8;
+        decoded = QString::fromUtf8(bytes.constData(), bytes.size());
+    }
     else
     {
-        if (!isValidUtf8(bytes))
+        // Not Unicode.  GB18030 is the only legacy code page guessed here: it
+        // is the one that turns up in practice (Chinese comments in source
+        // files), and it round-trips byte-for-byte, so saving cannot corrupt
+        // the file.  Anything it rejects is still reported as undecodable;
+        // Tools ▸ Encoding ▸ Reopen with Encoding handles the rest.
+        bool decodedAsLegacy = false;
+#ifdef NOTEPEEK_HAVE_TEXT_CODECS
+        if (QTextCodec *codec = legacyCodec(DocumentEncoding::Gb18030))
+        {
+            QTextCodec::ConverterState state;
+            const QString candidate = codec->toUnicode(bytes.constData(), int(bytes.size()), &state);
+            if (state.invalidChars == 0 && state.remainingChars == 0)
+            {
+                detected.encoding = DocumentEncoding::Gb18030;
+                decoded = candidate;
+                decodedAsLegacy = true;
+            }
+        }
+#endif
+        if (!decodedAsLegacy)
         {
             if (errorMessage)
                 *errorMessage = QStringLiteral("The file is not valid UTF-8 or BOM-marked UTF-16 text.");
             return false;
         }
-        detected.encoding = DocumentEncoding::Utf8;
-        decoded = QString::fromUtf8(bytes.constData(), bytes.size());
     }
 
     detected.lineEnding = detectLineEnding(decoded, detected.lineEnding);
@@ -262,6 +408,33 @@ bool DocumentFormatCodec::decodeWithEncoding(const QByteArray &bytes,
             return false;
         }
         decoded = QString::fromUtf8(payload.constData(), payload.size());
+    }
+    else if (isLegacyEncoding(encoding))
+    {
+#ifdef NOTEPEEK_HAVE_TEXT_CODECS
+        QTextCodec *codec = legacyCodec(encoding);
+        if (!codec)
+        {
+            if (errorMessage)
+                *errorMessage = QStringLiteral("This build cannot read %1 files.")
+                                    .arg(encodingName(encoding));
+            return false;
+        }
+        QTextCodec::ConverterState state;
+        decoded = codec->toUnicode(bytes.constData(), int(bytes.size()), &state);
+        if (state.invalidChars > 0 || state.remainingChars > 0)
+        {
+            if (errorMessage)
+                *errorMessage = QStringLiteral("The file is not valid %1 text.")
+                                    .arg(encodingName(encoding));
+            return false;
+        }
+#else
+        if (errorMessage)
+            *errorMessage = QStringLiteral("This build cannot read %1 files.")
+                                .arg(encodingName(encoding));
+        return false;
+#endif
     }
     else
     {
@@ -304,6 +477,19 @@ QByteArray DocumentFormatCodec::encode(const QString &text, const DocumentFormat
         return output.toUtf8();
     if (format.encoding == DocumentEncoding::Utf8Bom)
         return QByteArray("\xef\xbb\xbf", 3) + output.toUtf8();
+
+    if (isLegacyEncoding(format.encoding))
+    {
+#ifdef NOTEPEEK_HAVE_TEXT_CODECS
+        // Characters the code page cannot express become substitutes here;
+        // callers warn before converting (see canRepresent()).
+        if (QTextCodec *codec = legacyCodec(format.encoding))
+            return codec->fromUnicode(output.constData(), int(output.size()), nullptr);
+#endif
+        // Without codec support the document could only be written as mojibake,
+        // so fall back to UTF-8 rather than corrupting it.
+        return output.toUtf8();
+    }
 
     const bool littleEndian = format.encoding == DocumentEncoding::Utf16LittleEndian;
     const qsizetype unitCount = output.size();

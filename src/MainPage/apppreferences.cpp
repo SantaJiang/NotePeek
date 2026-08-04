@@ -82,6 +82,7 @@ AppPreferences::AppPreferences()
     , m_showFileTreeOnStartup(false)
     , m_markdownDefaultPreview(false)
     , m_untitledUsesCodeMode(false)
+    , m_overwriteMode(false)
     , m_codeFoldingEnabled(false)
     , m_bracketAssistanceEnabled(false)
     , m_smartIndentationEnabled(true)
@@ -154,6 +155,8 @@ void AppPreferences::load()
     m_untitledUsesCodeMode =
         settings.value(QStringLiteral("untitledDocumentMode"), QStringLiteral("text")).toString()
         == QLatin1String("code");
+    m_overwriteMode =
+        settings.value(QStringLiteral("overwriteMode"), false).toBool();
     m_codeFoldingEnabled =
         settings.value(QStringLiteral("codeFoldingEnabled"), false).toBool();
     m_bracketAssistanceEnabled =
@@ -183,6 +186,7 @@ void AppPreferences::save() const
     settings.setValue(QStringLiteral("markdownDefaultPreview"), m_markdownDefaultPreview);
     settings.setValue(QStringLiteral("untitledDocumentMode"),
                       m_untitledUsesCodeMode ? QStringLiteral("code") : QStringLiteral("text"));
+    settings.setValue(QStringLiteral("overwriteMode"), m_overwriteMode);
     settings.setValue(QStringLiteral("codeFoldingEnabled"), m_codeFoldingEnabled);
     settings.setValue(QStringLiteral("bracketAssistanceEnabled"), m_bracketAssistanceEnabled);
     settings.setValue(QStringLiteral("smartIndentationEnabled"), m_smartIndentationEnabled);

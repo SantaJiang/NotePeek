@@ -187,10 +187,12 @@ void MarginView::PaintMargin(Surface *surface, Sci::Line topLine, PRectangle rc,
 
 	const Point ptOrigin = model.GetVisibleOriginInMain();
 	FontAlias fontLineNumber = vs.styles[STYLE_LINENUMBER].font;
-	Style activeLineNumberStyle(vs.styles[STYLE_LINENUMBER]);
 	// Reuse the theme's accent colour so only the active line number stands
 	// out; the remaining line numbers keep their normal muted foreground.
-	activeLineNumberStyle.fore = vs.styles[STYLE_BRACELIGHT].fore;
+	// Applied as a colour override rather than through a recoloured copy of
+	// the style: copying a Style drops its font (FontAlias is non-assignable),
+	// which would draw the active line number in a fallback font.
+	const ColourDesired activeLineNumberFore = vs.styles[STYLE_BRACELIGHT].fore;
 	const Sci::Line caretLine = model.pdoc->SciLineFromPosition(model.sel.MainCaret());
 	const bool highlightCaretLineNumber = vs.showCaretLineBackground &&
 		(model.caret.active || vs.alwaysShowCaretLineBackground);
@@ -403,10 +405,10 @@ void MarginView::PaintMargin(Surface *surface, Sci::Line topLine, PRectangle rc,
 						const XYPOSITION width = surface->WidthText(fontLineNumber, sNumber.c_str(), static_cast<int>(sNumber.length()));
 						const XYPOSITION xpos = rcNumber.left + (rcNumber.Width() - width) / 2;
 						rcNumber.left = xpos;
-						const Style &lineNumberStyle = highlightCaretLineNumber && lineDoc == caretLine ?
-							activeLineNumberStyle : vs.styles[STYLE_LINENUMBER];
-						DrawTextNoClipPhase(surface, rcNumber, lineNumberStyle,
-							rcNumber.top + vs.maxAscent, sNumber.c_str(), static_cast<int>(sNumber.length()), drawAll);
+						const bool activeLineNumber = highlightCaretLineNumber && lineDoc == caretLine;
+						DrawTextNoClipPhase(surface, rcNumber, vs.styles[STYLE_LINENUMBER],
+							rcNumber.top + vs.maxAscent, sNumber.c_str(), static_cast<int>(sNumber.length()), drawAll,
+							activeLineNumber ? activeLineNumberFore : vs.styles[STYLE_LINENUMBER].fore);
 					} else if (vs.wrapVisualFlags & SC_WRAPVISUALFLAG_MARGIN) {
 						PRectangle rcWrapMarker = rcMarker;
 						rcWrapMarker.right -= wrapMarkerPaddingRight;

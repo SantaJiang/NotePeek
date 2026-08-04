@@ -37,6 +37,11 @@ bool ValidStyledText(const ViewStyle &vs, size_t styleOffset, const StyledText &
 int WidestLineWidth(Surface *surface, const ViewStyle &vs, int styleOffset, const StyledText &st);
 void DrawTextNoClipPhase(Surface *surface, PRectangle rc, const Style &style, XYPOSITION ybase,
 	const char *s, int len, DrawPhase phase);
+// Draws with an overridden foreground colour while keeping the style's font.
+// Callers must not copy a Style just to recolour it: Style's copy constructor
+// deliberately leaves the font empty because FontAlias is non-assignable.
+void DrawTextNoClipPhase(Surface *surface, PRectangle rc, const Style &style, XYPOSITION ybase,
+	const char *s, int len, DrawPhase phase, ColourDesired fore);
 void DrawStyledText(Surface *surface, const ViewStyle &vs, int styleOffset, PRectangle rcText,
 	const StyledText &st, size_t start, size_t length, DrawPhase phase);
 

@@ -55,10 +55,6 @@ private slots:
     void on_action_paste_triggered();
     void on_action_find_triggered();
     void on_action_findInFiles_triggered();
-    void on_action_foldCurrentBlock_triggered();
-    void on_action_toggleAllFolds_triggered();
-    void on_action_goToMatchingBrace_triggered();
-    void on_action_completeWord_triggered();
     void on_action_formatCode_triggered();
     void on_action_switchHeaderSource_triggered();
     void on_action_markdownPreview_triggered();

@@ -92,15 +92,7 @@
     <property name="title">
      <string>View</string>
     </property>
-    <widget class="QMenu" name="menuCodeFolding">
-     <property name="title">
-      <string>Code Folding</string>
-     </property>
-     <addaction name="action_foldCurrentBlock"/>
-     <addaction name="action_toggleAllFolds"/>
-    </widget>
     <addaction name="action_showSlideBar"/>
-    <addaction name="menuCodeFolding"/>
    </widget>
    <widget class="QMenu" name="menuEdit">
     <property name="title">
@@ -115,9 +107,6 @@
     <addaction name="separator"/>
     <addaction name="action_find"/>
     <addaction name="action_findInFiles"/>
-    <addaction name="separator"/>
-    <addaction name="action_goToMatchingBrace"/>
-    <addaction name="action_completeWord"/>
    </widget>
    <widget class="QMenu" name="menuTool">
     <property name="title">
@@ -147,14 +136,9 @@
    <addaction name="menuTool"/>
    <addaction name="menuHelp"/>
   </widget>
-  <widget class="QsciEditorInfoStatusBar" name="statusbar">
-   <property name="autoFillBackground">
-    <bool>false</bool>
-   </property>
-   <property name="styleSheet">
-    <string notr="true"/>
-   </property>
-  </widget>
+  <!-- No styleSheet property here: uic would apply it after the constructor
+       ran and wipe the chrome theme (background and the 1px top divider). -->
+  <widget class="QsciEditorInfoStatusBar" name="statusbar"/>
   <action name="action_openFile">
    <property name="text">
     <string>Open File</string>
@@ -275,39 +259,10 @@
   </action>
   <action name="action_findInFiles">
    <property name="text">
-    <string>Find in Files...</string>
+    <string>Advanced Find...</string>
    </property>
    <property name="shortcut">
     <string>Ctrl+Shift+F</string>
-   </property>
-  </action>
-  <action name="action_foldCurrentBlock">
-   <property name="text">
-    <string>Fold/Unfold Current Block</string>
-   </property>
-   <property name="shortcut">
-    <string>Ctrl+Shift+[</string>
-   </property>
-  </action>
-  <action name="action_toggleAllFolds">
-   <property name="text">
-    <string>Fold/Unfold All</string>
-   </property>
-  </action>
-  <action name="action_goToMatchingBrace">
-   <property name="text">
-    <string>Go to Matching Bracket</string>
-   </property>
-   <property name="shortcut">
-    <string>Ctrl+Shift+\</string>
-   </property>
-  </action>
-  <action name="action_completeWord">
-   <property name="text">
-    <string>Complete Word</string>
-   </property>
-   <property name="shortcut">
-    <string>Ctrl+Space</string>
    </property>
   </action>
   <action name="action_formatCode">

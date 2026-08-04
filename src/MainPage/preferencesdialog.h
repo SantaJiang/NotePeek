@@ -35,6 +35,7 @@ private:
     QCheckBox *m_showFileTree;
     QCheckBox *m_markdownSidePreview;
     QComboBox *m_untitledModeCombo;
+    QCheckBox *m_overtypeMode;
     QCheckBox *m_codeFolding;
     QCheckBox *m_bracketAssistance;
     QCheckBox *m_smartIndentation;

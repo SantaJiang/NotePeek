@@ -36,6 +36,15 @@ distributed under GNU GPL version 3.0 when they form part of QScintilla.
 
 - Centred line numbers in number margins used by NotePeek.
 - Prevented word wrapping from splitting Markdown list-marker prefixes.
+- Drew the caret line's number in the accent colour, following the caret line
+  background.  `MarginView::PaintMargin` passes a foreground override to a new
+  `DrawTextNoClipPhase` overload rather than recolouring a copied `Style`,
+  because `Style`'s copy constructor deliberately leaves the font empty
+  (`FontAlias` is non-assignable) and a copy would draw in a fallback font.
+  `Editor::RedrawMarginForCaretLineChange` repaints the whole margin on a caret
+  line change; it is called from the selection setters and again at the end of
+  `Editor::MovedCaret`, after scrolling, because a per-line invalidation
+  computed before the scroll can land outside the viewport and repaint nothing.
 
 These rendering changes predate the formal fork interface.  They will be
 converted into opt-in public configuration while the NotePeek editor API is

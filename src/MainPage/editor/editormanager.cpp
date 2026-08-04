@@ -555,6 +555,9 @@ void EditorManager::setupEditor(CustomEditor *editor)
     // Set UTF-8 encoding
     editor->setUtf8(true);
 
+    // Start in the typing mode chosen in Preferences ▸ General ▸ Typing.
+    editor->setOverwriteMode(AppPreferences::instance().overwriteMode());
+
     // No file path yet: seed with the code font.  updateEditorSyntax() applies
     // the correct text/code font once the path (and therefore the lexer) is known.
     const QFont initialFont = fontForPath(QString());
@@ -766,6 +769,7 @@ void EditorManager::applyCodeFeaturePreferences()
             continue;
 
         CustomEditor *editor = editorPtr;
+        editor->setOverwriteMode(AppPreferences::instance().overwriteMode());
         if (!AppPreferences::instance().codeFoldingEnabled()
             && editor->folding() != CustomEditor::NoFoldStyle)
         {
