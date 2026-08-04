@@ -19,6 +19,7 @@ jobs:
             cpack-generator: DragNDrop
             artifact-name: notepeek-macos-arm64
             package-suffix: Darwin-arm64
+            performance-open-budget-ms: 24000
           - os: macos-15-intel
             cpack-generator: DragNDrop
             artifact-name: notepeek-macos-x86_64
