@@ -44,6 +44,12 @@ public:
     bool markdownDefaultPreview() const { return m_markdownDefaultPreview; }
     void setMarkdownDefaultPreview(bool preview) { m_markdownDefaultPreview = preview; }
 
+    // Presentation used by the "untitled" document that has no file path yet.
+    // Text mode wraps long lines and hides the line-number margin (the plain
+    // text default); code mode keeps line numbers and horizontal scrolling.
+    bool untitledUsesCodeMode() const { return m_untitledUsesCodeMode; }
+    void setUntitledUsesCodeMode(bool useCodeMode) { m_untitledUsesCodeMode = useCodeMode; }
+
     bool codeFoldingEnabled() const { return m_codeFoldingEnabled; }
     void setCodeFoldingEnabled(bool enabled) { m_codeFoldingEnabled = enabled; }
     bool bracketAssistanceEnabled() const { return m_bracketAssistanceEnabled; }
@@ -79,6 +85,7 @@ private:
     QString m_syntaxThemeId;
     bool m_showFileTreeOnStartup;
     bool m_markdownDefaultPreview;
+    bool m_untitledUsesCodeMode;
     bool m_codeFoldingEnabled;
     bool m_bracketAssistanceEnabled;
     bool m_smartIndentationEnabled;

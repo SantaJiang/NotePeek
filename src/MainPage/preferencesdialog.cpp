@@ -230,6 +230,7 @@ PreferencesDialog::PreferencesDialog(QWidget *parent)
     , m_syntaxThemeCombo(new QComboBox(this))
     , m_showFileTree(new QCheckBox(tr("Show file tree on startup"), this))
     , m_markdownSidePreview(new QCheckBox(tr("Open with side preview"), this))
+    , m_untitledModeCombo(new QComboBox(this))
     , m_codeFolding(new QCheckBox(tr("Show folding controls"), this))
     , m_bracketAssistance(new QCheckBox(tr("Match and auto-close brackets"), this))
     , m_smartIndentation(new QCheckBox(tr("Indent guides and smart Tab/Backspace"), this))
@@ -272,10 +273,17 @@ PreferencesDialog::PreferencesDialog(QWidget *parent)
     m_languageCombo->addItem(QStringLiteral("简体中文"), QStringLiteral("zh_CN"));
     m_languageCombo->setToolTip(tr("Takes effect the next time NotePeek starts."));
 
+    // Presentation of the "untitled" document, which has no file extension to
+    // infer a mode from.
+    m_untitledModeCombo->addItem(tr("Text (wrap lines, no line numbers)"), false);
+    m_untitledModeCombo->addItem(tr("Code (line numbers, no wrapping)"), true);
+    m_untitledModeCombo->setToolTip(tr("Applies to untitled documents that have not been saved yet."));
+
     auto *generalSection = makeSection(tr("General"), this);
     auto *generalLayout = qobject_cast<QVBoxLayout *>(generalSection->layout());
     generalLayout->addLayout(makeSettingsRow(tr("Language"), m_languageCombo, generalSection));
     generalLayout->addLayout(makeSettingsRow(tr("Startup"), m_showFileTree, generalSection));
+    generalLayout->addLayout(makeSettingsRow(tr("New document"), m_untitledModeCombo, generalSection));
     generalLayout->addLayout(makeSettingsRow(tr("Markdown"), m_markdownSidePreview, generalSection));
 
     auto *codeSection = makeSection(tr("Code Editing"), this);
@@ -329,6 +337,8 @@ void PreferencesDialog::loadFromPreferences()
     m_syntaxThemeCombo->setCurrentIndex(themeIndex >= 0 ? themeIndex : 0);
     m_showFileTree->setChecked(prefs.showFileTreeOnStartup());
     m_markdownSidePreview->setChecked(prefs.markdownDefaultPreview());
+    const int untitledModeIndex = m_untitledModeCombo->findData(prefs.untitledUsesCodeMode());
+    m_untitledModeCombo->setCurrentIndex(untitledModeIndex >= 0 ? untitledModeIndex : 0);
     m_codeFolding->setChecked(prefs.codeFoldingEnabled());
     m_bracketAssistance->setChecked(prefs.bracketAssistanceEnabled());
     m_smartIndentation->setChecked(prefs.smartIndentationEnabled());
@@ -348,6 +358,7 @@ void PreferencesDialog::commit()
     prefs.setSyntaxThemeId(m_syntaxThemeCombo->currentData().toString());
     prefs.setShowFileTreeOnStartup(m_showFileTree->isChecked());
     prefs.setMarkdownDefaultPreview(m_markdownSidePreview->isChecked());
+    prefs.setUntitledUsesCodeMode(m_untitledModeCombo->currentData().toBool());
     prefs.setCodeFoldingEnabled(m_codeFolding->isChecked());
     prefs.setBracketAssistanceEnabled(m_bracketAssistance->isChecked());
     prefs.setSmartIndentationEnabled(m_smartIndentation->isChecked());

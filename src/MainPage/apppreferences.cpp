@@ -81,6 +81,7 @@ AppPreferences::AppPreferences()
     , m_syntaxThemeId(QStringLiteral("auto"))
     , m_showFileTreeOnStartup(false)
     , m_markdownDefaultPreview(false)
+    , m_untitledUsesCodeMode(false)
     , m_codeFoldingEnabled(false)
     , m_bracketAssistanceEnabled(false)
     , m_smartIndentationEnabled(true)
@@ -148,6 +149,11 @@ void AppPreferences::load()
         settings.value(QStringLiteral("showFileTreeOnStartup"), false).toBool();
     m_markdownDefaultPreview =
         settings.value(QStringLiteral("markdownDefaultPreview"), false).toBool();
+    // Stored as a readable mode name; anything other than "code" (including a
+    // missing value) keeps the plain-text default.
+    m_untitledUsesCodeMode =
+        settings.value(QStringLiteral("untitledDocumentMode"), QStringLiteral("text")).toString()
+        == QLatin1String("code");
     m_codeFoldingEnabled =
         settings.value(QStringLiteral("codeFoldingEnabled"), false).toBool();
     m_bracketAssistanceEnabled =
@@ -175,6 +181,8 @@ void AppPreferences::save() const
     settings.setValue(QStringLiteral("syntaxTheme"), m_syntaxThemeId);
     settings.setValue(QStringLiteral("showFileTreeOnStartup"), m_showFileTreeOnStartup);
     settings.setValue(QStringLiteral("markdownDefaultPreview"), m_markdownDefaultPreview);
+    settings.setValue(QStringLiteral("untitledDocumentMode"),
+                      m_untitledUsesCodeMode ? QStringLiteral("code") : QStringLiteral("text"));
     settings.setValue(QStringLiteral("codeFoldingEnabled"), m_codeFoldingEnabled);
     settings.setValue(QStringLiteral("bracketAssistanceEnabled"), m_bracketAssistanceEnabled);
     settings.setValue(QStringLiteral("smartIndentationEnabled"), m_smartIndentationEnabled);
