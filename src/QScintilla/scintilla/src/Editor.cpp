@@ -655,6 +655,7 @@ SelectionRange Editor::LineSelectionRange(SelectionPosition currentPos_, Selecti
 void Editor::SetSelection(SelectionPosition currentPos_, SelectionPosition anchor_) {
 	currentPos_ = ClampPositionIntoDocument(currentPos_);
 	anchor_ = ClampPositionIntoDocument(anchor_);
+	const Sci::Line previousLine = pdoc->SciLineFromPosition(sel.MainCaret());
 	const Sci::Line currentLine = pdoc->SciLineFromPosition(currentPos_.Position());
 	SelectionRange rangeNew(currentPos_, anchor_);
 	if (sel.selType == Selection::selLines) {
@@ -670,6 +671,9 @@ void Editor::SetSelection(SelectionPosition currentPos_, SelectionPosition ancho
 
 	if (marginView.highlightDelimiter.NeedsDrawing(currentLine)) {
 		RedrawSelMargin();
+	} else if (vs.showCaretLineBackground && previousLine != currentLine) {
+		RedrawSelMargin(previousLine);
+		RedrawSelMargin(currentLine);
 	}
 	QueueIdleWork(WorkNeeded::workUpdateUI);
 }
@@ -681,6 +685,7 @@ void Editor::SetSelection(Sci::Position currentPos_, Sci::Position anchor_) {
 // Just move the caret on the main selection
 void Editor::SetSelection(SelectionPosition currentPos_) {
 	currentPos_ = ClampPositionIntoDocument(currentPos_);
+	const Sci::Line previousLine = pdoc->SciLineFromPosition(sel.MainCaret());
 	const Sci::Line currentLine = pdoc->SciLineFromPosition(currentPos_.Position());
 	if (sel.Count() > 1 || !(sel.RangeMain().caret == currentPos_)) {
 		InvalidateSelection(SelectionRange(currentPos_));
@@ -700,6 +705,9 @@ void Editor::SetSelection(SelectionPosition currentPos_) {
 
 	if (marginView.highlightDelimiter.NeedsDrawing(currentLine)) {
 		RedrawSelMargin();
+	} else if (vs.showCaretLineBackground && previousLine != currentLine) {
+		RedrawSelMargin(previousLine);
+		RedrawSelMargin(currentLine);
 	}
 	QueueIdleWork(WorkNeeded::workUpdateUI);
 }
@@ -709,6 +717,7 @@ void Editor::SetSelection(int currentPos_) {
 }
 
 void Editor::SetEmptySelection(SelectionPosition currentPos_) {
+	const Sci::Line previousLine = pdoc->SciLineFromPosition(sel.MainCaret());
 	const Sci::Line currentLine = pdoc->SciLineFromPosition(currentPos_.Position());
 	SelectionRange rangeNew(ClampPositionIntoDocument(currentPos_));
 	if (sel.Count() > 1 || !(sel.RangeMain() == rangeNew)) {
@@ -722,6 +731,9 @@ void Editor::SetEmptySelection(SelectionPosition currentPos_) {
 
 	if (marginView.highlightDelimiter.NeedsDrawing(currentLine)) {
 		RedrawSelMargin();
+	} else if (vs.showCaretLineBackground && previousLine != currentLine) {
+		RedrawSelMargin(previousLine);
+		RedrawSelMargin(currentLine);
 	}
 	QueueIdleWork(WorkNeeded::workUpdateUI);
 }
