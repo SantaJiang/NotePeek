@@ -187,6 +187,13 @@ void MarginView::PaintMargin(Surface *surface, Sci::Line topLine, PRectangle rc,
 
 	const Point ptOrigin = model.GetVisibleOriginInMain();
 	FontAlias fontLineNumber = vs.styles[STYLE_LINENUMBER].font;
+	Style activeLineNumberStyle(vs.styles[STYLE_LINENUMBER]);
+	// Reuse the theme's accent colour so only the active line number stands
+	// out; the remaining line numbers keep their normal muted foreground.
+	activeLineNumberStyle.fore = vs.styles[STYLE_BRACELIGHT].fore;
+	const Sci::Line caretLine = model.pdoc->SciLineFromPosition(model.sel.MainCaret());
+	const bool highlightCaretLineNumber = vs.showCaretLineBackground &&
+		(model.caret.active || vs.alwaysShowCaretLineBackground);
 	for (size_t margin = 0; margin < vs.ms.size(); margin++) {
 		if (vs.ms[margin].width > 0) {
 
@@ -396,7 +403,9 @@ void MarginView::PaintMargin(Surface *surface, Sci::Line topLine, PRectangle rc,
 						const XYPOSITION width = surface->WidthText(fontLineNumber, sNumber.c_str(), static_cast<int>(sNumber.length()));
 						const XYPOSITION xpos = rcNumber.left + (rcNumber.Width() - width) / 2;
 						rcNumber.left = xpos;
-						DrawTextNoClipPhase(surface, rcNumber, vs.styles[STYLE_LINENUMBER],
+						const Style &lineNumberStyle = highlightCaretLineNumber && lineDoc == caretLine ?
+							activeLineNumberStyle : vs.styles[STYLE_LINENUMBER];
+						DrawTextNoClipPhase(surface, rcNumber, lineNumberStyle,
 							rcNumber.top + vs.maxAscent, sNumber.c_str(), static_cast<int>(sNumber.length()), drawAll);
 					} else if (vs.wrapVisualFlags & SC_WRAPVISUALFLAG_MARGIN) {
 						PRectangle rcWrapMarker = rcMarker;
