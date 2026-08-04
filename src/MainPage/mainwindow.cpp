@@ -30,10 +30,25 @@
 #include "editor/editorpane.h"
 #include "editor/externalfilewatcher.h"
 #include "editor/spliteditorcoordinator.h"
+#include "tool/format/codeformatter.h"
 #include "widgets/fileexplorerdock.h"
 #include "widgets/searchresultsdock.h"
 
 namespace {
+
+QString eolText(QsciScintilla::EolMode mode)
+{
+    switch (mode)
+    {
+    case QsciScintilla::EolWindows:
+        return QStringLiteral("\r\n");
+    case QsciScintilla::EolMac:
+        return QStringLiteral("\r");
+    case QsciScintilla::EolUnix:
+        break;
+    }
+    return QStringLiteral("\n");
+}
 
 QString normalizedAbsolutePath(const QString &path)
 {
@@ -141,6 +156,9 @@ MainWindow::MainWindow(QWidget *parent,
 
     // Must exist before the first updateToolActions(), which enables/disables it.
     setupEncodingMenu();
+    // Lets the Format Code entry explain which formatter it would run, and why
+    // it is disabled when it is.
+    ui->menuTool->setToolTipsVisible(true);
 
     m_fileExplorerDock = new FileExplorerDock(this);
     addDockWidget(Qt::LeftDockWidgetArea, m_fileExplorerDock->dockWidget());
@@ -160,6 +178,10 @@ MainWindow::MainWindow(QWidget *parent,
     // controller reports the file as opened.
     for (DocumentController *controller : m_documentControllers)
     {
+        // Editors are read-only while their file loads, which gates the tool
+        // actions; they have to be re-evaluated once the load completes.
+        connect(controller, &DocumentController::fileOpened,
+                this, [this](CustomEditor *, const QString &) { updateToolActions(); });
         connect(controller, &DocumentController::fileOpened,
                 this, [this](CustomEditor *editor, const QString &filePath) {
                     if (!m_pendingSearchJump.active
@@ -743,6 +765,63 @@ void MainWindow::on_action_completeWord_triggered()
     }
 }
 
+void MainWindow::on_action_formatCode_triggered()
+{
+    DocumentController *controller = activeController();
+    CustomEditor *editor = controller->currentEditor();
+    if (!editor || controller->pane()->isCurrentEditorHidden() || editor->isReadOnly())
+        return;
+
+    const QString filePath = editor->filePath();
+    if (!CodeFormatter::canFormat(filePath))
+        return;
+
+    CodeFormatter::Options options;
+    // indentationWidth() is 0 when the editor follows the tab width.
+    options.indentWidth = editor->indentationWidth() > 0 ? editor->indentationWidth()
+                                                         : editor->tabWidth();
+    options.useTabs = editor->indentationsUseTabs();
+    options.eol = eolText(editor->eolMode());
+
+    const QString original = editor->text();
+    QApplication::setOverrideCursor(Qt::WaitCursor);
+    const CodeFormatter::Result result = CodeFormatter::format(original, filePath, options);
+    QApplication::restoreOverrideCursor();
+
+    if (!result.ok)
+    {
+        QMessageBox::warning(this,
+                             tr("Format Code"),
+                             tr("Could not format %1.\n\n%2")
+                                 .arg(QFileInfo(filePath).fileName(), result.error));
+        return;
+    }
+
+    // Replacing identical text would still push an undo step and mark the
+    // document modified, so an already-formatted file is left alone.
+    if (result.text == original)
+        return;
+
+    int line = 0;
+    int index = 0;
+    editor->getCursorPosition(&line, &index);
+    const int firstVisibleLine =
+        int(editor->SendScintilla(QsciScintillaBase::SCI_GETFIRSTVISIBLELINE));
+
+    // selectAll()/replaceSelectedText() rather than setText(): the latter
+    // empties the undo buffer, and formatting has to stay undoable in one step.
+    editor->beginUndoAction();
+    editor->selectAll();
+    editor->replaceSelectedText(result.text);
+    editor->endUndoAction();
+
+    const int lastLine = qMax(0, editor->lines() - 1);
+    const int targetLine = qBound(0, line, lastLine);
+    editor->setCursorPosition(targetLine, qBound(0, index, editor->lineLength(targetLine)));
+    editor->SendScintilla(QsciScintillaBase::SCI_SETFIRSTVISIBLELINE, firstVisibleLine);
+    editor->setFocus();
+}
+
 void MainWindow::on_action_switchHeaderSource_triggered()
 {
     DocumentController *controller = activeController();
@@ -912,6 +991,20 @@ void MainWindow::updateToolActions()
 
     const bool cppSupported = !filePath.isEmpty() && m_headerSourceManager->isCppFile(filePath);
     const bool markdownSupported = !filePath.isEmpty() && m_markdownPreviewer->isMarkdownFile(filePath);
+
+    // A formatter has to exist for the language *and* be usable: C-family files
+    // report false while clang-format is not installed, so the entry is never
+    // offered when clicking it could only produce an error.
+    // A file that is still loading is held read-only, and formatting it would
+    // silently do nothing, so availability follows the editor's writability.
+    const bool sourceEditable = editor != nullptr
+                                && !controller->pane()->isCurrentEditorHidden()
+                                && !editor->isReadOnly();
+    const bool formatSupported = sourceEditable && CodeFormatter::canFormat(filePath);
+    ui->action_formatCode->setEnabled(formatSupported);
+    ui->action_formatCode->setToolTip(
+        formatSupported ? tr("Format this file with %1").arg(CodeFormatter::formatterName(filePath))
+                        : tr("No code formatter is available for this file."));
 
     ui->action_switchHeaderSource->setEnabled(cppSupported && !previewVisible);
     ui->menuToolCpp->setEnabled(cppSupported && !previewVisible);

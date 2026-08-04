@@ -59,6 +59,7 @@ private slots:
     void on_action_toggleAllFolds_triggered();
     void on_action_goToMatchingBrace_triggered();
     void on_action_completeWord_triggered();
+    void on_action_formatCode_triggered();
     void on_action_switchHeaderSource_triggered();
     void on_action_markdownPreview_triggered();
     void on_action_markdownExportPdf_triggered();

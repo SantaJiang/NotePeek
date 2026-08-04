@@ -136,6 +136,8 @@
      <addaction name="action_markdownPreview"/>
      <addaction name="action_markdownExportPdf"/>
     </widget>
+    <addaction name="action_formatCode"/>
+    <addaction name="separator"/>
     <addaction name="menuToolCpp"/>
     <addaction name="menuToolMarkdown"/>
    </widget>
@@ -306,6 +308,14 @@
    </property>
    <property name="shortcut">
     <string>Ctrl+Space</string>
+   </property>
+  </action>
+  <action name="action_formatCode">
+   <property name="text">
+    <string>Format Code</string>
+   </property>
+   <property name="shortcut">
+    <string>Shift+Alt+F</string>
    </property>
   </action>
   <action name="action_switchHeaderSource">

@@ -30,6 +30,21 @@ set_tests_properties(notepeek_editorfeatures_test PROPERTIES
     ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
 )
 
+add_executable(notepeek_codeformatter_test
+    codeformatter_test.cpp
+)
+
+target_link_libraries(notepeek_codeformatter_test PRIVATE
+    notepeek_core
+    Qt${NOTEPEEK_QT_MAJOR}::Test
+)
+notepeek_configure_project_target(notepeek_codeformatter_test)
+
+add_test(NAME notepeek_codeformatter_test COMMAND notepeek_codeformatter_test)
+set_tests_properties(notepeek_codeformatter_test PROPERTIES
+    ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
+)
+
 add_executable(notepeek_performance_test
     performance_test.cpp
 )

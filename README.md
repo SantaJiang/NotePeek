@@ -17,6 +17,7 @@
 - **Find in Files** – Project‑wide search (`Ctrl+Shift+F`) with a grouped result list and jump‑to‑match
 - **Encoding control** – Auto‑detects UTF‑8/UTF‑16, and lets you reopen or convert with an explicit encoding
 - **C/C++ header‑source switching** – Quick jump between `.h` and `.cpp/.cxx` files
+- **Format code** (`Shift+Alt+F`) – Built‑in formatters for JSON, JSON Lines, XML, Markdown, and CSS; C/C++, Java, JavaScript, and C# are formatted with `clang-format` when it is installed
 - **File‑system browser** – Integrated directory tree (dock) for quick file opening
 
 ### 🎨 Markdown & Preview
@@ -121,6 +122,7 @@ NotePeek/
         ├── decorators/         # Scroll‑bar result markers
         ├── widgets/            # Status‑bar components
         ├── tool/cpp/           # C/C++ header‑source switching
+        ├── tool/format/        # Whole‑document code formatting
         ├── tool/markdown/      # Markdown previewer
         ├── resource/           # Icons (.icns, .svg)
         └── rec.qrc             # Qt resource file
