@@ -28,6 +28,8 @@ add_library(notepeek_core STATIC
     find/filesearcher.h
     tool/cpp/headersourcemanager.cpp
     tool/cpp/headersourcemanager.h
+    tool/format/codeformatter.cpp
+    tool/format/codeformatter.h
     tool/markdown/markdownpreviewer.cpp
     tool/markdown/markdownpreviewer.h
     themecolors.h
