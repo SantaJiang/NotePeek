@@ -72,11 +72,15 @@ FileExplorerDock::FileExplorerDock(QWidget *parent)
     m_treeView->setSelectionMode(QAbstractItemView::SingleSelection);
     m_treeView->setSortingEnabled(true);
     m_treeView->sortByColumn(0, Qt::AscendingOrder);
-    m_treeView->setTextElideMode(Qt::ElideMiddle);
+    m_treeView->setTextElideMode(Qt::ElideRight);
     m_treeView->setUniformRowHeights(true);
     m_treeView->setVerticalScrollMode(QAbstractItemView::ScrollPerPixel);
-    m_treeView->setColumnWidth(0, 250);
-    m_treeView->header()->setSectionResizeMode(0, QHeaderView::Interactive);
+    // Elision is measured against the column width, not the viewport, so the
+    // name column has to track the viewport for long names to end in "…"
+    // instead of being clipped at the dock edge.  The header is hidden, so the
+    // column can never be resized by hand and nothing is lost by stretching it.
+    m_treeView->header()->setSectionResizeMode(0, QHeaderView::Stretch);
+    m_treeView->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     m_treeView->setHeaderHidden(true);
     m_treeView->viewport()->setMouseTracking(true);
     m_treeView->hideColumn(1);

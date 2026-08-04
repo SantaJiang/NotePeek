@@ -10,6 +10,7 @@
 #include "decorators/highlightedscrollbardecorator.h"
 #include "find/findreplacemanager.h"
 #include "tool/markdown/markdownpreviewer.h"
+#include "widgets/elidingcombobox.h"
 #include "apppreferences.h"
 #include <NotePeek/semantictokens.h>
 
@@ -43,6 +44,32 @@ private slots:
         prefs.setSmartIndentationEnabled(true);
         prefs.setDocumentCompletionEnabled(false);
         prefs.setSemanticHighlightingEnabled(true);
+    }
+
+    void elidesLongCurrentFileName()
+    {
+        ElidingComboBox combo;
+        const QString longName =
+            QStringLiteral("develop-for-6.0-2503-sync-memory.md");
+        combo.addItem(longName);
+        combo.resize(230, 25);
+        combo.setStyleSheet(QStringLiteral(
+            "QComboBox { padding: 0 0 0 8px; }"
+            "QComboBox::drop-down { width: 22px; }"));
+
+        QStyleOptionComboBox option;
+        option.initFrom(&combo);
+        const QRect textRect = combo.style()->subControlRect(QStyle::CC_ComboBox,
+                                                              &option,
+                                                              QStyle::SC_ComboBoxEditField,
+                                                              &combo);
+        QVERIFY(textRect.width() > 190);
+
+        const QString displayedText = combo.elidedCurrentText();
+        QVERIFY(displayedText != longName);
+        QVERIFY(displayedText.endsWith(QChar(0x2026)));
+        QVERIFY(combo.fontMetrics().horizontalAdvance(displayedText)
+                < combo.fontMetrics().horizontalAdvance(longName));
     }
 
     void autoClosesAndSkipsBrackets()

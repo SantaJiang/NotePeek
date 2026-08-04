@@ -31,7 +31,12 @@
 #include "mainwindow.h"
 #include "preferencesdialog.h"
 #include "tool/cpp/headersourcemanager.h"
+#include "widgets/fileexplorerdock.h"
+#include "widgets/filetypefilterproxymodel.h"
 #include "widgets/searchresultsdock.h"
+#include <QFileSystemModel>
+#include <QHeaderView>
+#include <QTreeView>
 #include "widgets/qscieditorinfostatusbar.h"
 #include "find/findreplacewidget.h"
 
@@ -752,6 +757,103 @@ private slots:
         QCOMPARE(QFileInfo(manager.getCorrespondingFile(sourcePath)).fileName(),
                  QStringLiteral("widget.h"));
         QVERIFY(!manager.hasCorrespondingFile(dir.filePath(QStringLiteral("orphan.cpp"))));
+    }
+
+    // The Tools entry has to be offered only for files a formatter handles, and
+    // one click must be one undo step.
+    void formatCodeActionReformatsSupportedFilesOnly()
+    {
+        QTemporaryDir dir;
+        QVERIFY(dir.isValid());
+        const QString jsonPath = dir.filePath(QStringLiteral("data.json"));
+        const QByteArray original = QByteArrayLiteral("{\"b\":1,\"a\":[2,3]}\n");
+        writeFile(jsonPath, original);
+        const QString textPath = dir.filePath(QStringLiteral("notes.txt"));
+        writeFile(textPath, QByteArrayLiteral("plain text\n"));
+
+        MainWindow window(nullptr, { jsonPath });
+        window.show();
+
+        auto *action = window.findChild<QAction *>(QStringLiteral("action_formatCode"));
+        QVERIFY(action);
+        QTRY_VERIFY(action->isEnabled());
+
+        const auto editorFor = [&window](const QString &path) -> CustomEditor * {
+            for (CustomEditor *candidate : window.findChildren<CustomEditor *>())
+            {
+                if (QFileInfo(candidate->filePath()) == QFileInfo(path))
+                {
+                    return candidate;
+                }
+            }
+            return nullptr;
+        };
+
+        CustomEditor *editor = nullptr;
+        QTRY_VERIFY((editor = editorFor(jsonPath)) != nullptr);
+        QTRY_COMPARE(editor->text(), QString::fromUtf8(original));
+
+        action->trigger();
+        QTRY_VERIFY(editor->text().startsWith(QStringLiteral("{\n")));
+        QVERIFY(editor->text().contains(QStringLiteral("\"b\": 1")));
+        // Streaming the source keeps member order; a QJsonDocument round trip
+        // would have sorted "a" ahead of "b".
+        QVERIFY(editor->text().indexOf(QStringLiteral("\"b\"")) < editor->text().indexOf(QStringLiteral("\"a\"")));
+        // The whole-document replacement must not leave the document selected.
+        QVERIFY(!editor->hasSelectedText());
+
+        editor->undo();
+        QCOMPARE(editor->text(), QString::fromUtf8(original));
+
+        window.openFileByArg(textPath);
+        QTRY_VERIFY(editorFor(textPath) != nullptr);
+        QTRY_VERIFY(!action->isEnabled());
+    }
+
+    // A name column wider than the viewport is clipped by the viewport instead
+    // of being elided, so the column has to follow the dock's width.
+    void fileTreeNameColumnTracksTheViewport()
+    {
+        QMainWindow window;
+        FileExplorerDock dock(&window);
+        window.addDockWidget(Qt::LeftDockWidgetArea, dock.dockWidget());
+        window.resize(700, 400);
+        window.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&window));
+
+        auto *tree = qobject_cast<QTreeView *>(dock.dockWidget()->widget());
+        QVERIFY(tree);
+        QCOMPARE(tree->textElideMode(), Qt::ElideRight);
+        QCOMPARE(tree->horizontalScrollBarPolicy(), Qt::ScrollBarAlwaysOff);
+        QTRY_COMPARE(tree->header()->sectionSize(0), tree->viewport()->width());
+
+        dock.dockWidget()->resize(160, 400);
+        QTRY_COMPARE(tree->header()->sectionSize(0), tree->viewport()->width());
+    }
+
+    void fileTreeExposesTheFullNameAsTooltip()
+    {
+        QTemporaryDir dir;
+        QVERIFY(dir.isValid());
+        const QString longName =
+            QStringLiteral("a-very-long-note-name-that-cannot-fit-in-the-file-tree-dock.md");
+        writeFile(dir.filePath(longName), QByteArrayLiteral("# note\n"));
+
+        QFileSystemModel model;
+        model.setFilter(QDir::AllEntries | QDir::NoDotAndDotDot | QDir::AllDirs);
+        FileTypeFilterProxyModel proxy;
+        proxy.setSourceModel(&model);
+        model.setRootPath(dir.path());
+        proxy.setVisibleRootDirectory(dir.path());
+
+        const QString filePath = dir.filePath(longName);
+        QModelIndex proxyIndex;
+        QTRY_VERIFY([&]() {
+            const QModelIndex sourceIndex = model.index(filePath);
+            proxyIndex = sourceIndex.isValid() ? proxy.mapFromSource(sourceIndex) : QModelIndex();
+            return proxyIndex.isValid();
+        }());
+        QCOMPARE(proxy.data(proxyIndex, Qt::ToolTipRole).toString(), longName);
     }
 
     void highlightsAllMatchesInEditor()

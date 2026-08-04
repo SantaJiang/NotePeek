@@ -96,6 +96,13 @@ bool FileTypeFilterProxyModel::isDir(const QModelIndex &proxyIndex) const
 
 QVariant FileTypeFilterProxyModel::data(const QModelIndex &index, int role) const
 {
+    // Long names are elided in the tree, so the untruncated name has to stay
+    // reachable somewhere.  QFileSystemModel supplies no tooltip of its own.
+    if (index.isValid() && role == Qt::ToolTipRole)
+    {
+        return QSortFilterProxyModel::data(index, Qt::DisplayRole);
+    }
+
     if (index.isValid()
         && role == Qt::FontRole
         && !m_visibleRootDirectory.isEmpty()
