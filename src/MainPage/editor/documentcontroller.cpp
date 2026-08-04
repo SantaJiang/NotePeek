@@ -1248,6 +1248,23 @@ bool DocumentController::convertEncodingAndSave(DocumentEncoding encoding)
     {
         return true;
     }
+
+    // The legacy code pages cover only part of Unicode; anything outside would
+    // be written as a substitute character and lost on the next read.
+    if (!DocumentFormatCodec::canRepresent(editor->text(), encoding))
+    {
+        const auto answer = QMessageBox::question(
+            m_pane, tr("Convert Encoding"),
+            tr("Some characters in this document cannot be represented in %1 "
+               "and will be replaced. Continue?")
+                .arg(DocumentFormatCodec::encodingName(encoding)),
+            QMessageBox::Yes | QMessageBox::Cancel, QMessageBox::Cancel);
+        if (answer != QMessageBox::Yes)
+        {
+            return false;
+        }
+    }
+
     editor->beginEncodingConversion(encoding);
 
     QString filePath = editor->filePath();

@@ -299,6 +299,7 @@ protected:	// ScintillaBase subclass needs access to much of Editor
 	virtual void DiscardOverdraw();
 	virtual void Redraw();
 	void RedrawSelMargin(Sci::Line line=-1, bool allAfter=false);
+	void RedrawMarginForCaretLineChange(Sci::Line previousLine, Sci::Line currentLine);
 	PRectangle RectangleFromRange(Range r, int overlap);
 	void InvalidateRange(Sci::Position start, Sci::Position end);
 

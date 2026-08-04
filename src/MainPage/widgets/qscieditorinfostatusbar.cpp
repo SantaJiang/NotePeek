@@ -18,48 +18,40 @@
 
 #include "widgets/qscieditorinfostatusbar.h"
 #include "editor/customeditor.h"
+#include "editor/documentformat.h"
 #include "themecolors.h"
 #include <QMainWindow>
-#include <QFrame>
 #include <QTimer>
 #include <Qsci/qsciscintilla.h>
 #include <Qsci/qsciscintillabase.h>
 #include <Qsci/qscilexer.h>
+
+namespace {
+
+// Kept equal on both ends so the row is not visually heavier on one side.
+constexpr int kEdgePadding = 12;
+
+} // namespace
 
 QsciEditorInfoStatusBar::QsciEditorInfoStatusBar(QMainWindow *window)
     : QStatusBar(window), currentEditor(nullptr)
 {
     setAttribute(Qt::WA_StyledBackground, true);
 
-    auto createSeparator = [this]() -> QFrame* {
-        auto *sep = new QFrame(this);
-        sep->setObjectName(QStringLiteral("statusBarSeparator"));
-        sep->setFixedWidth(1);
-        sep->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Expanding);
-        sep->setAttribute(Qt::WA_StyledBackground, true);
-        return sep;
-    };
-
     auto *leftPadding = new QWidget(this);
-    leftPadding->setFixedWidth(12);
+    leftPadding->setFixedWidth(kEdgePadding);
     addWidget(leftPadding, 0);
 
     docType = new StatusLabel(120);
     addWidget(docType, 1);
 
-    addPermanentWidget(createSeparator(), 0);
-
     docPos = new StatusLabel(270);
     docPos->setContentsMargins(6, 0, 6, 0);
     addPermanentWidget(docPos, 0);
 
-    addPermanentWidget(createSeparator(), 0);
-
     docSize = new StatusLabel(215);
     docSize->setContentsMargins(6, 0, 6, 0);
     addPermanentWidget(docSize, 0);
-
-    addPermanentWidget(createSeparator(), 0);
 
     eolFormat = new StatusLabel(165);
     eolFormat->setContentsMargins(6, 0, 6, 0);
@@ -70,20 +62,16 @@ QsciEditorInfoStatusBar::QsciEditorInfoStatusBar(QMainWindow *window)
         emit customContextMenuRequestedForEOLLabel(eolFormat->mapToGlobal(pos));
     });
 
-    addPermanentWidget(createSeparator(), 0);
-
-    unicodeType = new StatusLabel(60);
+    // Wide enough for the longest label offered ("ISO-8859-1").
+    unicodeType = new StatusLabel(90);
     unicodeType->setContentsMargins(6, 0, 6, 0);
     addPermanentWidget(unicodeType, 0);
 
-    addPermanentWidget(createSeparator(), 0);
-
-    overType = new StatusLabel(45);
-    overType->setContentsMargins(6, 0, 6, 0);
-    addPermanentWidget(overType, 0);
-    overType->setAlignment(Qt::AlignCenter);
-
-    connect(qobject_cast<StatusLabel*>(overType), &StatusLabel::clicked, this, &QsciEditorInfoStatusBar::toggleOvertypeMode);
+    // Balances leftPadding: the labels' own 6px margin alone would leave the
+    // last entry looking pinned to the window edge.
+    auto *rightPadding = new QWidget(this);
+    rightPadding->setFixedWidth(kEdgePadding - 6);
+    addPermanentWidget(rightPadding, 0);
 
     applyChromeTheme();
 }
@@ -97,7 +85,6 @@ void QsciEditorInfoStatusBar::refresh(QsciScintilla *editor)
     updateLanguage(editor);
     updateEol(editor);
     updateEncoding(editor);
-    updateOverType(editor);
 }
 
 void QsciEditorInfoStatusBar::connectToEditor(QsciScintilla *editor)
@@ -146,15 +133,6 @@ void QsciEditorInfoStatusBar::editorModificationChanged(bool modified)
     // No specific action needed for modification change in status bar
 }
 
-void QsciEditorInfoStatusBar::toggleOvertypeMode()
-{
-    if (currentEditor)
-    {
-        currentEditor->setOverwriteMode(!currentEditor->overwriteMode());
-        updateOverType(currentEditor);
-    }
-}
-
 void QsciEditorInfoStatusBar::applyChromeTheme()
 {
     using namespace ThemeColors::EditorTopBar;
@@ -165,10 +143,6 @@ void QsciEditorInfoStatusBar::applyChromeTheme()
         "  border-top: 1px solid %2;"
         "}"
         "QStatusBar::item { border: none; }"
-        "QFrame#statusBarSeparator {"
-        "  background-color: %2;"
-        "  border: none;"
-        "}"
     ).arg(background().name(QColor::HexRgb),
           border().name(QColor::HexRgb));
 
@@ -277,36 +251,11 @@ void QsciEditorInfoStatusBar::updateEncoding(QsciScintilla *editor)
 {
     if (const auto *customEditor = qobject_cast<const CustomEditor *>(editor))
     {
-        switch (customEditor->documentFormat().encoding)
-        {
-        case DocumentEncoding::Utf8:
-            unicodeType->setText(tr("UTF-8"));
-            break;
-        case DocumentEncoding::Utf8Bom:
-            unicodeType->setText(tr("UTF-8 BOM"));
-            break;
-        case DocumentEncoding::Utf16LittleEndian:
-            unicodeType->setText(tr("UTF-16 LE"));
-            break;
-        case DocumentEncoding::Utf16BigEndian:
-            unicodeType->setText(tr("UTF-16 BE"));
-            break;
-        }
+        unicodeType->setText(
+            DocumentFormatCodec::encodingName(customEditor->documentFormat().encoding));
     }
     else
     {
         unicodeType->setText(editor->isUtf8() ? tr("UTF-8") : tr("Unknown"));
-    }
-}
-
-void QsciEditorInfoStatusBar::updateOverType(QsciScintilla *editor)
-{
-    if (editor->overwriteMode())
-    {
-        overType->setText(tr("OVR"));
-    }
-    else
-    {
-        overType->setText(tr("INS"));
     }
 }

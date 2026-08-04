@@ -163,19 +163,24 @@ int WidestLineWidth(Surface *surface, const ViewStyle &vs, int styleOffset, cons
 }
 
 void DrawTextNoClipPhase(Surface *surface, PRectangle rc, const Style &style, XYPOSITION ybase,
-	const char *s, int len, DrawPhase phase) {
+	const char *s, int len, DrawPhase phase, ColourDesired fore) {
 	FontAlias fontText = style.font;
 	if (phase & drawBack) {
 		if (phase & drawText) {
 			// Drawing both
 			surface->DrawTextNoClip(rc, fontText, ybase, s, len,
-				style.fore, style.back);
+				fore, style.back);
 		} else {
 			surface->FillRectangle(rc, style.back);
 		}
 	} else if (phase & drawText) {
-		surface->DrawTextTransparent(rc, fontText, ybase, s, len, style.fore);
+		surface->DrawTextTransparent(rc, fontText, ybase, s, len, fore);
 	}
+}
+
+void DrawTextNoClipPhase(Surface *surface, PRectangle rc, const Style &style, XYPOSITION ybase,
+	const char *s, int len, DrawPhase phase) {
+	DrawTextNoClipPhase(surface, rc, style, ybase, s, len, phase, style.fore);
 }
 
 void DrawStyledText(Surface *surface, const ViewStyle &vs, int styleOffset, PRectangle rcText,

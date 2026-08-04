@@ -491,6 +491,21 @@ void Editor::Redraw() {
 	//wMain.InvalidateAll();
 }
 
+// Repaints the number margin when the caret moves to a different line, so the
+// active line number's highlight follows the caret line background.
+//
+// The whole margin is repainted rather than just the two lines involved:
+// RedrawSelMargin(line) maps a line to a screen rectangle using the *current*
+// scroll position, and callers run before MovedCaret() has scrolled the new
+// caret line into view, so a per-line rectangle would fall outside the
+// viewport and invalidate nothing. The margin is narrow and this only runs
+// when the caret actually changes line.
+void Editor::RedrawMarginForCaretLineChange(Sci::Line previousLine, Sci::Line currentLine) {
+	if (vs.showCaretLineBackground && previousLine != currentLine) {
+		RedrawSelMargin();
+	}
+}
+
 void Editor::RedrawSelMargin(Sci::Line line, bool allAfter) {
 	const bool markersInText = vs.maskInLine || vs.maskDrawInText;
 	if (!wMargin.GetID() || markersInText) {	// May affect text area so may need to abandon and retry
@@ -671,9 +686,8 @@ void Editor::SetSelection(SelectionPosition currentPos_, SelectionPosition ancho
 
 	if (marginView.highlightDelimiter.NeedsDrawing(currentLine)) {
 		RedrawSelMargin();
-	} else if (vs.showCaretLineBackground && previousLine != currentLine) {
-		RedrawSelMargin(previousLine);
-		RedrawSelMargin(currentLine);
+	} else {
+		RedrawMarginForCaretLineChange(previousLine, currentLine);
 	}
 	QueueIdleWork(WorkNeeded::workUpdateUI);
 }
@@ -705,9 +719,8 @@ void Editor::SetSelection(SelectionPosition currentPos_) {
 
 	if (marginView.highlightDelimiter.NeedsDrawing(currentLine)) {
 		RedrawSelMargin();
-	} else if (vs.showCaretLineBackground && previousLine != currentLine) {
-		RedrawSelMargin(previousLine);
-		RedrawSelMargin(currentLine);
+	} else {
+		RedrawMarginForCaretLineChange(previousLine, currentLine);
 	}
 	QueueIdleWork(WorkNeeded::workUpdateUI);
 }
@@ -731,9 +744,8 @@ void Editor::SetEmptySelection(SelectionPosition currentPos_) {
 
 	if (marginView.highlightDelimiter.NeedsDrawing(currentLine)) {
 		RedrawSelMargin();
-	} else if (vs.showCaretLineBackground && previousLine != currentLine) {
-		RedrawSelMargin(previousLine);
-		RedrawSelMargin(currentLine);
+	} else {
+		RedrawMarginForCaretLineChange(previousLine, currentLine);
 	}
 	QueueIdleWork(WorkNeeded::workUpdateUI);
 }
@@ -878,6 +890,11 @@ void Editor::MovedCaret(SelectionPosition newPos, SelectionPosition previousPos,
 
 	if (marginView.highlightDelimiter.NeedsDrawing(currentLine)) {
 		RedrawSelMargin();
+	} else if (previousPos.IsValid()) {
+		// Repeated after the scrolling above: SetSelection() already asked for
+		// this, but at that point the new caret line could still be off-screen.
+		RedrawMarginForCaretLineChange(
+			pdoc->SciLineFromPosition(previousPos.Position()), currentLine);
 	}
 }
 

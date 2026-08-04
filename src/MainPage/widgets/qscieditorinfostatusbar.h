@@ -87,7 +87,6 @@ private slots:
     void editorCursorPositionChanged(int line, int index);
     void editorTextChanged();
     void editorModificationChanged(bool modified);
-    void toggleOvertypeMode();
 
 private:
     void updateDocumentSize(QsciScintilla *editor);
@@ -95,7 +94,6 @@ private:
     void updateLanguage(QsciScintilla *editor);
     void updateEol(QsciScintilla *editor);
     void updateEncoding(QsciScintilla *editor);
-    void updateOverType(QsciScintilla *editor);
     void applyChromeTheme();
 
     QLabel *docType;
@@ -103,7 +101,6 @@ private:
     QLabel *docPos;
     QLabel *eolFormat;
     QLabel *unicodeType;
-    QLabel *overType;
 
     QsciScintilla *currentEditor;
 };

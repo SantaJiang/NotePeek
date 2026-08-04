@@ -72,6 +72,20 @@ else()
     endif()
 endif()
 
+# QTextCodec backs the legacy (non-Unicode) document encodings. Qt 5 ships it
+# in QtCore; Qt 6 moved it to the optional Core5Compat module. Without it the
+# UTF encodings still work and the legacy ones are simply not offered.
+set(NOTEPEEK_HAVE_QT5COMPAT OFF)
+if(NOTEPEEK_QT_MAJOR EQUAL 6)
+    find_package(Qt6 6.2 QUIET COMPONENTS Core5Compat)
+    if(TARGET Qt6::Core5Compat)
+        set(NOTEPEEK_HAVE_QT5COMPAT ON)
+    else()
+        message(STATUS
+            "Qt6 Core5Compat not found: legacy encodings (GB18030, Big5, Shift-JIS, EUC-KR, ISO-8859-1) will be unavailable")
+    endif()
+endif()
+
 add_subdirectory(src)
 
 if(BUILD_TESTING)
@@ -122,6 +136,11 @@ elseif(UNIX)
     if(NOTEPEEK_QT_MAJOR EQUAL 6)
         set(CPACK_DEBIAN_PACKAGE_DEPENDS "libc6 (>= 2.28), libstdc++6 (>= 9), libqt6widgets6 (>= 6.2), libqt6printsupport6 (>= 6.2), libqt6svg6 (>= 6.2)")
         set(CPACK_RPM_PACKAGE_REQUIRES "qt6-qtbase >= 6.2, qt6-qtsvg >= 6.2")
+        # Only linked when the legacy document encodings were compiled in.
+        if(NOTEPEEK_HAVE_QT5COMPAT)
+            string(APPEND CPACK_DEBIAN_PACKAGE_DEPENDS ", libqt6core5compat6 (>= 6.2)")
+            string(APPEND CPACK_RPM_PACKAGE_REQUIRES ", qt6-qt5compat >= 6.2")
+        endif()
     else()
         set(CPACK_DEBIAN_PACKAGE_DEPENDS "libc6 (>= 2.28), libstdc++6 (>= 9), libqt5widgets5 (>= 5.15), libqt5printsupport5 (>= 5.15), libqt5svg5 (>= 5.15)")
         set(CPACK_RPM_PACKAGE_REQUIRES "qt5-qtbase >= 5.15, qt5-qtsvg >= 5.15")

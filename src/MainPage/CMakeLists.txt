@@ -5,6 +5,10 @@ set(NOTEPEEK_QT_LIBS
     Qt${NOTEPEEK_QT_MAJOR}::Concurrent
 )
 
+if(NOTEPEEK_HAVE_QT5COMPAT)
+    list(APPEND NOTEPEEK_QT_LIBS Qt6::Core5Compat)
+endif()
+
 add_library(notepeek_core STATIC
     apppreferences.cpp
     apppreferences.h
@@ -52,6 +56,10 @@ target_include_directories(notepeek_core PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/../third_party/cmark-gfm/extensions
     ${CMAKE_CURRENT_BINARY_DIR}/../third_party/cmark-gfm/extensions
 )
+if(NOTEPEEK_HAVE_QT5COMPAT)
+    target_compile_definitions(notepeek_core PUBLIC NOTEPEEK_HAVE_QT5COMPAT)
+endif()
+
 notepeek_configure_project_target(notepeek_core)
 
 add_library(notepeek_widgets STATIC

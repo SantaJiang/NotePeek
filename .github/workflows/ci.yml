@@ -88,6 +88,9 @@ jobs:
           version: '6.8.3'
           arch: ${{ matrix.qt-arch }}
           tools: ${{ matrix.qt-tools }}
+          # Core5Compat provides QTextCodec, which backs the legacy
+          # (GB18030, Big5, Shift-JIS, EUC-KR) document encodings.
+          modules: 'qt5compat'
           cache: true
           cache-key-prefix: notepeek-qt-${{ matrix.artifact-name }}
       - name: Install Linux packaging tools
