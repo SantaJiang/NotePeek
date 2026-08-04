@@ -90,6 +90,7 @@ add_library(notepeek_widgets STATIC
     find/findreplacewidget.ui
     widgets/fileexplorerdock.cpp
     widgets/fileexplorerdock.h
+    widgets/elidingcombobox.h
     widgets/filetreeview.cpp
     widgets/filetreeview.h
     widgets/filetypefilterproxymodel.cpp

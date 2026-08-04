@@ -498,7 +498,7 @@ void EditorPane::applyTopbarStyleSheet()
         "  background-color: transparent;"
         "  color: %3;"
         "  border: 0;"
-        "  padding: 0 22px 0 8px;"
+        "  padding: 0 0 0 8px;"
         "}"
         "QComboBox#comboBox_files:hover {"
         "  background-color: %4;"
