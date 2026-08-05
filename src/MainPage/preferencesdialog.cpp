@@ -14,15 +14,19 @@
 #include <QIntValidator>
 #include <QLabel>
 #include <QLineEdit>
+#include <QListWidget>
+#include <QListWidgetItem>
 #include <QPalette>
 #include <QPushButton>
+#include <QStackedWidget>
 #include <QVBoxLayout>
 
 namespace {
 
 constexpr int kMinFontSize = 6;
 constexpr int kMaxFontSize = 288;
-constexpr int kDialogWidth = 520;
+constexpr int kDialogWidth = 720;
+constexpr int kSidebarWidth = 180;
 constexpr int kLabelWidth = 150;
 constexpr int kCommonFontSizes[] = {9, 10, 11, 12, 13, 14, 18, 24, 36, 48, 64, 72, 96, 144, 288};
 
@@ -160,9 +164,27 @@ QString preferencesStyleSheet()
         "  color: %6;"
         "}"
         "QFrame#settingsSection {"
+        "  background-color: transparent;"
+        "  border: none;"
+        "}"
+        "QListWidget#sectionList {"
         "  background-color: %2;"
+        "  color: %5;"
         "  border: 1px solid %4;"
         "  border-radius: 6px;"
+        "  outline: 0;"
+        "  padding: 4px;"
+        "}"
+        "QListWidget#sectionList::item {"
+        "  padding: 8px 12px;"
+        "  border-radius: 4px;"
+        "}"
+        "QListWidget#sectionList::item:hover {"
+        "  background-color: %7;"
+        "}"
+        "QListWidget#sectionList::item:selected {"
+        "  background-color: %9;"
+        "  color: %10;"
         "}"
         "QCheckBox {"
         "  color: %5;"
@@ -231,13 +253,15 @@ PreferencesDialog::PreferencesDialog(QWidget *parent)
     , m_showFileTree(new QCheckBox(tr("Show file tree on startup"), this))
     , m_markdownSidePreview(new QCheckBox(tr("Open with side preview"), this))
     , m_untitledModeCombo(new QComboBox(this))
-    , m_overtypeMode(new QCheckBox(tr("Overtype: typing replaces the character ahead"), this))
+    , m_overtypeMode(new QComboBox(this))
     , m_codeFolding(new QCheckBox(tr("Show folding controls"), this))
     , m_bracketAssistance(new QCheckBox(tr("Match and auto-close brackets"), this))
     , m_smartIndentation(new QCheckBox(tr("Indent guides and smart Tab/Backspace"), this))
     , m_documentCompletion(new QCheckBox(tr("Suggest words from the current document"), this))
     , m_semanticHighlighting(new QCheckBox(tr("Add function, type, member and variable colors"), this))
     , m_languageCombo(new QComboBox(this))
+    , m_sectionList(new QListWidget(this))
+    , m_sectionStack(new QStackedWidget(this))
 {
     setWindowTitle(tr("Preferences"));
     setModal(true);
@@ -251,10 +275,18 @@ PreferencesDialog::PreferencesDialog(QWidget *parent)
     configureFontSizeCombo(m_textFontSize);
     configureFontSizeCombo(m_codeFontSize);
 
-    auto *fontsSection = makeSection(tr("Editor Fonts"), this);
-    auto *fontsLayout = qobject_cast<QVBoxLayout *>(fontsSection->layout());
-    fontsLayout->addLayout(makeSettingsRow(tr("Text font"), makeFontRow(m_textFontCombo, m_textFontSize, fontsSection), fontsSection));
-    fontsLayout->addLayout(makeSettingsRow(tr("Code font"), makeFontRow(m_codeFontCombo, m_codeFontSize, fontsSection), fontsSection));
+    // Sidebar navigation list.  Each entry maps, by row index, to a page in
+    // the stacked widget on the right.
+    m_sectionList->setObjectName(QStringLiteral("sectionList"));
+    m_sectionList->setFixedWidth(kSidebarWidth);
+    m_sectionList->setUniformItemSizes(true);
+    m_sectionList->setFocusPolicy(Qt::StrongFocus);
+    m_sectionList->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+
+    auto *editorSection = makeSection(tr("Editor"), this);
+    auto *editorLayout = qobject_cast<QVBoxLayout *>(editorSection->layout());
+    editorLayout->addLayout(makeSettingsRow(tr("Text font"), makeFontRow(m_textFontCombo, m_textFontSize, editorSection), editorSection));
+    editorLayout->addLayout(makeSettingsRow(tr("Code font"), makeFontRow(m_codeFontCombo, m_codeFontSize, editorSection), editorSection));
 
     m_syntaxThemeCombo->addItem(tr("Automatic (system appearance)"), QStringLiteral("auto"));
     m_syntaxThemeCombo->setObjectName(QStringLiteral("syntaxThemeCombo"));
@@ -262,10 +294,8 @@ PreferencesDialog::PreferencesDialog(QWidget *parent)
     for (const NotePeek::SyntaxTheme &theme : syntaxThemes)
         m_syntaxThemeCombo->addItem(theme.name, theme.id);
     m_syntaxThemeCombo->setToolTip(tr("Applies immediately to syntax editors."));
-
-    auto *appearanceSection = makeSection(tr("Editor Appearance"), this);
-    auto *appearanceLayout = qobject_cast<QVBoxLayout *>(appearanceSection->layout());
-    appearanceLayout->addLayout(makeSettingsRow(tr("Syntax theme"), m_syntaxThemeCombo, appearanceSection));
+    editorLayout->addLayout(makeSettingsRow(tr("Syntax theme"), m_syntaxThemeCombo, editorSection));
+    editorLayout->addStretch();
 
     // Language names stay untranslated so each entry is readable in the
     // language it selects. Takes effect after a restart.
@@ -280,6 +310,13 @@ PreferencesDialog::PreferencesDialog(QWidget *parent)
     m_untitledModeCombo->addItem(tr("Code (line numbers, no wrapping)"), true);
     m_untitledModeCombo->setToolTip(tr("Applies to untitled documents that have not been saved yet."));
 
+    // Overtype mode selection (the keyboard INS/OVR toggle).  Insert is the
+    // normal typing behaviour; Overwrite replaces the character ahead of the
+    // caret instead.
+    m_overtypeMode->addItem(tr("Insert (INS)"), false);
+    m_overtypeMode->addItem(tr("Overwrite (OVR)"), true);
+    m_overtypeMode->setToolTip(tr("Controls whether typing inserts or replaces the character ahead of the caret."));
+
     auto *generalSection = makeSection(tr("General"), this);
     auto *generalLayout = qobject_cast<QVBoxLayout *>(generalSection->layout());
     generalLayout->addLayout(makeSettingsRow(tr("Language"), m_languageCombo, generalSection));
@@ -287,6 +324,7 @@ PreferencesDialog::PreferencesDialog(QWidget *parent)
     generalLayout->addLayout(makeSettingsRow(tr("New document"), m_untitledModeCombo, generalSection));
     generalLayout->addLayout(makeSettingsRow(tr("Typing"), m_overtypeMode, generalSection));
     generalLayout->addLayout(makeSettingsRow(tr("Markdown"), m_markdownSidePreview, generalSection));
+    generalLayout->addStretch();
 
     auto *codeSection = makeSection(tr("Code Editing"), this);
     auto *codeLayout = qobject_cast<QVBoxLayout *>(codeSection->layout());
@@ -295,19 +333,52 @@ PreferencesDialog::PreferencesDialog(QWidget *parent)
     codeLayout->addLayout(makeSettingsRow(tr("Indentation"), m_smartIndentation, codeSection));
     codeLayout->addLayout(makeSettingsRow(tr("Completion"), m_documentCompletion, codeSection));
     codeLayout->addLayout(makeSettingsRow(tr("Semantic highlighting"), m_semanticHighlighting, codeSection));
+    codeLayout->addStretch();
+
+    // Wire each section into the right pane as a stacked page, and add a
+    // matching sidebar entry.  The page index returned by addWidget is stored
+    // on the list item (Qt::UserRole) so each entry stays bound to its page
+    // regardless of the order in which pages and entries are added.
+    const int editorIndex = m_sectionStack->addWidget(editorSection);
+    const int generalIndex = m_sectionStack->addWidget(generalSection);
+    const int codeIndex = m_sectionStack->addWidget(codeSection);
+
+    auto *editorItem = new QListWidgetItem(tr("Editor"), m_sectionList);
+    editorItem->setData(Qt::UserRole, editorIndex);
+    auto *generalItem = new QListWidgetItem(tr("General"), m_sectionList);
+    generalItem->setData(Qt::UserRole, generalIndex);
+    auto *codeItem = new QListWidgetItem(tr("Code Editing"), m_sectionList);
+    codeItem->setData(Qt::UserRole, codeIndex);
+
+    connect(m_sectionList, &QListWidget::currentRowChanged, this, [this](int row) {
+        if (row < 0)
+            return;
+        const QVariant data = m_sectionList->item(row)->data(Qt::UserRole);
+        m_sectionStack->setCurrentIndex(data.toInt());
+    });
+    // Show the first page deterministically; setCurrentRow then highlights the
+    // matching sidebar entry (and the handler above keeps them in sync for
+    // every subsequent user-driven change).
+    m_sectionStack->setCurrentIndex(0);
+    m_sectionList->setCurrentRow(0);
 
     auto *buttons = new QDialogButtonBox(QDialogButtonBox::Ok
                                              | QDialogButtonBox::Apply
                                              | QDialogButtonBox::Cancel,
                                          this);
 
+    // Two-pane body: left sidebar + right stacked content.  The buttons sit
+    // beneath the whole body as before.
+    auto *bodyLayout = new QHBoxLayout;
+    bodyLayout->setContentsMargins(0, 0, 0, 0);
+    bodyLayout->setSpacing(14);
+    bodyLayout->addWidget(m_sectionList);
+    bodyLayout->addWidget(m_sectionStack, 1);
+
     auto *layout = new QVBoxLayout(this);
     layout->setContentsMargins(20, 20, 20, 18);
     layout->setSpacing(14);
-    layout->addWidget(fontsSection);
-    layout->addWidget(appearanceSection);
-    layout->addWidget(generalSection);
-    layout->addWidget(codeSection);
+    layout->addLayout(bodyLayout);
     layout->addStretch();
     layout->addWidget(buttons);
 
@@ -341,7 +412,8 @@ void PreferencesDialog::loadFromPreferences()
     m_markdownSidePreview->setChecked(prefs.markdownDefaultPreview());
     const int untitledModeIndex = m_untitledModeCombo->findData(prefs.untitledUsesCodeMode());
     m_untitledModeCombo->setCurrentIndex(untitledModeIndex >= 0 ? untitledModeIndex : 0);
-    m_overtypeMode->setChecked(prefs.overwriteMode());
+    const int overtypeIndex = m_overtypeMode->findData(prefs.overwriteMode());
+    m_overtypeMode->setCurrentIndex(overtypeIndex >= 0 ? overtypeIndex : 0);
     m_codeFolding->setChecked(prefs.codeFoldingEnabled());
     m_bracketAssistance->setChecked(prefs.bracketAssistanceEnabled());
     m_smartIndentation->setChecked(prefs.smartIndentationEnabled());
@@ -362,7 +434,7 @@ void PreferencesDialog::commit()
     prefs.setShowFileTreeOnStartup(m_showFileTree->isChecked());
     prefs.setMarkdownDefaultPreview(m_markdownSidePreview->isChecked());
     prefs.setUntitledUsesCodeMode(m_untitledModeCombo->currentData().toBool());
-    prefs.setOverwriteMode(m_overtypeMode->isChecked());
+    prefs.setOverwriteMode(m_overtypeMode->currentData().toBool());
     prefs.setCodeFoldingEnabled(m_codeFolding->isChecked());
     prefs.setBracketAssistanceEnabled(m_bracketAssistance->isChecked());
     prefs.setSmartIndentationEnabled(m_smartIndentation->isChecked());
