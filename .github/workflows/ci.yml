@@ -75,11 +75,15 @@ jobs:
             artifact-name: notepeek-macos-arm64
             package-suffix: Darwin-arm64
             performance-open-budget-ms: 24000
+            performance-highlight-budget-ms: 5000
+            performance-semantic-worker-budget-ms: 3
           - os: macos-15-intel
             cpack-generator: DragNDrop
             artifact-name: notepeek-macos-x86_64
             package-suffix: Darwin-x86_64
             performance-open-budget-ms: 24000
+            performance-highlight-budget-ms: 8000
+            performance-semantic-worker-budget-ms: 4
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v6
@@ -109,6 +113,8 @@ jobs:
       - name: Test
         env:
           NOTEPEEK_OPEN_SMOKE_BUDGET_MS: ${{ matrix.performance-open-budget-ms }}
+          NOTEPEEK_HIGHLIGHT_SMOKE_BUDGET_MS: ${{ matrix.performance-highlight-budget-ms }}
+          NOTEPEEK_SEMANTIC_WORKER_BUDGET_MS: ${{ matrix.performance-semantic-worker-budget-ms }}
         run: >-
           python scripts/ci_command.py
           --title "Qt 6 tests failed on ${{ runner.os }}"
