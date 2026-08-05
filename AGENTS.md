@@ -1,0 +1,124 @@
+# AGENTS.md — Constraints for AI-assisted changes
+
+This file gates how AI coding agents (and their human reviewers) operate on this
+repository. The three rules below are **mandatory**; run them in order after
+every code change. `CONTRIBUTING.md` is the human-facing companion; this file
+adds the guardrails an AI agent must self-enforce.
+
+## 1. Verify CI compatibility after every change
+
+CI only runs the full matrix when `scripts/ci_version_gate.py` says so —
+typically on a `PROJECT_VERSION` bump or a release. A version bump therefore
+triggers every job below, so treat a one-line version edit as a full-CI event,
+not a trivial safe change.
+
+**CI matrix** (`build-and-test`): Ubuntu x86_64, Ubuntu arm64, Windows, macOS
+arm64, macOS Intel — all on Qt 6.8.3. A separate `qt5-compatibility` job builds
+with Qt 5.15.2 (`-DNOTEPEEK_FORCE_QT_MAJOR=5`).
+
+Before declaring work done, reason about — and where possible build — the
+following. Do not limit verification to the files you touched.
+
+- **Qt 5 / Qt 6 API parity.** The single most common CI break is code that
+  compiles on Qt 6 but not Qt 5. The classic trap: container `.size()`
+  (`QString::size()`, `QByteArray::size()`, `QList::size()`, …) returns `int`
+  on Qt 5 and `qsizetype` on Qt 6, so `qMin(x, container.size())` deduces
+  conflicting types and fails the Qt 5 build. Cast explicitly:
+  `qMin(x, qsizetype(container.size()))`. Audit every `qMin`/`qMax` you add or
+  touch.
+- **Build beyond the files you touched.** Latent bugs in untouched files
+  surface when CI compiles the whole project. After editing, build at least
+  `notepeek_core` and `notepeek_widgets` and run `ctest` on **both** Qt major
+  versions, not just the one you happen to have installed.
+- **Platform-specific behavior.** Text-codec behavior (GB18030 and other
+  legacy encodings via qt5compat/Core5Compat), font availability, and
+  timing-based tests differ across the Linux/macOS/Windows runners. A test
+  passing on your machine does not prove it passes on CI.
+- **Performance budgets.** Some tests assert wall-clock budgets (e.g.
+  "2 MB highlight < 5 s", "viewport semantic worker < 2 ms"). These are tight
+  on the slow macOS Intel runner. Flag any change that touches editor rendering
+  (`src/QScintilla/scintilla/src/*`, `src/MainPage/editor/*`,
+  `src/MainPage/decorators/*`) as a potential perf regression and run
+  `notepeek_performance_test` locally.
+- **Version gate.** A release-triggering change is a `VERSION` bump in
+  `CMakeLists.txt` **plus** a matching `<release>` entry in
+  `deploy/linux/notepeek.appdata.xml`. `Info.plist` and `deploy/win/app.rc.in`
+  derive from `PROJECT_VERSION` automatically — do not hand-edit them.
+
+Local CI-equivalent checks (run before considering the task complete):
+
+```bash
+# Qt 6 (primary)
+cmake -S . -B build-qt6 -G Ninja -DCMAKE_BUILD_TYPE=Debug \
+  -DNOTEPEEK_WARNINGS_AS_ERRORS=ON
+cmake --build build-qt6 --parallel
+ctest --test-dir build-qt6 --output-on-failure
+
+# Qt 5.15 (compatibility — a version bump runs this in CI)
+cmake -S . -B build-qt5 -G Ninja -DCMAKE_BUILD_TYPE=Debug \
+  -DNOTEPEEK_FORCE_QT_MAJOR=5 -DCMAKE_PREFIX_PATH=<path-to-qt5>
+cmake --build build-qt5 --parallel
+ctest --test-dir build-qt5 --output-on-failure
+```
+
+If you cannot run a platform locally (no Qt 5 install, no Windows, etc.),
+**say so explicitly** and reason about that axis instead of staying silent.
+Never claim "tests pass" when you only ran one Qt major on one OS.
+
+## 2. Self-review the change you just made
+
+Before staging a commit, re-read every file in your diff end to end and look
+for, at minimum:
+
+- Type mismatches that compile on one Qt major but not the other (rule 1).
+- Null / empty / deselection edge cases in signal handlers
+  (e.g. `currentRowChanged` receiving `-1`, `item(row)` returning `nullptr`).
+- Fragile coupling between widgets (e.g. sidebar row index assumed to equal a
+  stacked-page index by position alone — bind them explicitly, e.g. via
+  `Qt::UserRole`).
+- Signal/slot wiring: `connect` order vs. initial state sync, receiver context
+  lifetime, whether a manual `setCurrentIndex` is still needed after a signal
+  handler is connected.
+- Unused includes or dead code left over from the edit.
+- Determinism that depends on signal emission order or platform defaults;
+  prefer explicit initialization over relying on a signal firing.
+- Translations: after adding or changing any `tr()` string, run the
+  `NotePeek_lupdate` CMake target (it feeds `qt_add_translations` with
+  `-no-obsolete` across all sources) to refresh line numbers and drop obsolete
+  entries, then fill in real translations. Never hand-edit stale line numbers,
+  and never leave `type="unfinished"` behind.
+
+Iterate the review until no new issue is found. Only then proceed to commit.
+
+## 3. Clean up after AI-made commits
+
+After a commit authored by an AI agent, leave the working tree as the human
+would expect:
+
+- Remove local build directories you created during the task: `build-qt5/`,
+  `build-qt6/`, `build-ci/`, `build-compat/`, `cmake-build-*/`,
+  `.cache/build-*/`, and any scratch dirs under `/var/folders/…` or `/tmp`.
+- Remove editor/IDE temp files you introduced (`.DS_Store`, `*.autosave`,
+  a `compile_commands.json` generated outside a build dir, `.qtcreator/`
+  session noise, etc.).
+- Confirm with `git status` that the tree is clean — no stray tracked or
+  untracked files you introduced. `git status --ignored` is useful to see what
+  build output exists (it is gitignored, but should still be deleted so it
+  does not pile up on disk).
+- Do **not** delete or weaken `.gitignore` patterns to force-include build
+  output, and do **not** commit build artifacts.
+- If an earlier AI run left garbage behind, clean it as part of the current
+  task rather than leaving it for the human.
+
+---
+
+## CI reference (quick)
+
+- Workflows: `.github/workflows/ci.yml` (build + test), `release.yml`.
+- Version gate: `scripts/ci_version_gate.py`.
+- Translation tooling: `NotePeek_lupdate` target → regenerates
+  `i18n/notepeek_zh_CN.ts`; the app build then `lrelease`s it into the bundled
+  `.qm` resource.
+- Sanitizers: `-DNOTEPEEK_ENABLE_SANITIZERS=ON` (NotePeek targets only; vendored
+  deps keep upstream flags).
+- Warnings-as-errors: `-DNOTEPEEK_WARNINGS_AS_ERRORS=ON`.
