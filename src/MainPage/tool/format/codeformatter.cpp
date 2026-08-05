@@ -809,7 +809,7 @@ private:
         {
             ++m_pos;
         }
-        m_pos = qMin(m_pos + 2, m_source.size());
+        m_pos = qMin(m_pos + 2, qsizetype(m_source.size()));
         emitComment(m_source.mid(start, m_pos - start));
     }
 
