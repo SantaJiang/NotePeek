@@ -6,11 +6,18 @@
 class QCheckBox;
 class QComboBox;
 class QFontComboBox;
+class QListWidget;
+class QListWidgetItem;
+class QStackedWidget;
 
 // The application settings window (File ▸ Preferences).  Editing is
 // non-destructive: changes are only committed to AppPreferences when the user
 // presses Apply or OK, at which point applied() is emitted so the main window
 // can refresh open editors live.  Cancel discards everything.
+//
+// The dialog uses a two-pane layout: a left sidebar lists the available
+// setting sections and the right pane shows the corresponding controls.  Only
+// one section is visible at a time, switched by selecting a sidebar entry.
 class PreferencesDialog : public QDialog
 {
     Q_OBJECT
@@ -35,13 +42,15 @@ private:
     QCheckBox *m_showFileTree;
     QCheckBox *m_markdownSidePreview;
     QComboBox *m_untitledModeCombo;
-    QCheckBox *m_overtypeMode;
+    QComboBox *m_overtypeMode;
     QCheckBox *m_codeFolding;
     QCheckBox *m_bracketAssistance;
     QCheckBox *m_smartIndentation;
     QCheckBox *m_documentCompletion;
     QCheckBox *m_semanticHighlighting;
     QComboBox *m_languageCombo;
+    QListWidget *m_sectionList;
+    QStackedWidget *m_sectionStack;
 };
 
 #endif // PREFERENCESDIALOG_H
