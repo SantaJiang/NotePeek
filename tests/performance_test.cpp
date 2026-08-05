@@ -209,7 +209,13 @@ private slots:
         QElapsedTimer timer;
         timer.start();
         manager.highlightAllMatches();
-        QVERIFY2(timer.elapsed() < 5000, "2 MB highlight pass exceeded the 5 second smoke budget");
+        bool highlightBudgetIsValid = false;
+        const int configuredHighlightBudget = qEnvironmentVariableIntValue(
+            "NOTEPEEK_HIGHLIGHT_SMOKE_BUDGET_MS", &highlightBudgetIsValid);
+        const int highlightBudgetMs =
+            highlightBudgetIsValid && configuredHighlightBudget > 0 ? configuredHighlightBudget : 5000;
+        QVERIFY2(timer.elapsed() < highlightBudgetMs,
+                 "2 MB highlight pass exceeded the configured smoke budget");
         QVERIFY(!manager.searchResults().isEmpty());
     }
 
@@ -402,7 +408,21 @@ private slots:
             "Debug viewport semantic highlighting regressed median scrolling by more than 10%";
 #endif
         QVERIFY2(ratio <= maximumScrollRatio, scrollBudgetMessage);
-        QVERIFY2(workerNs <= 2 * 1000 * 1000, "Viewport semantic worker exceeded its 2 ms budget");
+        // The worker is given a 2 ms design budget (kWorkerBudgetNs in
+        // editormanager.cpp) but the provider checks it between work chunks, so
+        // the measured elapsed time routinely overshoots by a fraction of a
+        // millisecond and lands right on the 2 ms boundary — flaky on slower CI
+        // runners and even under local background load.  Keep 2 ms as the
+        // shipped target but let the smoke budget be widened per runner via the
+        // same env-var pattern as NOTEPEEK_OPEN_SMOKE_BUDGET_MS, so a gross
+        // regression still fails while chunk-granularity overshoot does not.
+        bool workerBudgetIsValid = false;
+        const int configuredWorkerBudget = qEnvironmentVariableIntValue(
+            "NOTEPEEK_SEMANTIC_WORKER_BUDGET_MS", &workerBudgetIsValid);
+        const int workerBudgetMs =
+            workerBudgetIsValid && configuredWorkerBudget > 0 ? configuredWorkerBudget : 2;
+        QVERIFY2(workerNs <= qint64(workerBudgetMs) * 1000 * 1000,
+                 "Viewport semantic worker exceeded its configured budget");
         QVERIFY2(applyNs <= 2 * 1000 * 1000, "Applying viewport semantic tokens exceeded 2 ms on the UI thread");
         QVERIFY2(snapshotBytes < 128 * 1024, "Viewport snapshot exceeded the bounded memory budget");
         QVERIFY2(incrementalEditor->semanticTokenCount() < 2000, "Viewport token cache grew beyond its initial bound");
