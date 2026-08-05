@@ -349,13 +349,23 @@ bool DocumentFormatCodec::decode(const QByteArray &bytes,
         // files), and it round-trips byte-for-byte, so saving cannot corrupt
         // the file.  Anything it rejects is still reported as undecodable;
         // Tools ▸ Encoding ▸ Reopen with Encoding handles the rest.
+        //
+        // The acceptance test is a byte-faithful round-trip (re-encode the
+        // candidate and compare to the input) rather than
+        // state.invalidChars: that field is reported inconsistently by Qt's
+        // GB18030 codec across platforms (e.g. a lone 0xFF, which is not a
+        // valid GB18030 lead byte, sometimes counts as 0 invalid chars), so it
+        // would silently accept corrupted bytes as GB18030.  A genuine
+        // GB18030 sequence is the unique inverse of its bytes, so this check
+        // both accepts real legacy text and rejects anything the codec only
+        // "decoded" by substitution.
         bool decodedAsLegacy = false;
 #ifdef NOTEPEEK_HAVE_TEXT_CODECS
         if (QTextCodec *codec = legacyCodec(DocumentEncoding::Gb18030))
         {
             QTextCodec::ConverterState state;
             const QString candidate = codec->toUnicode(bytes.constData(), int(bytes.size()), &state);
-            if (state.invalidChars == 0 && state.remainingChars == 0)
+            if (codec->fromUnicode(candidate) == bytes)
             {
                 detected.encoding = DocumentEncoding::Gb18030;
                 decoded = candidate;
