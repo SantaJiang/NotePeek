@@ -35,6 +35,7 @@ public slots:
 
 signals:
     void visibilityChanged(bool visible);
+    void advancedSearchRequested();
 
 protected:
     void showEvent(QShowEvent *event) override;

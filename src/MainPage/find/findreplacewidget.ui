@@ -123,6 +123,34 @@
         </property>
        </widget>
       </item>
+      <item row="1" column="4">
+       <widget class="QToolButton" name="buttonAdvanced">
+        <property name="sizePolicy">
+         <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
+          <horstretch>0</horstretch>
+          <verstretch>0</verstretch>
+         </sizepolicy>
+        </property>
+        <property name="minimumSize">
+         <size>
+          <width>0</width>
+          <height>26</height>
+         </size>
+        </property>
+        <property name="maximumSize">
+         <size>
+          <width>16777215</width>
+          <height>26</height>
+         </size>
+        </property>
+        <property name="toolButtonStyle">
+         <enum>Qt::ToolButtonStyle::ToolButtonTextOnly</enum>
+        </property>
+        <property name="text">
+         <string>Advanced...</string>
+        </property>
+       </widget>
+      </item>
      <item row="0" column="1">
       <widget class="QComboBox" name="comboFind">
        <property name="sizePolicy">
@@ -245,7 +273,7 @@
        </property>
       </widget>
      </item>
-      <item row="0" column="3" alignment="Qt::AlignRight">
+      <item row="0" column="4" alignment="Qt::AlignRight">
        <widget class="QToolButton" name="buttonClose">
         <property name="sizePolicy">
          <sizepolicy hsizetype="Fixed" vsizetype="Fixed">

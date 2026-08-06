@@ -2,8 +2,9 @@
 #include <QComboBox>
 #include <QDockWidget>
 #include <QMainWindow>
+#include <QLineEdit>
 #include <QMessageBox>
-#include <QPushButton>
+#include <QToolButton>
 #include <QSignalSpy>
 #include <QScrollBar>
 #include <QTimer>
@@ -36,7 +37,9 @@
 #include "widgets/searchresultsdock.h"
 #include <QFileSystemModel>
 #include <QHeaderView>
+#include <QImage>
 #include <QTreeView>
+#include "themecolors.h"
 #include "widgets/qscieditorinfostatusbar.h"
 #include "find/findreplacewidget.h"
 
@@ -231,6 +234,124 @@ private slots:
         emit tree->itemActivated(matchItem, 0);
         emit tree->itemDoubleClicked(matchItem, 0);
         QCOMPARE(activated.count(), 1);
+    }
+
+    void longSearchResultPreviewKeepsMatchVisible()
+    {
+        QTemporaryDir root;
+        QVERIFY(root.isValid());
+        const QString longLine = QString(900, QLatin1Char('x'))
+                                 + QStringLiteral("needle")
+                                 + QString(200, QLatin1Char('y'));
+        writeFile(root.filePath(QStringLiteral("long.txt")),
+                  (longLine + QStringLiteral("\r\n")).toUtf8());
+
+        FileSearcher searcher;
+        QSignalSpy finished(&searcher, &FileSearcher::searchFinished);
+        searcher.start(root.path(), QStringLiteral("needle"), true, false);
+        QTRY_COMPARE(finished.count(), 1);
+
+        const auto outcome = finished.takeFirst().first().value<FileSearchOutcome>();
+        QCOMPARE(outcome.matches.size(), 1);
+        const FileSearchMatch &match = outcome.matches.constFirst();
+        QCOMPARE(match.column, 900);
+        QVERIFY(match.lineText.size() <= 500);
+        QVERIFY(!match.lineText.contains(QLatin1Char('\r')));
+        QCOMPARE(match.lineText.mid(match.previewColumn, match.length),
+                 QStringLiteral("needle"));
+    }
+
+    void searchResultDelegatePaintsLineNumberAndHighlight()
+    {
+        QMainWindow window;
+        SearchResultsDock dock(&window);
+        window.addDockWidget(Qt::BottomDockWidgetArea, dock.dockWidget());
+        window.resize(700, 320);
+
+        FileSearchOutcome outcome;
+        FileSearchMatch match;
+        match.filePath = QStringLiteral("/tmp/result.txt");
+        match.line = 41;
+        match.column = 7;
+        match.length = 6;
+        match.previewColumn = 7;
+        match.lineText = QStringLiteral("prefix needle suffix");
+        outcome.matches.append(match);
+        outcome.summary.matchCount = 1;
+
+        QVERIFY(QMetaObject::invokeMethod(&dock,
+                                          "onSearchFinished",
+                                          Qt::DirectConnection,
+                                          Q_ARG(FileSearchOutcome, outcome)));
+        QTreeWidget *tree = dock.dockWidget()->findChild<QTreeWidget *>();
+        QVERIFY(tree);
+        QVERIFY(tree->findChild<QObject *>(QStringLiteral("searchResultDelegate")));
+        QCOMPARE(tree->indentation(), 12);
+        QVERIFY(tree->property("searchResultLineNumberWidth").toInt() < 64);
+        QCOMPARE(tree->topLevelItemCount(), 1);
+        QTreeWidgetItem *matchItem = tree->topLevelItem(0)->child(0);
+        QVERIFY(matchItem);
+        QCOMPARE(matchItem->text(0), match.lineText);
+        QVERIFY(matchItem->data(0, Qt::AccessibleTextRole).toString().contains(QStringLiteral("42")));
+
+        window.show();
+        QCoreApplication::processEvents();
+        const QImage rendered = tree->viewport()->grab().toImage();
+        QVERIFY(!rendered.isNull());
+        const QRgb highlight = ThemeColors::FindReplace::highlightIndicator().rgb();
+        bool foundHighlight = false;
+        for (int y = 0; y < rendered.height() && !foundHighlight; ++y)
+        {
+            for (int x = 0; x < rendered.width(); ++x)
+            {
+                if (rendered.pixel(x, y) == highlight)
+                {
+                    foundHighlight = true;
+                    break;
+                }
+            }
+        }
+        QVERIFY(foundHighlight);
+    }
+
+    void advancedSearchChromeAndEntryPointStayInSync()
+    {
+        MainWindow window;
+        SearchResultsDock *searchDock = window.findChild<SearchResultsDock *>();
+        FindReplaceWidget *findReplace = window.findChild<FindReplaceWidget *>();
+        QVERIFY(searchDock);
+        QVERIFY(findReplace);
+
+        QDockWidget *dockWidget = searchDock->dockWidget();
+        QVERIFY(dockWidget);
+        QVERIFY(dockWidget->features().testFlag(QDockWidget::DockWidgetClosable));
+        QVERIFY(!dockWidget->features().testFlag(QDockWidget::DockWidgetFloatable));
+        QCOMPARE(window.corner(Qt::BottomLeftCorner), Qt::LeftDockWidgetArea);
+
+        auto *titleBar = dockWidget->findChild<QWidget *>(QStringLiteral("searchResultsTitleBar"));
+        auto *closeButton = dockWidget->findChild<QToolButton *>(QStringLiteral("searchResultsCloseButton"));
+        auto *patternEdit = dockWidget->findChild<QLineEdit *>(QStringLiteral("searchResultsPatternEdit"));
+        auto *caseButton = dockWidget->findChild<QToolButton *>(QStringLiteral("searchResultsCaseButton"));
+        auto *wholeWordButton = dockWidget->findChild<QToolButton *>(QStringLiteral("searchResultsWholeWordButton"));
+        auto *searchButton = dockWidget->findChild<QToolButton *>(QStringLiteral("searchResultsSearchButton"));
+        QVERIFY(titleBar);
+        QVERIFY(closeButton);
+        QVERIFY(patternEdit);
+        QVERIFY(caseButton);
+        QVERIFY(wholeWordButton);
+        QVERIFY(searchButton);
+        QVERIFY(!titleBar->styleSheet().isEmpty());
+        QVERIFY(!searchButton->styleSheet().isEmpty());
+        QCOMPARE(caseButton->height(), patternEdit->sizeHint().height());
+        QCOMPARE(wholeWordButton->height(), patternEdit->sizeHint().height());
+
+        auto *advancedButton = findReplace->findChild<QToolButton *>(QStringLiteral("buttonAdvanced"));
+        QVERIFY(advancedButton);
+        QVERIFY(dockWidget->isHidden());
+        advancedButton->click();
+        QVERIFY(!dockWidget->isHidden());
+        closeButton->click();
+        QVERIFY(dockWidget->isHidden());
     }
 
     void searchJumpWaitsForAnEditorThatIsStillLoading()

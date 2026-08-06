@@ -9,7 +9,6 @@
 class QDockWidget;
 class QLabel;
 class QLineEdit;
-class QPushButton;
 class QToolButton;
 class QTreeWidget;
 class QTreeWidgetItem;
@@ -30,6 +29,7 @@ public:
     // Root directory searches run in; empty disables searching with a hint.
     void setSearchRoot(const QString &rootDirectory);
     void focusSearchInput(const QString &initialText = QString());
+    void reapplyTheme();
 
 signals:
     void matchActivated(const QString &filePath, int line, int column, int length);
@@ -46,7 +46,8 @@ private:
     QLineEdit *m_patternEdit;
     QToolButton *m_caseButton;
     QToolButton *m_wholeWordButton;
-    QPushButton *m_searchButton;
+    QToolButton *m_searchButton;
+    QWidget *m_titleBar;
     QLabel *m_statusLabel;
     QTreeWidget *m_resultsTree;
     FileSearcher *m_searcher;

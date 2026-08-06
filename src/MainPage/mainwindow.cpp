@@ -170,10 +170,13 @@ MainWindow::MainWindow(QWidget *parent,
             this, &MainWindow::openFileInNewWindow);
 
     m_searchResultsDock = new SearchResultsDock(this);
+    setCorner(Qt::BottomLeftCorner, Qt::LeftDockWidgetArea);
     addDockWidget(Qt::BottomDockWidgetArea, m_searchResultsDock->dockWidget());
     m_searchResultsDock->setVisible(false);
     connect(m_searchResultsDock, &SearchResultsDock::matchActivated,
             this, &MainWindow::openFileAtSearchMatch);
+    connect(ui->widget_findreplace, &FindReplaceWidget::advancedSearchRequested,
+            this, &MainWindow::on_action_findInFiles_triggered);
     // Search-result jumps into files that are still loading complete once the
     // controller reports the file as opened.
     for (DocumentController *controller : m_documentControllers)
@@ -451,6 +454,7 @@ void MainWindow::reapplyChromeTheme()
     applyEditorSplitterStyle(ui->editorSplitter);
     applyMainWindowSeparatorStyle(this);
     m_fileExplorerDock->reapplyTheme();
+    m_searchResultsDock->reapplyTheme();
     m_editorCoordinator->reapplyThemeToEditorPanes();
     m_editorCoordinator->refreshVisibleMarkdownPreviews();
 }

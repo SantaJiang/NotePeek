@@ -15,6 +15,7 @@ struct FileSearchMatch
     int line = 0;    // 0-based line number
     int column = 0;  // 0-based character index within the line
     int length = 0;  // match length in characters
+    int previewColumn = 0; // match index within lineText
     QString lineText;
 };
 
