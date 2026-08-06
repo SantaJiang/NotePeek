@@ -71,6 +71,10 @@ void collectMatchesInFile(const QString &filePath,
         {
             lineEnd = int(text.size());
         }
+        if (lineEnd > currentLineStart && text.at(lineEnd - 1) == QLatin1Char('\r'))
+        {
+            --lineEnd;
+        }
 
         FileSearchMatch match;
         match.filePath = filePath;
@@ -78,8 +82,16 @@ void collectMatchesInFile(const QString &filePath,
         match.column = position - currentLineStart;
         match.length = int(pattern.size());
         constexpr int MaximumPreviewLength = 500;
-        match.lineText = text.mid(currentLineStart,
-                                  qMin(lineEnd - currentLineStart, MaximumPreviewLength));
+        const int lineLength = lineEnd - currentLineStart;
+        const int previewLength = qMin(lineLength, MaximumPreviewLength);
+        const int visibleMatchLength = qMin(match.length, previewLength);
+        const int preferredContextBefore = (previewLength - visibleMatchLength) / 2;
+        const int maximumPreviewStart = qMax(0, lineLength - previewLength);
+        const int previewStart = qBound(0,
+                                        match.column - preferredContextBefore,
+                                        maximumPreviewStart);
+        match.previewColumn = match.column - previewStart;
+        match.lineText = text.mid(currentLineStart + previewStart, previewLength);
         outcome->matches.append(match);
 
         if (++outcome->summary.matchCount >= FileSearcher::MaximumMatches)

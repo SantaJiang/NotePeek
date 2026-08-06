@@ -32,12 +32,14 @@ FindReplaceWidget::FindReplaceWidget(QWidget *parent)
     ui->buttonFind->setAccessibleName(tr("Find next"));
     ui->buttonReplace->setAccessibleName(tr("Replace current match"));
     ui->buttonReplaceAll->setAccessibleName(tr("Replace all matches"));
+    ui->buttonAdvanced->setAccessibleName(tr("Advanced search"));
     ui->comboFind->setAccessibleName(tr("Search text"));
     ui->comboReplace->setAccessibleName(tr("Replacement text"));
 
     connect(ui->buttonFind, &QToolButton::clicked, this, &FindReplaceWidget::onFindClicked);
     connect(ui->buttonReplace, &QToolButton::clicked, this, &FindReplaceWidget::onReplaceClicked);
     connect(ui->buttonReplaceAll, &QToolButton::clicked, this, &FindReplaceWidget::onReplaceAllClicked);
+    connect(ui->buttonAdvanced, &QToolButton::clicked, this, &FindReplaceWidget::advancedSearchRequested);
     connect(ui->comboFind->lineEdit(), &QLineEdit::textChanged, this, &FindReplaceWidget::onFindTextChanged);
     connect(ui->comboReplace->lineEdit(), &QLineEdit::textChanged, this, &FindReplaceWidget::onReplaceTextChanged);
 
@@ -67,6 +69,7 @@ void FindReplaceWidget::applyChromeTheme()
         "QToolButton#buttonFind,"
         "QToolButton#buttonReplace,"
         "QToolButton#buttonReplaceAll,"
+        "QToolButton#buttonAdvanced,"
         "QToolButton#buttonClose {"
         "  background-color: transparent;"
         "  color: %2;"
@@ -77,18 +80,21 @@ void FindReplaceWidget::applyChromeTheme()
         "}"
         "QToolButton#buttonFind,"
         "QToolButton#buttonReplace,"
-        "QToolButton#buttonReplaceAll {"
+        "QToolButton#buttonReplaceAll,"
+        "QToolButton#buttonAdvanced {"
         "  padding: 0 8px;"
         "}"
         "QToolButton#buttonFind:hover,"
         "QToolButton#buttonReplace:hover,"
         "QToolButton#buttonReplaceAll:hover,"
+        "QToolButton#buttonAdvanced:hover,"
         "QToolButton#buttonClose:hover {"
         "  background-color: %3;"
         "}"
         "QToolButton#buttonFind:pressed,"
         "QToolButton#buttonReplace:pressed,"
         "QToolButton#buttonReplaceAll:pressed,"
+        "QToolButton#buttonAdvanced:pressed,"
         "QToolButton#buttonClose:pressed {"
         "  background-color: %4;"
         "}"
