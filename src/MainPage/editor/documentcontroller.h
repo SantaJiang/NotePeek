@@ -90,6 +90,7 @@ signals:
     void editorCreated(CustomEditor *editor);
     void editorClosed(CustomEditor *editor);
     void fileOpened(CustomEditor *editor, const QString &filePath);
+    void emojiFontInstallationRecommended(const QString &filePath);
     void fileOpenFailed(const QString &filePath);
     void filePathChanged(CustomEditor *editor, const QString &oldFilePath, const QString &newFilePath);
     void currentFileChanged(CustomEditor *editor, const QString &filePath);

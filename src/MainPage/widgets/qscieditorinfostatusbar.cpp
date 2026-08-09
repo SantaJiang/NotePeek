@@ -147,8 +147,7 @@ void QsciEditorInfoStatusBar::applyChromeTheme()
           border().name(QColor::HexRgb));
 
     // setStyleSheet() repolishes the widget and can synchronously emit another
-    // PaletteChange. Avoid reapplying an identical sheet so that theme changes
-    // remain safe on both Qt 5 and Qt 6.
+    // PaletteChange. Avoid reapplying an identical sheet during theme changes.
     if (this->styleSheet() != styleSheet)
     {
         setStyleSheet(styleSheet);

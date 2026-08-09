@@ -4,7 +4,7 @@ Thanks for taking the time to improve NotePeek.
 
 ## Development Setup
 
-Install Qt 5.15+ or Qt 6.2+, CMake 3.16+, and a C++17 compiler. Then build from the repository root:
+Install Qt 6.2+, CMake 3.16+, and a C++17 compiler. Then build from the repository root:
 
 ```bash
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug

@@ -26,10 +26,6 @@ file(GLOB QSCINTILLA_SRC_SOURCES CONFIGURE_DEPENDS
 
 list(FILTER QSCINTILLA_SOURCES_TOP EXCLUDE REGEX "/moc_.*\\\\.cpp$")
 list(FILTER QSCINTILLA_LEXERS EXCLUDE REGEX "LexLPeg")
-if(NOT APPLE)
-    list(FILTER QSCINTILLA_SOURCES_TOP EXCLUDE REGEX "MacPasteboardMime")
-endif()
-
 file(GLOB QSCINTILLA_HEADERS_TOP CONFIGURE_DEPENDS
     ${CMAKE_CURRENT_SOURCE_DIR}/*.h
     ${CMAKE_CURRENT_SOURCE_DIR}/Qsci/*.h
@@ -83,23 +79,10 @@ target_include_directories(qscintilla2 PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/scintilla/src
 )
 
-if(Qt6_FOUND)
-    target_link_libraries(qscintilla2 PUBLIC
-        Qt6::Widgets
-        Qt6::PrintSupport
-    )
-else()
-    target_link_libraries(qscintilla2 PUBLIC
-        Qt5::Widgets
-        Qt5::PrintSupport
-    )
-    if(APPLE)
-        find_package(Qt5MacExtras QUIET)
-        if(Qt5MacExtras_FOUND)
-            target_link_libraries(qscintilla2 PUBLIC Qt5::MacExtras)
-        endif()
-    endif()
-endif()
+target_link_libraries(qscintilla2 PUBLIC
+    Qt6::Widgets
+    Qt6::PrintSupport
+)
 
 set_target_properties(qscintilla2 PROPERTIES
     OUTPUT_NAME NotePeekScintilla

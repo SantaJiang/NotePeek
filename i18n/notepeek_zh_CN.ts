@@ -113,76 +113,76 @@
 <context>
     <name>DocumentController</name>
     <message>
-        <location filename="../src/MainPage/editor/documentcontroller.cpp" line="307"/>
-        <location filename="../src/MainPage/editor/documentcontroller.cpp" line="531"/>
-        <location filename="../src/MainPage/editor/documentcontroller.cpp" line="639"/>
-        <location filename="../src/MainPage/editor/documentcontroller.cpp" line="699"/>
-        <location filename="../src/MainPage/editor/documentcontroller.cpp" line="709"/>
-        <location filename="../src/MainPage/editor/documentcontroller.cpp" line="1185"/>
+        <location filename="../src/MainPage/editor/documentcontroller.cpp" line="308"/>
+        <location filename="../src/MainPage/editor/documentcontroller.cpp" line="532"/>
+        <location filename="../src/MainPage/editor/documentcontroller.cpp" line="648"/>
+        <location filename="../src/MainPage/editor/documentcontroller.cpp" line="708"/>
+        <location filename="../src/MainPage/editor/documentcontroller.cpp" line="718"/>
+        <location filename="../src/MainPage/editor/documentcontroller.cpp" line="1194"/>
         <source>NotePeek</source>
         <translation>NotePeek</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/editor/documentcontroller.cpp" line="308"/>
-        <location filename="../src/MainPage/editor/documentcontroller.cpp" line="700"/>
+        <location filename="../src/MainPage/editor/documentcontroller.cpp" line="309"/>
+        <location filename="../src/MainPage/editor/documentcontroller.cpp" line="709"/>
         <source>Cannot prepare file %1 for saving:
 %2.</source>
         <translation>无法准备文件 %1 以进行保存：
 %2。</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/editor/documentcontroller.cpp" line="375"/>
+        <location filename="../src/MainPage/editor/documentcontroller.cpp" line="376"/>
         <source> (saving)</source>
         <translation>（正在保存）</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/editor/documentcontroller.cpp" line="532"/>
-        <location filename="../src/MainPage/editor/documentcontroller.cpp" line="1186"/>
+        <location filename="../src/MainPage/editor/documentcontroller.cpp" line="533"/>
+        <location filename="../src/MainPage/editor/documentcontroller.cpp" line="1195"/>
         <source>Cannot read file %1:
 %2.</source>
         <translation>无法读取文件 %1：
 %2。</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/editor/documentcontroller.cpp" line="640"/>
-        <location filename="../src/MainPage/editor/documentcontroller.cpp" line="710"/>
+        <location filename="../src/MainPage/editor/documentcontroller.cpp" line="649"/>
+        <location filename="../src/MainPage/editor/documentcontroller.cpp" line="719"/>
         <source>Cannot write file %1:
 %2.</source>
         <translation>无法写入文件 %1：
 %2。</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/editor/documentcontroller.cpp" line="1130"/>
+        <location filename="../src/MainPage/editor/documentcontroller.cpp" line="1139"/>
         <source>Reopen with Encoding</source>
         <translation>以指定编码重新打开</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/editor/documentcontroller.cpp" line="1131"/>
+        <location filename="../src/MainPage/editor/documentcontroller.cpp" line="1140"/>
         <source>Reopening the file will discard the unsaved changes. Continue?</source>
         <translation>重新打开文件将丢弃未保存的更改。是否继续？</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/editor/documentcontroller.cpp" line="1257"/>
+        <location filename="../src/MainPage/editor/documentcontroller.cpp" line="1266"/>
         <source>Convert Encoding</source>
         <translation>转换编码</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/editor/documentcontroller.cpp" line="1258"/>
+        <location filename="../src/MainPage/editor/documentcontroller.cpp" line="1267"/>
         <source>Some characters in this document cannot be represented in %1 and will be replaced. Continue?</source>
         <translation>本文档中的部分字符无法用 %1 表示，转换后将被替换。是否继续？</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/editor/documentcontroller.cpp" line="1557"/>
+        <location filename="../src/MainPage/editor/documentcontroller.cpp" line="1566"/>
         <source>The file was deleted outside NotePeek. Saving will recreate it.</source>
         <translation>文件已在 NotePeek 外部被删除。保存将重新创建该文件。</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/editor/documentcontroller.cpp" line="1558"/>
+        <location filename="../src/MainPage/editor/documentcontroller.cpp" line="1567"/>
         <source>The file changed outside NotePeek. Saving will overwrite those changes.</source>
         <translation>文件已在 NotePeek 外部发生更改。保存将覆盖这些更改。</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/editor/documentcontroller.cpp" line="1560"/>
+        <location filename="../src/MainPage/editor/documentcontroller.cpp" line="1569"/>
         <source>External File Conflict</source>
         <translation>外部文件冲突</translation>
     </message>
@@ -453,7 +453,7 @@
     <name>MainWindow</name>
     <message>
         <location filename="../src/MainPage/mainwindow.ui" line="14"/>
-        <location filename="../src/MainPage/mainwindow.cpp" line="929"/>
+        <location filename="../src/MainPage/mainwindow.cpp" line="947"/>
         <source>NotePeek</source>
         <translation></translation>
     </message>
@@ -499,7 +499,7 @@
     </message>
     <message>
         <location filename="../src/MainPage/mainwindow.ui" line="144"/>
-        <location filename="../src/MainPage/mainwindow.cpp" line="534"/>
+        <location filename="../src/MainPage/mainwindow.cpp" line="552"/>
         <source>Open File</source>
         <translation>打开文件</translation>
     </message>
@@ -585,7 +585,7 @@
     </message>
     <message>
         <location filename="../src/MainPage/mainwindow.ui" line="270"/>
-        <location filename="../src/MainPage/mainwindow.cpp" line="767"/>
+        <location filename="../src/MainPage/mainwindow.cpp" line="785"/>
         <source>Format Code</source>
         <translation>格式化代码</translation>
     </message>
@@ -690,42 +690,47 @@
         <translation></translation>
     </message>
     <message>
-        <location filename="../src/MainPage/mainwindow.cpp" line="251"/>
+        <location filename="../src/MainPage/mainwindow.cpp" line="197"/>
+        <source>%1 contains emoji, but no emoji-capable font was found on this system. Install an emoji font such as Noto Color Emoji, then restart NotePeek.</source>
+        <translation>%1 包含 Emoji，但此系统中未找到可显示 Emoji 的字体。请自行安装 Noto Color Emoji 等 Emoji 字体，然后重启 NotePeek。</translation>
+    </message>
+    <message>
+        <location filename="../src/MainPage/mainwindow.cpp" line="270"/>
         <source>External File Conflict</source>
         <translation>外部文件冲突</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/mainwindow.cpp" line="253"/>
+        <location filename="../src/MainPage/mainwindow.cpp" line="272"/>
         <source>%1 was deleted outside NotePeek. The in-memory copy was kept and marked modified.</source>
         <translation>%1 已在 NotePeek 外部被删除。内存中的副本已保留并标记为已修改。</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/mainwindow.cpp" line="255"/>
+        <location filename="../src/MainPage/mainwindow.cpp" line="274"/>
         <source>%1 changed outside NotePeek and could not be reloaded safely. Review the in-memory copy before overwriting it.</source>
         <translation>%1 已在 NotePeek 外部发生更改，无法安全地重新加载。覆盖前请检查内存中的副本。</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/mainwindow.cpp" line="331"/>
+        <location filename="../src/MainPage/mainwindow.cpp" line="350"/>
         <source>Encoding</source>
         <translation>编码</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/mainwindow.cpp" line="332"/>
+        <location filename="../src/MainPage/mainwindow.cpp" line="351"/>
         <source>Reopen with Encoding</source>
         <translation>以指定编码重新打开</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/mainwindow.cpp" line="333"/>
+        <location filename="../src/MainPage/mainwindow.cpp" line="352"/>
         <source>Convert to Encoding and Save</source>
         <translation>转换编码并保存</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/mainwindow.cpp" line="546"/>
+        <location filename="../src/MainPage/mainwindow.cpp" line="564"/>
         <source>Open Directory...</source>
         <translation>打开文件夹...</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/mainwindow.cpp" line="768"/>
+        <location filename="../src/MainPage/mainwindow.cpp" line="786"/>
         <source>Could not format %1.
 
 %2</source>
@@ -734,47 +739,52 @@
 %2</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/mainwindow.cpp" line="861"/>
+        <location filename="../src/MainPage/mainwindow.cpp" line="879"/>
         <source>Export Markdown to PDF</source>
         <translation>将 Markdown 导出为 PDF</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/mainwindow.cpp" line="863"/>
+        <location filename="../src/MainPage/mainwindow.cpp" line="881"/>
         <source>PDF Files (*.pdf)</source>
         <translation>PDF 文件 (*.pdf)</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/mainwindow.cpp" line="877"/>
+        <location filename="../src/MainPage/mainwindow.cpp" line="895"/>
         <source>Export Failed</source>
         <translation>导出失败</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/mainwindow.cpp" line="878"/>
+        <location filename="../src/MainPage/mainwindow.cpp" line="896"/>
         <source>Could not export Markdown to PDF.</source>
         <translation>无法将 Markdown 导出为 PDF。</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/mainwindow.cpp" line="937"/>
+        <location filename="../src/MainPage/mainwindow.cpp" line="955"/>
         <source>%1 - %2</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="../src/MainPage/mainwindow.cpp" line="971"/>
+        <location filename="../src/MainPage/mainwindow.cpp" line="989"/>
         <source>Format this file with %1</source>
         <translation>使用 %1 格式化此文件</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/mainwindow.cpp" line="972"/>
+        <location filename="../src/MainPage/mainwindow.cpp" line="990"/>
         <source>No code formatter is available for this file.</source>
         <translation>此文件没有可用的代码格式化程序。</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/mainwindow.cpp" line="932"/>
+        <location filename="../src/MainPage/mainwindow.cpp" line="950"/>
         <source>%1 - %2[*]</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="../src/MainPage/mainwindow.cpp" line="582"/>
+        <location filename="../src/MainPage/mainwindow.cpp" line="196"/>
+        <source>Emoji Font Not Installed</source>
+        <translation>未安装 Emoji 字体</translation>
+    </message>
+    <message>
+        <location filename="../src/MainPage/mainwindow.cpp" line="600"/>
         <source>For Yueyue</source>
         <translation>致玥玥</translation>
     </message>
@@ -790,12 +800,12 @@
 <context>
     <name>MarkdownPreviewer</name>
     <message>
-        <location filename="../src/MainPage/tool/markdown/markdownpreviewer.cpp" line="374"/>
+        <location filename="../src/MainPage/tool/markdown/markdownpreviewer.cpp" line="377"/>
         <source>Markdown Preview</source>
         <translation>Markdown 预览</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/tool/markdown/markdownpreviewer.cpp" line="375"/>
+        <location filename="../src/MainPage/tool/markdown/markdownpreviewer.cpp" line="378"/>
         <source>Markdown Preview - %1</source>
         <translation>Markdown 预览 - %1</translation>
     </message>
@@ -979,58 +989,58 @@
 <context>
     <name>QsciEditorInfoStatusBar</name>
     <message>
-        <location filename="../src/MainPage/widgets/qscieditorinfostatusbar.cpp" line="172"/>
+        <location filename="../src/MainPage/widgets/qscieditorinfostatusbar.cpp" line="171"/>
         <source>Length: %1    Lines: %2</source>
         <translation>长度: %1    行数: %2</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/widgets/qscieditorinfostatusbar.cpp" line="198"/>
+        <location filename="../src/MainPage/widgets/qscieditorinfostatusbar.cpp" line="197"/>
         <source>Sel: %1 | %2</source>
         <translation>选择: %1 | %2</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/widgets/qscieditorinfostatusbar.cpp" line="202"/>
+        <location filename="../src/MainPage/widgets/qscieditorinfostatusbar.cpp" line="201"/>
         <source>Sel: 0 | 0</source>
         <translation>选择: 0 | 0</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/widgets/qscieditorinfostatusbar.cpp" line="207"/>
+        <location filename="../src/MainPage/widgets/qscieditorinfostatusbar.cpp" line="206"/>
         <source>Ln: %1    Col: %2    </source>
         <translation>行: %1    列: %2    </translation>
     </message>
     <message>
-        <location filename="../src/MainPage/widgets/qscieditorinfostatusbar.cpp" line="220"/>
+        <location filename="../src/MainPage/widgets/qscieditorinfostatusbar.cpp" line="219"/>
         <source>Plain Text</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="../src/MainPage/widgets/qscieditorinfostatusbar.cpp" line="229"/>
+        <location filename="../src/MainPage/widgets/qscieditorinfostatusbar.cpp" line="228"/>
         <source>Mixed line endings</source>
         <translation>混合换行符</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/widgets/qscieditorinfostatusbar.cpp" line="236"/>
+        <location filename="../src/MainPage/widgets/qscieditorinfostatusbar.cpp" line="235"/>
         <source>Windows (CR LF)</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="../src/MainPage/widgets/qscieditorinfostatusbar.cpp" line="239"/>
+        <location filename="../src/MainPage/widgets/qscieditorinfostatusbar.cpp" line="238"/>
         <source>Unix (LF)</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="../src/MainPage/widgets/qscieditorinfostatusbar.cpp" line="242"/>
+        <location filename="../src/MainPage/widgets/qscieditorinfostatusbar.cpp" line="241"/>
         <source>Macintosh (CR)</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="../src/MainPage/widgets/qscieditorinfostatusbar.cpp" line="245"/>
-        <location filename="../src/MainPage/widgets/qscieditorinfostatusbar.cpp" line="259"/>
+        <location filename="../src/MainPage/widgets/qscieditorinfostatusbar.cpp" line="244"/>
+        <location filename="../src/MainPage/widgets/qscieditorinfostatusbar.cpp" line="258"/>
         <source>Unknown</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="../src/MainPage/widgets/qscieditorinfostatusbar.cpp" line="259"/>
+        <location filename="../src/MainPage/widgets/qscieditorinfostatusbar.cpp" line="258"/>
         <source>UTF-8</source>
         <translation></translation>
     </message>

@@ -74,49 +74,42 @@ private slots:
         }
     }
 
-    void detectsAndRoundTripsGb18030()
+    void reopensAndRoundTripsLatin1()
     {
-        if (!DocumentFormatCodec::legacyEncodingsAvailable())
-        {
-            QSKIP("This build has no legacy text codecs.");
-        }
-
         QTemporaryDir tempDir;
         QVERIFY(tempDir.isValid());
-        const QString path = tempDir.filePath(QStringLiteral("comment.c"));
+        const QString path = tempDir.filePath(QStringLiteral("latin1.txt"));
 
-        // "// 中文注释\n" as a Chinese-locale source file would store it.
-        const QByteArray gbBytes("// \xd6\xd0\xce\xc4\xd7\xa2\xca\xcd\n");
+        const QByteArray latin1Bytes("caf\xe9\n", 5);
         QFile file(path);
         QVERIFY(file.open(QIODevice::WriteOnly));
-        QCOMPARE(file.write(gbBytes), qint64(gbBytes.size()));
+        QCOMPARE(file.write(latin1Bytes), qint64(latin1Bytes.size()));
         file.close();
 
-        // A file that is not UTF-8 still opens, tagged with the encoding it
-        // was read as, rather than being rejected.
         QString content;
         DocumentFormat format;
         QString error;
-        QVERIFY2(DocumentIO::loadTextFile(path, &content, &format, &error), qPrintable(error));
-        QCOMPARE(content, QStringLiteral("// 中文注释\n"));
-        QCOMPARE(format.encoding, DocumentEncoding::Gb18030);
+        QByteArray editorContent;
+        QVERIFY2(DocumentIO::loadEditorFileWithEncoding(path,
+                                                        DocumentEncoding::Latin1,
+                                                        &editorContent,
+                                                        &format,
+                                                        &error),
+                 qPrintable(error));
+        content = QString::fromUtf8(editorContent);
+        QCOMPARE(content, QStringLiteral("café\n"));
+        QCOMPARE(format.encoding, DocumentEncoding::Latin1);
 
-        // Saving it back must reproduce the original bytes exactly.
         QVERIFY2(DocumentIO::saveTextFile(path, content, format, &error), qPrintable(error));
         QVERIFY(file.open(QIODevice::ReadOnly));
-        QCOMPARE(file.readAll(), gbBytes);
+        QCOMPARE(file.readAll(), latin1Bytes);
         file.close();
     }
 
-    void reportsCharactersALegacyEncodingCannotStore()
+    void reportsCharactersLatin1CannotStore()
     {
-        if (!DocumentFormatCodec::legacyEncodingsAvailable())
-        {
-            QSKIP("This build has no legacy text codecs.");
-        }
-
-        QVERIFY(DocumentFormatCodec::canRepresent(QStringLiteral("中文"), DocumentEncoding::Gb18030));
         QVERIFY(!DocumentFormatCodec::canRepresent(QStringLiteral("中文"), DocumentEncoding::Latin1));
+        QVERIFY(DocumentFormatCodec::canRepresent(QStringLiteral("café"), DocumentEncoding::Latin1));
         // The UTF encodings always cover the whole of Unicode.
         QVERIFY(DocumentFormatCodec::canRepresent(QStringLiteral("中文😀"), DocumentEncoding::Utf8));
     }

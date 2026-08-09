@@ -15,6 +15,7 @@
 #include <NotePeek/lexerfactory.h>
 #include "editor/editorpane.h"
 #include "find/findreplacemanager.h"
+#include "tool/markdown/emojifontsupport.h"
 
 #include <QApplication>
 #include <QCoreApplication>
@@ -547,8 +548,12 @@ void DocumentController::onFileLoaded(const DocumentLoadResult &result)
     const bool largeFile = result.largeFile;
     const bool activate = pending.activate;
     const int previousIndex = pending.previousIndex;
+    const bool recommendEmojiFont = isMarkdownPath(filePath)
+                                    && EmojiFontSupport::shouldRecommendInstallation(
+                                        result.content,
+                                        EmojiFontSupport::hasSystemEmojiFont());
     insertContentInChunks(editor, result.content,
-                          [this, editorGuard, pageGuard, format, filePath, largeFile, activate, previousIndex]() {
+                          [this, editorGuard, pageGuard, format, filePath, largeFile, activate, previousIndex, recommendEmojiFont]() {
         if (!editorGuard)
             return;
 
@@ -579,6 +584,10 @@ void DocumentController::onFileLoaded(const DocumentLoadResult &result)
         }
 
         m_editorsLoading.remove(editor);
+        if (recommendEmojiFont)
+        {
+            emit emojiFontInstallationRecommended(filePath);
+        }
         emit fileOpened(editor, filePath);
     });
 }

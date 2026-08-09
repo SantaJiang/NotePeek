@@ -43,12 +43,6 @@ private:
 
 int main(int argc, char *argv[])
 {
-    //high dpi
-#if QT_VERSION < QT_VERSION_CHECK(6,0,0)
-    QApplication::setAttribute(Qt::AA_UseHighDpiPixmaps);
-    QApplication::setAttribute(Qt::AA_EnableHighDpiScaling);
-#endif
-
     QApplication a(argc, argv);
     QCoreApplication::setOrganizationName("NotePeek");
     QCoreApplication::setApplicationName("NotePeek");
@@ -91,14 +85,6 @@ int main(int argc, char *argv[])
     {
         qWarning() << "Failed to load Fira Code from resource";
     }
-    // Bundle a color-emoji family so glyphs like 📄 render even on systems that
-    // ship no emoji font (common on Linux).  It sits last in the Markdown font
-    // fallback stacks, behind the platform-native emoji fonts on macOS/Windows.
-    if (QFontDatabase::addApplicationFont(QStringLiteral("://resource/NotoColorEmoji.ttf")) == -1)
-    {
-        qWarning() << "Failed to load Noto Color Emoji from resource";
-    }
-
     // Load persisted user preferences after the fonts are registered so font
     // validation sees the bundled families, and before the translator so the
     // language preference can override the system locale.

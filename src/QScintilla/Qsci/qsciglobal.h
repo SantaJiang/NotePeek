@@ -35,9 +35,9 @@
 #define NOTEPEEK_QSCINTILLA_UPSTREAM_STR QSCINTILLA_VERSION_STR
 
 
-// We only support Qt v5.11 and later.
-#if QT_VERSION < 0x050b00
-#error "Qt v5.11.0 or later is required"
+// NotePeek supports Qt 6.2 and later.
+#if QT_VERSION < QT_VERSION_CHECK(6, 2, 0)
+#error "Qt 6.2.0 or later is required"
 #endif
 
 

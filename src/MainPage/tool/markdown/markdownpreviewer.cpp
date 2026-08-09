@@ -66,7 +66,10 @@ MarkdownRenderStyle captureMarkdownRenderStyle(MarkdownRenderMode mode)
 
     const bool pdfMode = mode == MarkdownRenderMode::Pdf;
     const AppPreferences &prefs = AppPreferences::instance();
-    const QString emojiFallback = QStringLiteral("\"Apple Color Emoji\", \"Segoe UI Emoji\", \"Noto Color Emoji\"");
+    const QString emojiFallback = QStringLiteral(
+        "\"Apple Color Emoji\", \"Segoe UI Emoji\", \"Noto Color Emoji\", "
+        "\"Noto Emoji\", \"Twemoji Mozilla\", \"Twitter Color Emoji\", "
+        "\"EmojiOne Color\", \"JoyPixels\", Symbola");
 
     MarkdownRenderStyle style;
     style.bodyBg = pdfMode ? QStringLiteral("#ffffff") : cssColor(MP::bodyBg());
@@ -82,9 +85,9 @@ MarkdownRenderStyle captureMarkdownRenderStyle(MarkdownRenderMode mode)
     style.bodyMargin = pdfMode
                            ? QStringLiteral("0")
                            : QStringLiteral("28px %1px").arg(MarkdownPreviewLayout::ScreenHorizontalMargin);
-    style.bodyFontFamily = QStringLiteral("\"%1\", -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif, %2")
+    style.bodyFontFamily = QStringLiteral("\"%1\", -apple-system, BlinkMacSystemFont, \"Segoe UI\", %2, sans-serif")
                                .arg(prefs.textFontFamily(), emojiFallback);
-    style.codeFontFamily = QStringLiteral("\"%1\", Menlo, Consolas, monospace, %2")
+    style.codeFontFamily = QStringLiteral("\"%1\", Menlo, Consolas, %2, monospace")
                                .arg(prefs.codeFontFamily(), emojiFallback);
     return style;
 }

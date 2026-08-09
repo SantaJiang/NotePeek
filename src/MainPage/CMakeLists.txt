@@ -1,13 +1,9 @@
 set(NOTEPEEK_QT_LIBS
-    Qt${NOTEPEEK_QT_MAJOR}::Widgets
-    Qt${NOTEPEEK_QT_MAJOR}::PrintSupport
-    Qt${NOTEPEEK_QT_MAJOR}::Svg
-    Qt${NOTEPEEK_QT_MAJOR}::Concurrent
+    Qt6::Widgets
+    Qt6::PrintSupport
+    Qt6::Svg
+    Qt6::Concurrent
 )
-
-if(NOTEPEEK_HAVE_QT5COMPAT)
-    list(APPEND NOTEPEEK_QT_LIBS Qt6::Core5Compat)
-endif()
 
 add_library(notepeek_core STATIC
     apppreferences.cpp
@@ -34,6 +30,8 @@ add_library(notepeek_core STATIC
     tool/cpp/headersourcemanager.h
     tool/format/codeformatter.cpp
     tool/format/codeformatter.h
+    tool/markdown/emojifontsupport.cpp
+    tool/markdown/emojifontsupport.h
     tool/markdown/markdownpreviewer.cpp
     tool/markdown/markdownpreviewer.h
     themecolors.h
@@ -56,10 +54,6 @@ target_include_directories(notepeek_core PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/../third_party/cmark-gfm/extensions
     ${CMAKE_CURRENT_BINARY_DIR}/../third_party/cmark-gfm/extensions
 )
-if(NOTEPEEK_HAVE_QT5COMPAT)
-    target_compile_definitions(notepeek_core PUBLIC NOTEPEEK_HAVE_QT5COMPAT)
-endif()
-
 notepeek_configure_project_target(notepeek_core)
 
 add_library(notepeek_widgets STATIC
@@ -134,39 +128,26 @@ if(WIN32)
 endif()
 
 # ---- Translations ----
-if(Qt6_FOUND)
-    file(GLOB_RECURSE NOTEPEEK_TRANSLATION_SOURCES CONFIGURE_DEPENDS
-        "${CMAKE_CURRENT_SOURCE_DIR}/*.cpp"
-        "${CMAKE_CURRENT_SOURCE_DIR}/*.h"
-        "${CMAKE_CURRENT_SOURCE_DIR}/*.ui"
+file(GLOB_RECURSE NOTEPEEK_TRANSLATION_SOURCES CONFIGURE_DEPENDS
+    "${CMAKE_CURRENT_SOURCE_DIR}/*.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/*.h"
+    "${CMAKE_CURRENT_SOURCE_DIR}/*.ui"
+)
+if(Qt6_VERSION VERSION_LESS 6.7)
+    qt_add_translations(notepeek
+        TS_FILES ${CMAKE_SOURCE_DIR}/i18n/notepeek_zh_CN.ts
+        SOURCES ${NOTEPEEK_TRANSLATION_SOURCES}
+        LUPDATE_OPTIONS -no-obsolete
+        RESOURCE_PREFIX "/i18n"
     )
-    if(Qt6_VERSION VERSION_LESS 6.7)
-        qt_add_translations(notepeek
-            TS_FILES ${CMAKE_SOURCE_DIR}/i18n/notepeek_zh_CN.ts
-            SOURCES ${NOTEPEEK_TRANSLATION_SOURCES}
-            LUPDATE_OPTIONS -no-obsolete
-            RESOURCE_PREFIX "/i18n"
-        )
-    else()
-        add_custom_target(notepeek_translation_sources SOURCES ${NOTEPEEK_TRANSLATION_SOURCES})
-        qt_add_translations(notepeek
-            SOURCE_TARGETS notepeek_translation_sources
-            TS_FILES ${CMAKE_SOURCE_DIR}/i18n/notepeek_zh_CN.ts
-            LUPDATE_OPTIONS -no-obsolete
-            RESOURCE_PREFIX "/i18n"
-        )
-    endif()
 else()
-    qt5_add_translation(QM_FILES
-        ${CMAKE_SOURCE_DIR}/i18n/notepeek_zh_CN.ts
+    add_custom_target(notepeek_translation_sources SOURCES ${NOTEPEEK_TRANSLATION_SOURCES})
+    qt_add_translations(notepeek
+        SOURCE_TARGETS notepeek_translation_sources
+        TS_FILES ${CMAKE_SOURCE_DIR}/i18n/notepeek_zh_CN.ts
+        LUPDATE_OPTIONS -no-obsolete
+        RESOURCE_PREFIX "/i18n"
     )
-    file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/translations.qrc
-"<RCC>
-    <qresource prefix=\"/i18n\">
-        <file alias=\"notepeek_zh_CN.qm\">notepeek_zh_CN.qm</file>
-    </qresource>
-</RCC>")
-    target_sources(notepeek PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/translations.qrc)
 endif()
 
 # ---- Platform-specific ----
@@ -233,7 +214,7 @@ endif()
 # ---- Deploy (Qt 6.3+ only) ----
 # qt_generate_deploy_app_script was introduced in Qt 6.3. Linux packages use
 # their declared system Qt dependencies instead of bundling Qt libraries.
-if(Qt6_FOUND AND COMMAND qt_generate_deploy_app_script AND (APPLE OR WIN32))
+if(COMMAND qt_generate_deploy_app_script AND (APPLE OR WIN32))
     qt_generate_deploy_app_script(
         TARGET notepeek
         OUTPUT_SCRIPT deploy_script

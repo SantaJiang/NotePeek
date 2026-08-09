@@ -79,7 +79,7 @@ if(TARGET litehtml)
   add_library(qlitehtml ${QLITEHTML_LIBRARY_TYPE} ${PUBLIC_HEADERS} container_qpainter.cpp qlitehtmlwidget.cpp)
 
   target_include_directories(qlitehtml PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>)
-  target_link_libraries(qlitehtml PUBLIC Qt${QT_VERSION_MAJOR}::Widgets PRIVATE litehtml)
+  target_link_libraries(qlitehtml PUBLIC Qt6::Widgets PRIVATE litehtml)
   target_compile_definitions(qlitehtml PRIVATE
     QT_NO_JAVA_STYLE_ITERATORS
     QT_NO_CAST_TO_ASCII QT_RESTRICTED_CAST_FROM_ASCII
@@ -89,8 +89,8 @@ if(TARGET litehtml)
   else()
     target_compile_definitions(qlitehtml PUBLIC QLITEHTML_STATIC_LIBRARY)
   endif()
-  if(TARGET Qt${QT_VERSION_MAJOR}::PrintSupport)
-    target_link_libraries(qlitehtml PRIVATE Qt${QT_VERSION_MAJOR}::PrintSupport)
+  if(TARGET Qt6::PrintSupport)
+    target_link_libraries(qlitehtml PRIVATE Qt6::PrintSupport)
     target_compile_definitions(qlitehtml PRIVATE QLITEHTML_HAS_QPRINTER=1)
   else()
     target_compile_definitions(qlitehtml PRIVATE QLITEHTML_HAS_QPRINTER=0)

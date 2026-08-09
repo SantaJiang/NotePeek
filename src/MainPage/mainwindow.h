@@ -126,6 +126,7 @@ private:
     bool m_fileExplorerRootExplicit;
     bool m_reapplyingChromeTheme = false;
     bool m_chromeThemeRefreshPending = false;
+    bool m_emojiFontWarningShown = false;
     FindReplaceManager *m_findReplaceManager;
     HeaderSourceManager *m_headerSourceManager;
     MarkdownPreviewer *m_markdownPreviewer;
