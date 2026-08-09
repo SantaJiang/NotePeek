@@ -227,7 +227,6 @@ private slots:
             markdown.append(QStringLiteral("# Heading\n\nSome *emphasis*, a [link](https://example.com) "
                                            "and `code`.\n\n- item one\n- item two\n\n"));
 
-        // Qt 5's QSignalSpy needs the custom result type registered to record it.
         qRegisterMetaType<MarkdownRenderResult>("MarkdownRenderResult");
         MarkdownPreviewer previewer;
         QSignalSpy rendered(&previewer, &MarkdownPreviewer::previewRendered);

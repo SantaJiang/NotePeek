@@ -10,24 +10,14 @@ namespace {
 constexpr int kMinFontSize = 6;
 constexpr int kMaxFontSize = 288;
 
-// QFontDatabase became fully static in Qt6 but is instance-based in Qt5; wrap
-// the two queries the preferences need so the code builds against both.
 bool familyInstalled(const QString &family)
 {
-#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
     return QFontDatabase::hasFamily(family);
-#else
-    return QFontDatabase().hasFamily(family);
-#endif
 }
 
 bool familyFixedPitch(const QString &family)
 {
-#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
     return QFontDatabase::isFixedPitch(family);
-#else
-    return QFontDatabase().isFixedPitch(family);
-#endif
 }
 
 // The first font family from candidates that is actually installed.  The

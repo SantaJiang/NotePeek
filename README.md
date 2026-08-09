@@ -2,7 +2,7 @@
 
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 [![Platforms: macOS | Windows | Linux](https://img.shields.io/badge/Platforms-macOS%20%7C%20Windows%20%7C%20Linux-lightgrey)](https://github.com/SantaSpeeds/NotePeek/releases)
-[![Qt](https://img.shields.io/badge/Qt-5.15%2B%20%7C%206.2%2B-green)](https://www.qt.io/)
+[![Qt](https://img.shields.io/badge/Qt-6.2%2B-green)](https://www.qt.io/)
 
 **NotePeek** is a modern, lightweight, cross-platform code/text editor built with Qt and QScintilla. It provides a clean interface, essential editing features, and native packaging for macOS, Windows, and Linux.
 
@@ -59,7 +59,7 @@ NotePeek’s syntax highlighting covers **50+ languages and file formats** via i
 
 ### Prerequisites
 
-- **Qt** 5.15+ or Qt 6.2+ (with components: Widgets, PrintSupport, Svg, Concurrent, LinguistTools)
+- **Qt** 6.2+ (with components: Widgets, PrintSupport, Svg, Concurrent, LinguistTools)
 - **CMake** 3.16+
 - **C++17** compiler (GCC/Clang/MSVC)
 - **Optional for packaging**:

@@ -8,7 +8,7 @@ distributed under GNU GPL version 3.0 when they form part of QScintilla.
 - Replaced the upstream qmake-only library build with the project CMake target.
 - Renamed the shipped binary to `NotePeekScintilla` and assigned an independent
   fork version and ABI.
-- Added Qt 5/6 and cross-platform packaging integration.
+- Added Qt 6 and cross-platform packaging integration.
 
 ## Lexer wrappers
 

@@ -243,20 +243,9 @@ static Selection::Element selection_element_at_point(const litehtml::element::pt
     return result;
 }
 
-// CSS: 400 == normal, 700 == bold.
-// Qt5: 50 == normal, 75 == bold
-// Qt6: == CSS
 static QFont::Weight cssWeightToQtWeight(int cssWeight)
 {
-#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
     return QFont::Weight(cssWeight);
-#else
-    if (cssWeight <= 400)
-        return QFont::Weight(cssWeight * 50 / 400);
-    if (cssWeight >= 700)
-        return QFont::Weight(75 + (cssWeight - 700) * 25 / 300);
-    return QFont::Weight(50 + (cssWeight - 400) * 25 / 300);
-#endif
 }
 
 static QFont::Style toQFontStyle(litehtml::font_style style)

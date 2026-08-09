@@ -185,6 +185,25 @@ MainWindow::MainWindow(QWidget *parent,
         // actions; they have to be re-evaluated once the load completes.
         connect(controller, &DocumentController::fileOpened,
                 this, [this](CustomEditor *, const QString &) { updateToolActions(); });
+        connect(controller, &DocumentController::emojiFontInstallationRecommended,
+                this, [this](const QString &filePath) {
+                    if (m_emojiFontWarningShown)
+                        return;
+
+                    m_emojiFontWarningShown = true;
+                    auto *message = new QMessageBox(
+                        QMessageBox::Information,
+                        tr("Emoji Font Not Installed"),
+                        tr("%1 contains emoji, but no emoji-capable font was found on this "
+                           "system. Install an emoji font such as Noto Color Emoji, "
+                           "then restart NotePeek.")
+                            .arg(QFileInfo(filePath).fileName()),
+                        QMessageBox::Ok,
+                        this);
+                    message->setAttribute(Qt::WA_DeleteOnClose);
+                    message->setModal(false);
+                    message->show();
+                });
         connect(controller, &DocumentController::fileOpened,
                 this, [this](CustomEditor *editor, const QString &filePath) {
                     if (!m_pendingSearchJump.active
@@ -332,8 +351,7 @@ void MainWindow::setupEncodingMenu()
     m_reopenEncodingMenu = m_encodingMenu->addMenu(tr("Reopen with Encoding"));
     m_convertEncodingMenu = m_encodingMenu->addMenu(tr("Convert to Encoding and Save"));
 
-    // Unicode first, then the legacy code pages (only present when this build
-    // has codec support for them), separated so the common choices stay on top.
+    // Unicode first, then ISO-8859-1, separated so the common choices stay on top.
     bool separatorPending = false;
     for (DocumentEncoding encoding : DocumentFormatCodec::supportedEncodings())
     {

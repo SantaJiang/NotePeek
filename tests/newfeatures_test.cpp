@@ -32,6 +32,7 @@
 #include "mainwindow.h"
 #include "preferencesdialog.h"
 #include "tool/cpp/headersourcemanager.h"
+#include "tool/markdown/emojifontsupport.h"
 #include "widgets/fileexplorerdock.h"
 #include "widgets/filetypefilterproxymodel.h"
 #include "widgets/searchresultsdock.h"
@@ -61,8 +62,21 @@ class NewFeaturesTest : public QObject
 private slots:
     void initTestCase()
     {
-        // Qt 5's QSignalSpy needs the custom result type registered to record it.
         qRegisterMetaType<FileSearchOutcome>("FileSearchOutcome");
+    }
+
+    void detectsEmojiWithoutTreatingOrdinaryUnicodeAsEmoji()
+    {
+        QVERIFY(!QFile::exists(QStringLiteral(":/resource/NotoColorEmoji.ttf")));
+        QVERIFY(!EmojiFontSupport::containsEmoji(QByteArrayLiteral("plain Markdown 中文")));
+        QVERIFY(!EmojiFontSupport::containsEmoji(QStringLiteral("Copyright © 2026").toUtf8()));
+        QVERIFY(EmojiFontSupport::containsEmoji(QStringLiteral("Copyright ©️ 2026").toUtf8()));
+        QVERIFY(EmojiFontSupport::containsEmoji(QStringLiteral("status: ✅").toUtf8()));
+        QVERIFY(EmojiFontSupport::containsEmoji(QStringLiteral("developer 👩🏽‍💻").toUtf8()));
+        QVERIFY(EmojiFontSupport::shouldRecommendInstallation(
+            QStringLiteral("flag 🇨🇳").toUtf8(), false));
+        QVERIFY(!EmojiFontSupport::shouldRecommendInstallation(
+            QStringLiteral("flag 🇨🇳").toUtf8(), true));
     }
 
     // Constructing the shell wires up docks, menus and the pane controllers in

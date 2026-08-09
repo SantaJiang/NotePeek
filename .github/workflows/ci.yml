@@ -92,9 +92,6 @@ jobs:
           version: '6.8.3'
           arch: ${{ matrix.qt-arch }}
           tools: ${{ matrix.qt-tools }}
-          # Core5Compat provides QTextCodec, which backs the legacy
-          # (GB18030, Big5, Shift-JIS, EUC-KR) document encodings.
-          modules: 'qt5compat'
           cache: true
           cache-key-prefix: notepeek-qt-${{ matrix.artifact-name }}
       - name: Install Linux packaging tools
@@ -148,36 +145,8 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
-  qt5-compatibility:
-    needs: version_gate
-    if: needs.version_gate.outputs.run_ci == 'true'
-    runs-on: ubuntu-22.04
-    steps:
-      - uses: actions/checkout@v6
-      - uses: jurplel/install-qt-action@v4
-        with:
-          version: '5.15.2'
-          cache: true
-      - name: Configure Qt 5.15
-        run: >-
-          cmake -S . -B build-compat -G Ninja
-          -DCMAKE_BUILD_TYPE=Release
-          -DNOTEPEEK_FORCE_QT_MAJOR=5
-      - name: Build
-        run: >-
-          python scripts/ci_command.py
-          --title "Qt 5.15 build failed"
-          -- cmake --build build-compat --parallel 2
-      - name: Test
-        env:
-          QT_QPA_PLATFORM: offscreen
-        run: >-
-          python scripts/ci_command.py
-          --title "Qt 5.15 tests failed"
-          -- ctest --test-dir build-compat --output-on-failure
-
   publish-release:
-    needs: [version_gate, build-and-test, qt5-compatibility]
+    needs: [version_gate, build-and-test]
     if: needs.version_gate.outputs.release == 'true'
     runs-on: ubuntu-24.04
     permissions:

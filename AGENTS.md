@@ -13,27 +13,20 @@ triggers every job below, so treat a one-line version edit as a full-CI event,
 not a trivial safe change.
 
 **CI matrix** (`build-and-test`): Ubuntu x86_64, Ubuntu arm64, Windows, macOS
-arm64, macOS Intel — all on Qt 6.8.3. A separate `qt5-compatibility` job builds
-with Qt 5.15.2 (`-DNOTEPEEK_FORCE_QT_MAJOR=5`).
+arm64, macOS Intel — all on Qt 6.8.3.
 
 Before declaring work done, reason about — and where possible build — the
 following. Do not limit verification to the files you touched.
 
-- **Qt 5 / Qt 6 API parity.** The single most common CI break is code that
-  compiles on Qt 6 but not Qt 5. The classic trap: container `.size()`
-  (`QString::size()`, `QByteArray::size()`, `QList::size()`, …) returns `int`
-  on Qt 5 and `qsizetype` on Qt 6, so `qMin(x, container.size())` deduces
-  conflicting types and fails the Qt 5 build. Cast explicitly:
-  `qMin(x, qsizetype(container.size()))`. Audit every `qMin`/`qMax` you add or
-  touch.
+- **Qt 6 API baseline.** The project requires Qt 6.2 or newer and CI packages
+  with Qt 6.8.3. Do not add older-major fallbacks, version-selection options, or
+  compatibility-module dependencies.
 - **Build beyond the files you touched.** Latent bugs in untouched files
   surface when CI compiles the whole project. After editing, build at least
-  `notepeek_core` and `notepeek_widgets` and run `ctest` on **both** Qt major
-  versions, not just the one you happen to have installed.
-- **Platform-specific behavior.** Text-codec behavior (GB18030 and other
-  legacy encodings via qt5compat/Core5Compat), font availability, and
-  timing-based tests differ across the Linux/macOS/Windows runners. A test
-  passing on your machine does not prove it passes on CI.
+  `notepeek_core` and `notepeek_widgets` and run `ctest` with Qt 6.
+- **Platform-specific behavior.** Font availability and timing-based tests
+  differ across the Linux/macOS/Windows runners. A test passing on your
+  machine does not prove it passes on CI.
 - **Performance budgets.** Some tests assert wall-clock budgets (e.g.
   "2 MB highlight < 5 s", "viewport semantic worker < 2 ms"). These are tight
   on the slow macOS Intel runner. Flag any change that touches editor rendering
@@ -48,29 +41,22 @@ following. Do not limit verification to the files you touched.
 Local CI-equivalent checks (run before considering the task complete):
 
 ```bash
-# Qt 6 (primary)
 cmake -S . -B build-qt6 -G Ninja -DCMAKE_BUILD_TYPE=Debug \
   -DNOTEPEEK_WARNINGS_AS_ERRORS=ON
 cmake --build build-qt6 --parallel
 ctest --test-dir build-qt6 --output-on-failure
-
-# Qt 5.15 (compatibility — a version bump runs this in CI)
-cmake -S . -B build-qt5 -G Ninja -DCMAKE_BUILD_TYPE=Debug \
-  -DNOTEPEEK_FORCE_QT_MAJOR=5 -DCMAKE_PREFIX_PATH=<path-to-qt5>
-cmake --build build-qt5 --parallel
-ctest --test-dir build-qt5 --output-on-failure
 ```
 
-If you cannot run a platform locally (no Qt 5 install, no Windows, etc.),
-**say so explicitly** and reason about that axis instead of staying silent.
-Never claim "tests pass" when you only ran one Qt major on one OS.
+If you cannot run a platform locally (no Windows, Linux, etc.), **say so
+explicitly** and reason about that axis instead of staying silent. Never claim
+cross-platform coverage when you only ran on one OS.
 
 ## 2. Self-review the change you just made
 
 Before staging a commit, re-read every file in your diff end to end and look
 for, at minimum:
 
-- Type mismatches that compile on one Qt major but not the other (rule 1).
+- Qt APIs newer than the documented minimum without a guarded fallback.
 - Null / empty / deselection edge cases in signal handlers
   (e.g. `currentRowChanged` receiving `-1`, `item(row)` returning `nullptr`).
 - Fragile coupling between widgets (e.g. sidebar row index assumed to equal a
@@ -95,8 +81,8 @@ Iterate the review until no new issue is found. Only then proceed to commit.
 After a commit authored by an AI agent, leave the working tree as the human
 would expect:
 
-- Remove local build directories you created during the task: `build-qt5/`,
-  `build-qt6/`, `build-ci/`, `build-compat/`, `cmake-build-*/`,
+- Remove local build directories you created during the task: `build-qt6/`,
+  `build-ci/`, `cmake-build-*/`,
   `.cache/build-*/`, and any scratch dirs under `/var/folders/…` or `/tmp`.
 - Remove editor/IDE temp files you introduced (`.DS_Store`, `*.autosave`,
   a `compile_commands.json` generated outside a build dir, `.qtcreator/`

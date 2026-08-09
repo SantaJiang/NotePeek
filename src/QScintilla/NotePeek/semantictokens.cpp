@@ -25,16 +25,9 @@ struct MaskDialect
     bool backtickStrings = false;
 };
 
-// Compared character by character rather than through QStringView::mid so the
-// same source builds against both Qt 5.15 and Qt 6.
 bool matchesAt(const QString &line, int index, QLatin1String needle)
 {
-    if (index < 0 || index + needle.size() > line.size())
-        return false;
-    for (int i = 0; i < needle.size(); ++i)
-        if (line.at(index + i) != QLatin1Char(needle.data()[i]))
-            return false;
-    return true;
+    return index >= 0 && QStringView(line).mid(index).startsWith(needle);
 }
 
 void blankRange(QString &masked, int from, int count)

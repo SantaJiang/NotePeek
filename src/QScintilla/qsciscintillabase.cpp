@@ -79,11 +79,6 @@ static const QLatin1String mimeTextPlain("text/plain");
 static const QLatin1String mimeRectangularWin("MSDEVColumnSelect");
 static const QLatin1String mimeRectangular("text/x-qscintilla-rectangular");
 
-#if QT_VERSION < 0x060000 && defined(Q_OS_OSX)
-extern void initialiseRectangularPasteboardMime();
-#endif
-
-
 // The ctor.
 QsciScintillaBase::QsciScintillaBase(QWidget *parent)
     : QAbstractScrollArea(parent), preeditPos(-1), preeditNrBytes(0),
@@ -108,10 +103,6 @@ QsciScintillaBase::QsciScintillaBase(QWidget *parent)
     viewport()->setAttribute(Qt::WA_NoSystemBackground);
 
     triple_click.setSingleShot(true);
-
-#if QT_VERSION < 0x060000 && defined(Q_OS_OSX)
-    initialiseRectangularPasteboardMime();
-#endif
 
     sci = new QsciScintillaQt(this);
 
@@ -327,7 +318,7 @@ void QsciScintillaBase::focusOutEvent(QFocusEvent *e)
         // Only tell Scintilla we have lost focus if the new active window
         // isn't our auto-completion list.  This is probably only an issue on
         // Linux and there are still problems because subsequent focus out
-        // events don't always seem to get generated (at least with Qt5).
+        // Subsequent focus-out events do not always seem to get generated.
 
         QWidget *aw = QApplication::activeWindow();
 
