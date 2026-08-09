@@ -100,6 +100,18 @@ jobs:
         uses: softprops/action-gh-release@v3
         with:
           generate_release_notes: true
+          body: |
+            ## macOS 安装提示
+
+            当前 macOS 安装包未使用 Apple Developer ID 签名和公证。从本页面下载后，macOS 可能提示应用“已损坏”或无法验证开发者。
+
+            请先将 `NotePeek.app` 拖入“应用程序”文件夹，然后在“终端”中运行：
+
+            ```bash
+            xattr -dr com.apple.quarantine /Applications/NotePeek.app
+            ```
+
+            完成后即可正常打开。请只对从本项目官方 GitHub Release 页面下载的安装包执行此命令。
           fail_on_unmatched_files: true
           files: release-assets/*
         env:
