@@ -6,6 +6,8 @@
 #include <QFileDialog>
 #include <QScreen>
 #include <QFileInfo>
+#include <QFutureWatcher>
+#include <QPointer>
 #include <QDir>
 #include <QScrollBar>
 #include <QMessageBox>
@@ -17,10 +19,14 @@
 #include <QApplication>
 #include <QProcess>
 #include <QScopedValueRollback>
+#include <QSet>
 #include <QTimer>
 #include <QDockWidget>
 #include <QMenu>
 #include <QSplitter>
+#include <QtConcurrent>
+
+#include <utility>
 #include "editor/documentformat.h"
 #include "editor/customeditor.h"
 #include "editor/documentcontroller.h"
@@ -577,6 +583,17 @@ bool MainWindow::on_action_save_triggered()
     return activeController()->save();
 }
 
+bool MainWindow::on_action_saveAll_triggered()
+{
+    QSet<void *> processedDocuments;
+    for (DocumentController *controller : std::as_const(m_documentControllers))
+    {
+        if (controller && !controller->saveAll(&processedDocuments))
+            return false;
+    }
+    return true;
+}
+
 bool MainWindow::on_action_saveAs_triggered()
 {
     return activeController()->saveAs();
@@ -760,7 +777,8 @@ void MainWindow::on_action_formatCode_triggered()
 {
     DocumentController *controller = activeController();
     CustomEditor *editor = controller->currentEditor();
-    if (!editor || controller->pane()->isCurrentEditorHidden() || editor->isReadOnly())
+    if (!editor || controller->pane()->isCurrentEditorHidden() || editor->isReadOnly()
+        || editor->property("notepeekFormattingInProgress").toBool())
         return;
 
     const QString filePath = editor->filePath();
@@ -775,42 +793,73 @@ void MainWindow::on_action_formatCode_triggered()
     options.eol = eolText(editor->eolMode());
 
     const QString original = editor->text();
-    QApplication::setOverrideCursor(Qt::WaitCursor);
-    const CodeFormatter::Result result = CodeFormatter::format(original, filePath, options);
-    QApplication::restoreOverrideCursor();
+    const quint64 revision = editor->documentRevision();
+    QPointer<CustomEditor> editorGuard(editor);
+    editor->setProperty("notepeekFormattingInProgress", true);
+    updateToolActions();
 
-    if (!result.ok)
-    {
-        QMessageBox::warning(this,
-                             tr("Format Code"),
-                             tr("Could not format %1.\n\n%2")
-                                 .arg(QFileInfo(filePath).fileName(), result.error));
-        return;
-    }
+    auto *watcher = new QFutureWatcher<CodeFormatter::Result>(this);
+    connect(watcher, &QFutureWatcher<CodeFormatter::Result>::finished,
+            this, [this, watcher, editorGuard, revision, original, filePath]() {
+        const CodeFormatter::Result result = watcher->result();
+        watcher->deleteLater();
+        if (editorGuard)
+            editorGuard->setProperty("notepeekFormattingInProgress", false);
+        updateToolActions();
 
-    // Replacing identical text would still push an undo step and mark the
-    // document modified, so an already-formatted file is left alone.
-    if (result.text == original)
-        return;
+        CustomEditor *editor = editorGuard.data();
+        if (!editor || editor->documentRevision() != revision
+            || editor->filePath() != filePath)
+            return;
+        if (!result.ok)
+        {
+            QMessageBox::warning(this,
+                                 tr("Format Code"),
+                                 tr("Could not format %1.\n\n%2")
+                                     .arg(QFileInfo(filePath).fileName(), result.error));
+            return;
+        }
 
-    int line = 0;
-    int index = 0;
-    editor->getCursorPosition(&line, &index);
-    const int firstVisibleLine =
-        int(editor->SendScintilla(QsciScintillaBase::SCI_GETFIRSTVISIBLELINE));
+        // Replacing identical text would still push an undo step and mark the
+        // document modified, so an already-formatted file is left alone.
+        if (result.text == original)
+            return;
 
-    // selectAll()/replaceSelectedText() rather than setText(): the latter
-    // empties the undo buffer, and formatting has to stay undoable in one step.
-    editor->beginUndoAction();
-    editor->selectAll();
-    editor->replaceSelectedText(result.text);
-    editor->endUndoAction();
+        int line = 0;
+        int index = 0;
+        editor->getCursorPosition(&line, &index);
+        const int firstVisibleLine = int(editor->SendScintilla(
+            QsciScintillaBase::SCI_GETFIRSTVISIBLELINE));
+        const int xOffset = int(editor->SendScintilla(QsciScintillaBase::SCI_GETXOFFSET));
 
-    const int lastLine = qMax(0, editor->lines() - 1);
-    const int targetLine = qBound(0, line, lastLine);
-    editor->setCursorPosition(targetLine, qBound(0, index, editor->lineLength(targetLine)));
-    editor->SendScintilla(QsciScintillaBase::SCI_SETFIRSTVISIBLELINE, firstVisibleLine);
-    editor->setFocus();
+        // selectAll()/replaceSelectedText() rather than setText(): the latter
+        // empties the undo buffer, and formatting stays one undoable action.
+        const bool updatesWereEnabled = editor->updatesEnabled();
+        editor->setUpdatesEnabled(false);
+        editor->beginUndoAction();
+        editor->selectAll();
+        editor->replaceSelectedText(result.text);
+        editor->endUndoAction();
+        editor->setUpdatesEnabled(updatesWereEnabled);
+
+        const int lastLine = qMax(0, editor->lines() - 1);
+        const int targetLine = qBound(0, line, lastLine);
+        editor->setCursorPosition(targetLine,
+                                  qBound(0, index, editor->lineLength(targetLine)));
+        editor->SendScintilla(QsciScintillaBase::SCI_SETFIRSTVISIBLELINE,
+                              firstVisibleLine);
+        editor->SendScintilla(QsciScintillaBase::SCI_SETXOFFSET, xOffset);
+        editor->viewport()->update();
+        DocumentController *currentController = activeController();
+        if (currentController && currentController->currentEditor() == editor
+            && !currentController->pane()->isCurrentEditorHidden())
+        {
+            editor->setFocus();
+        }
+    });
+    watcher->setFuture(QtConcurrent::run([original, filePath, options]() {
+        return CodeFormatter::format(original, filePath, options);
+    }));
 }
 
 void MainWindow::on_action_switchHeaderSource_triggered()
@@ -983,7 +1032,9 @@ void MainWindow::updateToolActions()
     const bool sourceEditable = editor != nullptr
                                 && !controller->pane()->isCurrentEditorHidden()
                                 && !editor->isReadOnly();
-    const bool formatSupported = sourceEditable && CodeFormatter::canFormat(filePath);
+    const bool formatSupported = sourceEditable
+                                 && !editor->property("notepeekFormattingInProgress").toBool()
+                                 && CodeFormatter::canFormat(filePath);
     ui->action_formatCode->setEnabled(formatSupported);
     ui->action_formatCode->setToolTip(
         formatSupported ? tr("Format this file with %1").arg(CodeFormatter::formatterName(filePath))

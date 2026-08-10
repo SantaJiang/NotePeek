@@ -50,12 +50,15 @@ bool DocumentIO::loadEditorFile(const QString &filePath,
                                 DocumentFormat *format,
                                 QString *errorMessage)
 {
-    QString text;
-    if (!loadTextFile(filePath, &text, format, errorMessage))
+    QFile file(filePath);
+    if (!file.open(QFile::ReadOnly))
+    {
+        if (errorMessage)
+            *errorMessage = file.errorString();
         return false;
-    if (utf8Content)
-        *utf8Content = text.toUtf8();
-    return true;
+    }
+    return DocumentFormatCodec::decodeToEditorBytes(file.readAll(), utf8Content,
+                                                     format, errorMessage);
 }
 
 bool DocumentIO::loadEditorFileWithEncoding(const QString &filePath,
@@ -74,12 +77,8 @@ bool DocumentIO::loadEditorFileWithEncoding(const QString &filePath,
         return false;
     }
 
-    QString text;
-    if (!DocumentFormatCodec::decodeWithEncoding(file.readAll(), encoding, &text, format, errorMessage))
-        return false;
-    if (utf8Content)
-        *utf8Content = text.toUtf8();
-    return true;
+    return DocumentFormatCodec::decodeToEditorBytesWithEncoding(
+        file.readAll(), encoding, utf8Content, format, errorMessage);
 }
 
 bool DocumentIO::saveTextFile(const QString &filePath, const QString &content, QString *errorMessage)

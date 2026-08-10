@@ -47,6 +47,7 @@
 #include <Qsci/qscilexeryaml.h>
 
 #include <QFileInfo>
+#include <QJsonDocument>
 
 #include <algorithm>
 
@@ -254,6 +255,30 @@ bool matchesRule(const QString &baseName, const FileNameRule &rule)
            && baseName.startsWith(QString(name) + QLatin1Char('.'), rule.caseSensitivity);
 }
 
+bool startsWithHtmlRootTag(const QByteArray &content)
+{
+    if (!content.startsWith("<html"))
+        return false;
+    if (content.size() == 5)
+        return true;
+    const char delimiter = content.at(5);
+    return delimiter == '>' || delimiter == ' ' || delimiter == '\t'
+           || delimiter == '\r' || delimiter == '\n';
+}
+
+bool startsWithHtmlDoctype(const QByteArray &content)
+{
+    constexpr auto prefix = "<!doctype html";
+    constexpr qsizetype prefixLength = 14;
+    if (!content.startsWith(prefix))
+        return false;
+    if (content.size() == prefixLength)
+        return true;
+    const char delimiter = content.at(prefixLength);
+    return delimiter == '>' || delimiter == ' ' || delimiter == '\t'
+           || delimiter == '\r' || delimiter == '\n';
+}
+
 } // namespace
 
 QsciLexer *LexerFactory::createLexer(Language lang)
@@ -291,6 +316,72 @@ LexerFactory::Language LexerFactory::languageFromFilePath(const QString &filePat
         return lang;
 
     return languageFromExtension(fileInfo.suffix());
+}
+
+LexerFactory::Language LexerFactory::languageFromContent(const QByteArray &utf8Content)
+{
+    // Keep detection bounded: signatures and shebangs live at the beginning,
+    // and JSON parsing is attempted only for modest documents.
+    constexpr qsizetype MaximumSignatureBytes = 64 * 1024;
+    constexpr qsizetype MaximumJsonDetectionBytes = 1024 * 1024;
+    QByteArray prefix = utf8Content.left(MaximumSignatureBytes);
+    if (prefix.startsWith("\xef\xbb\xbf"))
+        prefix.remove(0, 3);
+
+    const QByteArray trimmed = prefix.trimmed();
+    if (trimmed.isEmpty())
+        return Unknown;
+
+    const int firstLineEnd = trimmed.indexOf('\n');
+    const QByteArray firstLine = trimmed.left(firstLineEnd < 0 ? trimmed.size() : firstLineEnd).toLower();
+    if (firstLine.startsWith("#!"))
+    {
+        if (firstLine.contains("python"))
+            return Python;
+        if (firstLine.contains("node") || firstLine.contains("deno"))
+            return JavaScript;
+        if (firstLine.contains("ruby"))
+            return RUBY;
+        if (firstLine.contains("perl"))
+            return PERL;
+        if (firstLine.contains("lua"))
+            return LUA;
+        if (firstLine.contains("bash") || firstLine.contains("zsh")
+            || firstLine.contains("ksh") || firstLine.endsWith("/sh"))
+        {
+            return SHELL;
+        }
+    }
+
+    const QByteArray lowerPrefix = trimmed.left(1024).toLower();
+    if (lowerPrefix.startsWith("<?xml"))
+        return XML;
+    if (startsWithHtmlDoctype(lowerPrefix) || startsWithHtmlRootTag(lowerPrefix))
+        return HTML;
+    if (lowerPrefix.startsWith("diff --git ")
+        || (lowerPrefix.startsWith("--- ") && lowerPrefix.contains("\n+++ ")))
+    {
+        return DIFF;
+    }
+    if (lowerPrefix.startsWith("cmake_minimum_required(")
+        || lowerPrefix.startsWith("cmake_minimum_required ("))
+    {
+        return CMAKE;
+    }
+
+    if (utf8Content.size() <= MaximumJsonDetectionBytes
+        && (trimmed.startsWith('{') || trimmed.startsWith('[')))
+    {
+        QByteArray jsonContent = utf8Content;
+        if (jsonContent.startsWith("\xef\xbb\xbf"))
+            jsonContent.remove(0, 3);
+        QJsonParseError error;
+        const QJsonDocument document = QJsonDocument::fromJson(jsonContent, &error);
+        if (error.error == QJsonParseError::NoError && !document.isNull())
+            return JSON;
+    }
+
+    return Unknown;
 }
 
 QString LexerFactory::languageName(Language lang)

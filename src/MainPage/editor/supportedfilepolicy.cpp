@@ -65,7 +65,12 @@ bool SupportedFilePolicy::looksLikeBinaryFile(const QString &filePath)
         return true;
     }
 
-    const QByteArray sample = file.read(BinaryProbeSize);
+    return looksLikeBinaryData(file.read(BinaryProbeSize));
+}
+
+bool SupportedFilePolicy::looksLikeBinaryData(const QByteArray &bytes)
+{
+    const QByteArray sample = bytes.left(BinaryProbeSize);
     if (sample.isEmpty())
     {
         return false;

@@ -20,6 +20,8 @@ class QWidget;
 struct ExternalReloadResult
 {
     bool success = false;
+    bool performanceDegraded = false;
+    int detectedLanguage = 0;
     QByteArray content;
     DocumentFormat format;
     QString errorMessage;

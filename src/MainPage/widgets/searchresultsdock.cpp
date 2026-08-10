@@ -1,15 +1,16 @@
 #include "widgets/searchresultsdock.h"
+#include "widgets/iconfont.h"
 
 #include <QApplication>
 #include <QDir>
 #include <QDockWidget>
 #include <QFileInfo>
-#include <QFontDatabase>
 #include <QFontMetrics>
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QLineEdit>
 #include <QPainter>
+#include <QSignalBlocker>
 #include <QStyle>
 #include <QStyledItemDelegate>
 #include <QTextCharFormat>
@@ -230,11 +231,10 @@ SearchResultsDock::SearchResultsDock(QWidget *parent)
     closeButton->setFixedSize(26, 26);
     closeButton->setToolTip(tr("Close search results"));
     closeButton->setAccessibleName(tr("Close search results"));
-    const int fontId = QFontDatabase::addApplicationFont("://resource/fontawesome-webfont.ttf");
-    const QStringList fontFamilies = QFontDatabase::applicationFontFamilies(fontId);
-    if (!fontFamilies.isEmpty())
+    const QString &iconFontFamily = IconFont::fontAwesomeFamily();
+    if (!iconFontFamily.isEmpty())
     {
-        closeButton->setFont(QFont(fontFamilies.first()));
+        closeButton->setFont(QFont(iconFontFamily));
     }
     closeButton->setText(QChar(0xf00d));
 
@@ -367,6 +367,8 @@ void SearchResultsDock::startOrCancelSearch()
 void SearchResultsDock::onSearchFinished(const FileSearchOutcome &outcome)
 {
     setSearchingState(false);
+    const QSignalBlocker treeSignals(m_resultsTree);
+    m_resultsTree->setUpdatesEnabled(false);
 
     QTreeWidgetItem *currentFileItem = nullptr;
     QString currentFilePath;
@@ -426,6 +428,8 @@ void SearchResultsDock::onSearchFinished(const FileSearchOutcome &outcome)
                                    .arg(m_resultsTree->topLevelItemCount()));
     }
     m_statusLabel->setVisible(true);
+    m_resultsTree->setUpdatesEnabled(true);
+    m_resultsTree->viewport()->update();
 }
 
 void SearchResultsDock::onItemActivated(QTreeWidgetItem *item, int column)

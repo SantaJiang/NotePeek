@@ -191,7 +191,9 @@ void ensureCmarkExtensionsRegistered()
     });
 }
 
-QString addSourceLineAnchors(const QString &html, QVector<int> *sourceLines)
+QString addSourceLineAnchors(const QString &html,
+                             QVector<int> *sourceLines,
+                             const std::shared_ptr<std::atomic_bool> &cancellation = {})
 {
     static const QRegularExpression sourceposPattern(
         QStringLiteral("<([A-Za-z][A-Za-z0-9]*)\\b([^>]*)\\sdata-sourcepos=\"((\\d+):\\d+-(\\d+):\\d+)\""));
@@ -204,6 +206,10 @@ QString addSourceLineAnchors(const QString &html, QVector<int> *sourceLines)
     QRegularExpressionMatchIterator it = sourceposPattern.globalMatch(html);
     while (it.hasNext())
     {
+        if (cancellation && cancellation->load(std::memory_order_relaxed))
+        {
+            return {};
+        }
         const QRegularExpressionMatch match = it.next();
         const int line = match.captured(4).toInt();
         anchored += html.mid(lastEnd, match.capturedStart() - lastEnd);
@@ -231,7 +237,9 @@ QString addSourceLineAnchors(const QString &html, QVector<int> *sourceLines)
     return anchored;
 }
 
-QString markdownToHtmlBody(const QString &markdown, QVector<int> *sourceLines)
+QString markdownToHtmlBody(const QString &markdown,
+                           QVector<int> *sourceLines,
+                           const std::shared_ptr<std::atomic_bool> &cancellation = {})
 {
     const QByteArray input = markdown.toUtf8();
 
@@ -264,7 +272,10 @@ QString markdownToHtmlBody(const QString &markdown, QVector<int> *sourceLines)
     QString rendered;
     if (html)
     {
-        rendered = addSourceLineAnchors(QString::fromUtf8(html), sourceLines);
+        if (!cancellation || !cancellation->load(std::memory_order_relaxed))
+        {
+            rendered = addSourceLineAnchors(QString::fromUtf8(html), sourceLines, cancellation);
+        }
         cmark_get_default_mem_allocator()->free(html);
     }
 
@@ -277,12 +288,17 @@ QString markdownToHtmlBody(const QString &markdown, QVector<int> *sourceLines)
 MarkdownRenderResult renderMarkdownDocumentWithStyle(quint64 requestId,
                                                      const QString &markdown,
                                                      const QString &filePath,
-                                                     const MarkdownRenderStyle &style)
+                                                     const MarkdownRenderStyle &style,
+                                                     const std::shared_ptr<std::atomic_bool> &cancellation = {})
 {
     MarkdownRenderResult result;
     result.requestId = requestId;
     result.filePath = filePath;
-    result.htmlDocument = buildHtmlDocumentFromStyle(markdownToHtmlBody(markdown, &result.sourceLines), style);
+    const QString body = markdownToHtmlBody(markdown, &result.sourceLines, cancellation);
+    if (!cancellation || !cancellation->load(std::memory_order_relaxed))
+    {
+        result.htmlDocument = buildHtmlDocumentFromStyle(body, style);
+    }
     return result;
 }
 
@@ -460,9 +476,17 @@ quint64 MarkdownPreviewer::renderPreviewAsync(const QString &markdown,
     const quint64 requestId = m_nextRequestId++;
     QObject *owner = requestOwner ? requestOwner : this;
     const quintptr ownerKey = reinterpret_cast<quintptr>(owner);
-    const PendingRender render{owner, requestId, markdown, filePath};
+    const PendingRender render{owner,
+                               requestId,
+                               markdown,
+                               filePath,
+                               std::make_shared<std::atomic_bool>(false)};
     if (m_renderActive)
     {
+        if (m_activeOwner == owner && m_activeCancellation)
+        {
+            m_activeCancellation->store(true, std::memory_order_relaxed);
+        }
         if (!m_pendingRenders.contains(ownerKey))
             m_pendingOrder.enqueue(ownerKey);
         m_pendingRenders.insert(ownerKey, render);
@@ -476,10 +500,13 @@ quint64 MarkdownPreviewer::renderPreviewAsync(const QString &markdown,
 void MarkdownPreviewer::startAsyncRender(const PendingRender &render)
 {
     m_renderActive = true;
+    m_activeOwner = render.owner;
+    m_activeCancellation = render.cancellation;
     const MarkdownRenderStyle style = captureMarkdownRenderStyle(MarkdownRenderMode::Screen);
     const quint64 requestId = render.requestId;
     const QString markdown = render.markdown;
     const QString filePath = render.filePath;
+    const std::shared_ptr<std::atomic_bool> cancellation = render.cancellation;
     auto *watcher = new QFutureWatcher<MarkdownRenderResult>(this);
     connect(watcher, &QFutureWatcher<MarkdownRenderResult>::finished, this, [this, watcher]() {
         const MarkdownRenderResult result = watcher->result();
@@ -489,13 +516,16 @@ void MarkdownPreviewer::startAsyncRender(const PendingRender &render)
         // coalescing queue instead of starting a second concurrent worker.
         emit previewRendered(result);
         m_renderActive = false;
+        m_activeOwner.clear();
+        m_activeCancellation.reset();
         startNextPendingRender();
     });
-    watcher->setFuture(QtConcurrent::run(m_renderPool, [requestId, markdown, filePath, style]() {
+    watcher->setFuture(QtConcurrent::run(m_renderPool, [requestId, markdown, filePath, style, cancellation]() {
         return renderMarkdownDocumentWithStyle(requestId,
                                                markdown,
                                                filePath,
-                                               style);
+                                               style,
+                                               cancellation);
     }));
 }
 

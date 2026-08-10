@@ -43,6 +43,13 @@ bool canRepresent(const QString &text, DocumentEncoding encoding);
 
 DocumentFormat defaultFormat();
 bool decode(const QByteArray &bytes, QString *text, DocumentFormat *format, QString *errorMessage);
+// Decodes directly to the UTF-8/LF representation consumed by Scintilla. The
+// common UTF-8/LF path shares the input QByteArray instead of round-tripping
+// through a UTF-16 QString.
+bool decodeToEditorBytes(const QByteArray &bytes,
+                         QByteArray *utf8Content,
+                         DocumentFormat *format,
+                         QString *errorMessage);
 // Reinterprets the bytes in the given encoding instead of auto-detecting.
 // A matching BOM is consumed; Utf8 and Utf8Bom interpret identically (the
 // recorded encoding follows the BOM actually present).
@@ -51,6 +58,11 @@ bool decodeWithEncoding(const QByteArray &bytes,
                         QString *text,
                         DocumentFormat *format,
                         QString *errorMessage);
+bool decodeToEditorBytesWithEncoding(const QByteArray &bytes,
+                                     DocumentEncoding encoding,
+                                     QByteArray *utf8Content,
+                                     DocumentFormat *format,
+                                     QString *errorMessage);
 QByteArray encode(const QString &text, const DocumentFormat &format);
 QString normalizedEditorText(const QString &text);
 

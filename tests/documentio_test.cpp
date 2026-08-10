@@ -196,6 +196,50 @@ private slots:
         QCOMPARE(format.lineEnding, DocumentLineEnding::CrLf);
     }
 
+    void loadsUtf8EditorBytesWithoutChangingFormatSemantics()
+    {
+        struct Fixture
+        {
+            QByteArray input;
+            QByteArray expected;
+            DocumentEncoding encoding;
+            DocumentLineEnding lineEnding;
+        };
+        const QList<Fixture> fixtures = {
+            {QByteArray("alpha\nbeta\n"), QByteArray("alpha\nbeta\n"),
+             DocumentEncoding::Utf8, DocumentLineEnding::Lf},
+            {QByteArray("\xef\xbb\xbf" "alpha\nbeta\n", 14), QByteArray("alpha\nbeta\n"),
+             DocumentEncoding::Utf8Bom, DocumentLineEnding::Lf},
+            {QByteArray("alpha\rbeta\r"), QByteArray("alpha\nbeta\n"),
+             DocumentEncoding::Utf8, DocumentLineEnding::Cr},
+            {QByteArray("alpha\r\nbeta\n"), QByteArray("alpha\nbeta\n"),
+             DocumentEncoding::Utf8, DocumentLineEnding::Mixed}
+        };
+
+        for (const Fixture &fixture : fixtures)
+        {
+            QByteArray editorBytes;
+            DocumentFormat format;
+            QString error;
+            QVERIFY2(DocumentFormatCodec::decodeToEditorBytes(
+                         fixture.input, &editorBytes, &format, &error),
+                     qPrintable(error));
+            QCOMPARE(editorBytes, fixture.expected);
+            QCOMPARE(format.encoding, fixture.encoding);
+            QCOMPARE(format.lineEnding, fixture.lineEnding);
+        }
+    }
+
+    void directEditorDecodeRejectsInvalidUtf8()
+    {
+        QByteArray editorBytes;
+        DocumentFormat format;
+        QString error;
+        QVERIFY(!DocumentFormatCodec::decodeToEditorBytes(
+            QByteArray("valid\xffinvalid", 13), &editorBytes, &format, &error));
+        QVERIFY(!error.isEmpty());
+    }
+
     void asyncSavesAreFifoAcrossServices()
     {
         QTemporaryDir tempDir;

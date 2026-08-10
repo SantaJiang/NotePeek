@@ -23,6 +23,7 @@
 #include "Qsci/qsciscintilla.h"
 
 #include <string.h>
+#include <utility>
 
 #include <QAction>
 #include <QApplication>
@@ -34,6 +35,7 @@
 #include <QKeySequence>
 #include <QMenu>
 #include <QPoint>
+#include <QSet>
 
 #include "Qsci/qsciabstractapis.h"
 #include "Qsci/qscicommandset.h"
@@ -694,6 +696,16 @@ void QsciScintilla::startAutoCompletion(AutoCompletionSource acs,
 
     if (acs == AcsAll || acs == AcsDocument)
     {
+        // The upstream implementation used QStringList::contains() for every
+        // match. A document with many distinct identifiers therefore became
+        // quadratic and blocked the UI thread on each typed character. Keep the
+        // ordered list for the public interaction, but use a hash set solely for
+        // membership checks.
+        QSet<QString> uniqueWords;
+        uniqueWords.reserve(wlist.size() + 64);
+        for (const QString &word : std::as_const(wlist))
+            uniqueWords.insert(word);
+
         int sflags = SCFIND_WORDSTART;
 
         if (!SendScintilla(SCI_AUTOCGETIGNORECASE))
@@ -752,15 +764,18 @@ void QsciScintilla::startAutoCompletion(AutoCompletionSource acs,
                     QString api_w = w;
                     api_w.append(' ');
 
-                    keep = !wlist.contains(api_w);
+                    keep = !uniqueWords.contains(api_w);
                 }
                 else
                 {
                     keep = true;
                 }
 
-                if (keep && !wlist.contains(w))
+                if (keep && !uniqueWords.contains(w))
+                {
                     wlist.append(w);
+                    uniqueWords.insert(w);
+                }
             }
         }
 

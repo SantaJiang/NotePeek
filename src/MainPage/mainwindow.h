@@ -44,6 +44,7 @@ private slots:
     void on_action_openFile_triggered();
     void on_action_openDirectory_triggered();
     bool on_action_save_triggered();
+    bool on_action_saveAll_triggered();
     bool on_action_saveAs_triggered();
     void on_action_exit_triggered();
     void on_action_about_triggered();

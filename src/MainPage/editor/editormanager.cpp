@@ -88,6 +88,49 @@ bool shouldUseSoftWrap(const QString &filePath, LexerFactory::Language lang)
     return proseFileNames.contains(fileName);
 }
 
+LexerFactory::Language effectiveLanguage(CustomEditor *editor, const QString &filePath)
+{
+    const LexerFactory::Language pathLanguage = LexerFactory::languageFromFilePath(filePath);
+    if (pathLanguage != LexerFactory::Unknown || !editor)
+        return pathLanguage;
+
+    const QVariant detected = editor->property("notepeekContentLanguage");
+    if (!detected.isValid())
+        return LexerFactory::Unknown;
+    const int value = detected.toInt();
+    if (value <= int(LexerFactory::Unknown) || value > int(LexerFactory::IGNORE))
+        return LexerFactory::Unknown;
+    return static_cast<LexerFactory::Language>(value);
+}
+
+bool insertedTextContainsAbnormallyLongLine(const char *text, int length)
+{
+    if (!text || length <= PerformanceConstants::AbnormallyLongLineBytes)
+        return false;
+
+    int lineLength = 0;
+    for (int index = 0; index < length; ++index)
+    {
+        if (text[index] == '\n' || text[index] == '\r')
+        {
+            lineLength = 0;
+            continue;
+        }
+        if (++lineLength > PerformanceConstants::AbnormallyLongLineBytes)
+            return true;
+    }
+    return false;
+}
+
+qsizetype editorLineContentLength(CustomEditor *editor, int line)
+{
+    if (!editor || line < 0 || line >= editor->lines())
+        return 0;
+    const long start = editor->SendScintilla(QsciScintillaBase::SCI_POSITIONFROMLINE, line);
+    const long end = editor->SendScintilla(QsciScintillaBase::SCI_GETLINEENDPOSITION, line);
+    return qsizetype(qMax(0L, end - start));
+}
+
 } // namespace
 
 class SemanticHighlightingEngine final : public QObject
@@ -160,6 +203,7 @@ public:
         if (State *state = m_states.value(editor))
         {
             state->path = path;
+            state->language = effectiveLanguage(editor, path);
             schedule(state, 0);
         }
     }
@@ -215,6 +259,7 @@ private:
         QPointer<CustomEditor> editor;
         QTimer timer;
         QString path;
+        LexerFactory::Language language = LexerFactory::Unknown;
         quint64 requestId = 0;
         bool inFlight = false;
         bool rerun = false;
@@ -317,7 +362,7 @@ private:
             return;
         }
         CustomEditor *editor = state->editor;
-        const LexerFactory::Language language = LexerFactory::languageFromFilePath(state->path);
+        const LexerFactory::Language language = state->language;
         if (language == LexerFactory::Unknown || !editor->lexer())
         {
             editor->clearSemanticTokens();
@@ -449,6 +494,8 @@ CustomEditor *EditorManager::createEditorSharingDocument(CustomEditor *sourceEdi
     editor->setDocument(sourceEditor->document());
     editor->shareDocumentSessionFrom(sourceEditor);
     editor->setFilePath(sourceEditor->filePath());
+    editor->setProperty("notepeekContentLanguage",
+                        sourceEditor->property("notepeekContentLanguage"));
     updateEditorSyntax(editor, sourceEditor->filePath());
     updateLineNumberMarginWidth(editor);
     return editor;
@@ -472,7 +519,8 @@ CustomEditor *EditorManager::createEditorForFile(const QString &filePath, bool t
     CustomEditor *editor = createEditor(fileInfo.fileName());
 
     // Load file content
-    bool isLargeFile = (fileInfo.size() > PerformanceConstants::LargeFileSize);
+    const bool isLargeFile = fileInfo.size() > PerformanceConstants::LargeFileSize;
+    editor->setLargeFileMode(isLargeFile);
 
     if (isLargeFile)
     {
@@ -492,10 +540,9 @@ CustomEditor *EditorManager::createEditorForFile(const QString &filePath, bool t
 
         editor->setUpdatesEnabled(true);
     }
-    else
-    {
-        updateEditorSyntax(editor, filePath);
-    }
+    // For ordinary files the lexer is attached only after the asynchronous
+    // load and bulk insertion complete. Styling an empty document now and then
+    // re-styling every inserted chunk adds work without producing visible UI.
 
     return editor;
 }
@@ -549,6 +596,8 @@ void EditorManager::setupEditor(CustomEditor *editor)
     editor->setCaretLineVisible(true);
     editor->setBraceMatching(CustomEditor::NoBraceMatch);
     editor->setWrapMode(CustomEditor::WrapNone);
+    editor->SendScintilla(QsciScintillaBase::SCI_SETIDLESTYLING,
+                          QsciScintillaBase::SC_IDLESTYLING_TOVISIBLE);
 
     // Set UTF-8 encoding
     editor->setUtf8(true);
@@ -587,6 +636,32 @@ void EditorManager::setupEditor(CustomEditor *editor)
     });
     connect(editor, &CustomEditor::linesChanged, this, [this, editor]() {
         updateLineNumberMarginWidth(editor);
+    });
+    connect(editor, &QsciScintillaBase::SCN_MODIFIED, this,
+            [this, editor](int position, int modificationType, const char *text, int length, int,
+                           int, int, int, int, int) {
+        if ((modificationType & (QsciScintillaBase::SC_MOD_INSERTTEXT
+                                 | QsciScintillaBase::SC_MOD_DELETETEXT)) == 0
+            || editor->isLargeFileMode())
+        {
+            return;
+        }
+
+        bool shouldDegrade = editor->length() > PerformanceConstants::LargeFileSize;
+        if (!shouldDegrade && (modificationType & QsciScintillaBase::SC_MOD_INSERTTEXT))
+        {
+            const int firstLine = int(editor->SendScintilla(
+                QsciScintillaBase::SCI_LINEFROMPOSITION, position));
+            const int lastLine = int(editor->SendScintilla(
+                QsciScintillaBase::SCI_LINEFROMPOSITION, position + qMax(0, length)));
+            shouldDegrade = editorLineContentLength(editor, firstLine)
+                                > PerformanceConstants::AbnormallyLongLineBytes
+                            || editorLineContentLength(editor, lastLine)
+                                > PerformanceConstants::AbnormallyLongLineBytes
+                            || insertedTextContainsAbnormallyLongLine(text, length);
+        }
+        if (shouldDegrade)
+            promoteToLargeFileMode(editor);
     });
 
     m_semanticEngine->attach(editor);
@@ -653,6 +728,14 @@ QFont EditorManager::fontForPath(const QString &filePath) const
                  : AppPreferences::instance().codeFont();
 }
 
+QFont EditorManager::fontForEditor(CustomEditor *editor, const QString &filePath) const
+{
+    const LexerFactory::Language language = effectiveLanguage(editor, filePath);
+    return shouldUseSoftWrap(filePath, language)
+               ? AppPreferences::instance().textFont()
+               : AppPreferences::instance().codeFont();
+}
+
 void EditorManager::setMarginsFont(CustomEditor *editor, const QFont &font)
 {
     if (!editor) return;
@@ -662,13 +745,74 @@ void EditorManager::setMarginsFont(CustomEditor *editor, const QFont &font)
 
 void EditorManager::updateEditorSyntax(CustomEditor *editor, const QString &filePath)
 {
+    updateEditorSyntax(editor, filePath, effectiveLanguage(editor, filePath));
+}
+
+void EditorManager::updateEditorSyntax(CustomEditor *editor,
+                                       const QString &filePath,
+                                       LexerFactory::Language detectedLanguage)
+{
     if (!editor) return;
-    editor->setProperty("semanticFilePath", filePath);
-
-    const QFont font = fontForPath(filePath);
-
+    if (detectedLanguage < LexerFactory::Unknown || detectedLanguage > LexerFactory::IGNORE)
+        detectedLanguage = LexerFactory::Unknown;
+    const LexerFactory::Language pathLanguage = LexerFactory::languageFromFilePath(filePath);
+    const LexerFactory::Language lang = pathLanguage == LexerFactory::Unknown
+                                            ? detectedLanguage
+                                            : pathLanguage;
+    if (pathLanguage == LexerFactory::Unknown && lang != LexerFactory::Unknown)
+        editor->setProperty("notepeekContentLanguage", int(lang));
+    else
+        editor->setProperty("notepeekContentLanguage", QVariant());
     QsciLexer *oldLexer = editor->lexer();
-    LexerFactory::Language lang = LexerFactory::languageFromFilePath(filePath);
+    if (editor->isLargeFileMode())
+    {
+        editor->setProperty("semanticFilePath", filePath);
+        editor->setProperty("notepeekLexerLanguage", -1);
+        editor->setProperty("notepeekLargeFilePolicyApplied", true);
+        if (oldLexer)
+        {
+            editor->setLexer(nullptr);
+            oldLexer->deleteLater();
+        }
+        applyDisplayPolicy(editor, filePath);
+        editor->setMarginWidth(1, 0);
+        applyEditorColors(editor);
+        m_semanticEngine->setPath(editor, filePath);
+        return;
+    }
+
+    const QFont font = shouldUseSoftWrap(filePath, lang)
+                           ? AppPreferences::instance().textFont()
+                           : AppPreferences::instance().codeFont();
+    const int previousLanguage = editor->property("notepeekLexerLanguage").toInt();
+    const bool hasRecordedLanguage = editor->property("notepeekLexerLanguage").isValid();
+    const bool sameLexer = hasRecordedLanguage && previousLanguage == int(lang)
+                           && ((oldLexer != nullptr) == (lang != LexerFactory::Unknown));
+    const QFont previousFont = editor->property("notepeekAppliedFont").value<QFont>();
+    const bool fontChanged = !editor->property("notepeekAppliedFont").isValid()
+                             || previousFont != font;
+
+    editor->setProperty("semanticFilePath", filePath);
+    editor->setProperty("notepeekLargeFilePolicyApplied", false);
+    editor->setProperty("notepeekLexerLanguage", int(lang));
+    editor->setProperty("notepeekAppliedFont", font);
+
+    if (sameLexer)
+    {
+        if (fontChanged)
+        {
+            if (oldLexer)
+                applyUniformStyleFont(oldLexer, font);
+            else
+                editor->setFont(font);
+            setMarginsFont(editor, font);
+        }
+        applyDisplayPolicy(editor, filePath);
+        applyEditorColors(editor);
+        m_semanticEngine->setPath(editor, filePath);
+        return;
+    }
+
     QsciLexer* lexer = LexerFactory::createLexer(lang);
 
     if(lexer)
@@ -709,10 +853,28 @@ void EditorManager::updateEditorSyntax(CustomEditor *editor, const QString &file
         editor->setFont(font);
     }
     setMarginsFont(editor, font);
+    editor->setProperty("notepeekAppliedFont", font);
     applyDisplayPolicy(editor, filePath);
     // Re-apply margin colors after lexer change (lexer can override margin colors)
     applyEditorColors(editor);
     m_semanticEngine->setPath(editor, filePath);
+}
+
+void EditorManager::promoteToLargeFileMode(CustomEditor *editor)
+{
+    if (!editor)
+        return;
+
+    editor->setLargeFileMode(true);
+    for (const QPointer<CustomEditor> &candidatePointer : std::as_const(m_editors))
+    {
+        CustomEditor *candidate = candidatePointer.data();
+        if (!candidate || !candidate->sharesDocumentSessionWith(editor))
+            continue;
+        candidate->setLargeFileMode(true);
+        if (!candidate->property("notepeekLargeFilePolicyApplied").toBool())
+            updateEditorSyntax(candidate, candidate->filePath());
+    }
 }
 
 void EditorManager::applyDisplayPolicy(CustomEditor *editor, const QString &filePath)
@@ -722,7 +884,30 @@ void EditorManager::applyDisplayPolicy(CustomEditor *editor, const QString &file
         return;
     }
 
-    const LexerFactory::Language lang = LexerFactory::languageFromFilePath(filePath);
+    if (editor->isLargeFileMode())
+    {
+        editor->setCodeEditingFeaturesEnabled(false);
+        editor->setBracketAssistanceEnabled(false);
+        editor->setDocumentCompletionEnabled(false);
+        editor->setBraceMatching(CustomEditor::NoBraceMatch);
+        editor->setWrapMode(CustomEditor::WrapNone);
+        editor->setFolding(CustomEditor::NoFoldStyle, 1);
+        editor->setAutoIndent(false);
+        editor->setIndentationGuides(false);
+        editor->setTabIndents(false);
+        editor->setBackspaceUnindents(false);
+        if (editor->isListActive())
+            editor->cancelList();
+        editor->setAutoCompletionSource(CustomEditor::AcsNone);
+        editor->setAutoCompletionThreshold(-1);
+        editor->SendScintilla(QsciScintillaBase::SCI_SETIDLESTYLING,
+                              QsciScintillaBase::SC_IDLESTYLING_NONE);
+        updateLineNumberMarginWidth(editor);
+        editor->SendScintilla(QsciScintillaBase::SCI_SETMARGINRIGHT, 0UL, 0L);
+        return;
+    }
+
+    const LexerFactory::Language lang = effectiveLanguage(editor, filePath);
     const bool softWrap = shouldUseSoftWrap(filePath, lang);
     const bool codeFeatures = editor->lexer() && !softWrap;
     const AppPreferences &prefs = AppPreferences::instance();
@@ -752,6 +937,8 @@ void EditorManager::applyDisplayPolicy(CustomEditor *editor, const QString &file
                                                         : CustomEditor::AcsNone);
     editor->setAutoCompletionThreshold(documentCompletion ? 3 : -1);
     editor->setAutoCompletionUseSingle(CustomEditor::AcusNever);
+    editor->SendScintilla(QsciScintillaBase::SCI_SETIDLESTYLING,
+                          QsciScintillaBase::SC_IDLESTYLING_TOVISIBLE);
     editor->setMarginWidth(0, softWrap ? 0 : 30);
     if (!softWrap)
     {
@@ -836,7 +1023,7 @@ void EditorManager::applyFontPreferences()
         }
 
         CustomEditor *editor = editorPtr;
-        const QFont font = fontForPath(editor->filePath());
+        const QFont font = fontForEditor(editor, editor->filePath());
 
         if (QsciLexer *lexer = editor->lexer())
         {
@@ -867,7 +1054,7 @@ void EditorManager::reapplyEditorSyntax(CustomEditor *editor)
         // Re-setting the lexer resets all styles to the UI font (see
         // updateEditorSyntax); restore the editor font across every style so a
         // theme change does not inflate the line spacing.
-        applyUniformStyleFont(lexer, fontForPath(editor->filePath()));
+        applyUniformStyleFont(lexer, fontForEditor(editor, editor->filePath()));
     }
     else
     {

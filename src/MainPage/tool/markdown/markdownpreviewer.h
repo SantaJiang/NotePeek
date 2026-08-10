@@ -9,6 +9,9 @@
 #include <QString>
 #include <QVector>
 
+#include <atomic>
+#include <memory>
+
 class QWidget;
 class QLiteHtmlWidget;
 class QThreadPool;
@@ -66,6 +69,7 @@ private:
         quint64 requestId = 0;
         QString markdown;
         QString filePath;
+        std::shared_ptr<std::atomic_bool> cancellation;
     };
 
     void startAsyncRender(const PendingRender &render);
@@ -76,6 +80,8 @@ private:
     quint64 m_nextRequestId = 1;
     QThreadPool *m_renderPool;
     bool m_renderActive = false;
+    QPointer<QObject> m_activeOwner;
+    std::shared_ptr<std::atomic_bool> m_activeCancellation;
     QHash<quintptr, PendingRender> m_pendingRenders;
     QQueue<quintptr> m_pendingOrder;
 };

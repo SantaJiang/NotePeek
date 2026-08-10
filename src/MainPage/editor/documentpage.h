@@ -106,12 +106,14 @@ private:
     QLiteHtmlWidget *m_preview;
     MarkdownPreviewer *m_previewer;
     QTimer *m_updateTimer;
+    QTimer *m_scrollMapTimer;
     QVector<QPair<int, int>> m_previewLineMap;
     QVector<int> m_previewSourceLines;
     // Thin accent bar painted over the preview viewport marking the block that
     // corresponds to the source cursor line (VS Code-style).
     QWidget *m_previewLineMarker;
     int m_currentSourceLine;
+    int m_pendingScrollMapSourceLine;
     bool m_syncingScroll;
     quint64 m_latestPreviewRequestId;
     ViewMode m_mode;

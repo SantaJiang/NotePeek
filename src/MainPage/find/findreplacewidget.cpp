@@ -2,11 +2,11 @@
 #include "ui_findreplacewidget.h"
 #include "find/findreplacemanager.h"
 #include "themecolors.h"
+#include "widgets/iconfont.h"
 #include <QEvent>
 #include <QKeyEvent>
 #include <QLineEdit>
 #include <QToolButton>
-#include <QFontDatabase>
 #include <QTimer>
 
 FindReplaceWidget::FindReplaceWidget(QWidget *parent)
@@ -21,10 +21,9 @@ FindReplaceWidget::FindReplaceWidget(QWidget *parent)
     setAttribute(Qt::WA_StyledBackground, true);
     applyChromeTheme();
 
-    const int fontId = QFontDatabase::addApplicationFont("://resource/fontawesome-webfont.ttf");
-    const QStringList fontFamilies = QFontDatabase::applicationFontFamilies(fontId);
-    if (!fontFamilies.isEmpty()) {
-        ui->buttonClose->setFont(QFont(fontFamilies.first()));
+    const QString &iconFontFamily = IconFont::fontAwesomeFamily();
+    if (!iconFontFamily.isEmpty()) {
+        ui->buttonClose->setFont(QFont(iconFontFamily));
     }
     ui->buttonClose->setText(QChar(0xf00d));
     ui->buttonClose->setToolTip(tr("Close find and replace"));

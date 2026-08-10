@@ -51,6 +51,8 @@ private:
     QHash<QObject *, QSet<QString>> m_pathsByOwner;
     QSet<QString> m_pendingChangeChecks;
     QHash<QString, WatchedFileState> m_fileStates;
+    QSet<QString> m_baselineHashesInFlight;
+    QHash<QString, WatchedFileState> m_pendingBaselineStates;
     QSet<QString> m_hashChecksInFlight;
     QSet<QString> m_hashRecheckRequested;
     QThreadPool *m_hashPool;

@@ -6,6 +6,7 @@
 #include "editor/documentcontroller.h"
 #include "editor/editormanager.h"
 #include "editor/editorpane.h"
+#include "editor/performanceconstants.h"
 #include "find/findreplacemanager.h"
 #include "decorators/highlightedscrollbar.h"
 #include "decorators/highlightedscrollbardecorator.h"
@@ -168,9 +169,10 @@ private slots:
         QVERIFY(file.open(QIODevice::WriteOnly));
         const QByteArray line("0123456789 abcdefghijklmnopqrstuvwxyz\n");
         qint64 written = 0;
-        while (written < 10 * 1024 * 1024)
+        const qint64 expectedSize = PerformanceConstants::LargeFileSize + 1;
+        while (written < expectedSize)
         {
-            const qint64 remaining = 10 * 1024 * 1024 - written;
+            const qint64 remaining = expectedSize - written;
             const qint64 chunkSize = file.write(line.constData(), qMin<qint64>(line.size(), remaining));
             QVERIFY2(chunkSize > 0, "Failed to create the 10 MB performance fixture");
             written += chunkSize;
@@ -190,7 +192,37 @@ private slots:
                                  openBudgetMs + 3000);
         QVERIFY2(timer.elapsed() < openBudgetMs,
                  "10 MB asynchronous open exceeded the configured smoke budget");
-        QCOMPARE(controller.currentEditor()->length(), 10 * 1024 * 1024);
+        QCOMPARE(controller.currentEditor()->length(), expectedSize);
+        QVERIFY(controller.currentEditor()->isLargeFileMode());
+        QVERIFY(controller.currentEditor()->lexer() == nullptr);
+        QVERIFY(!controller.currentEditor()->codeEditingFeaturesEnabled());
+        QCOMPARE(controller.currentEditor()->autoCompletionSource(), CustomEditor::AcsNone);
+    }
+
+    void degradesSmallFilesWithPathologicalLinesDuringBackgroundLoad()
+    {
+        QTemporaryDir tempDir;
+        QVERIFY(tempDir.isValid());
+        const QString path = tempDir.filePath(QStringLiteral("minified.js"));
+        QFile file(path);
+        QVERIFY(file.open(QIODevice::WriteOnly));
+        const QByteArray content(PerformanceConstants::AbnormallyLongLineBytes + 1, 'x');
+        QCOMPARE(file.write(content), qint64(content.size()));
+        file.close();
+
+        EditorPane pane;
+        DocumentController controller(&pane, false);
+        controller.openFile(path);
+        QTRY_VERIFY_WITH_TIMEOUT(controller.currentEditor()
+                                     && !controller.currentEditor()->isReadOnly(),
+                                 3000);
+
+        CustomEditor *editor = controller.currentEditor();
+        QVERIFY(editor->isLargeFileMode());
+        QVERIFY(editor->lexer() == nullptr);
+        QVERIFY(!editor->codeEditingFeaturesEnabled());
+        QCOMPARE(editor->SendScintilla(QsciScintillaBase::SCI_GETIDLESTYLING),
+                 long(QsciScintillaBase::SC_IDLESTYLING_NONE));
     }
 
     void highlightsAllMatchesWithinSmokeBudget()
@@ -217,6 +249,27 @@ private slots:
         QVERIFY2(timer.elapsed() < highlightBudgetMs,
                  "2 MB highlight pass exceeded the configured smoke budget");
         QVERIFY(!manager.searchResults().isEmpty());
+    }
+
+    void completesManyDistinctDocumentWordsWithinSmokeBudget()
+    {
+        QString text;
+        constexpr int candidateCount = 25000;
+        text.reserve(candidateCount * 16);
+        for (int i = 0; i < candidateCount; ++i)
+            text += QStringLiteral("prefix%1 ").arg(i);
+        text += QStringLiteral("prefix");
+
+        QsciScintilla editor;
+        editor.setText(text);
+        editor.setCursorPosition(0, text.size());
+        QElapsedTimer timer;
+        timer.start();
+        editor.autoCompleteFromDocument();
+        QVERIFY2(timer.elapsed() < 5000,
+                 "25,000 distinct completion candidates exceeded 5 seconds");
+        QVERIFY(editor.isListActive());
+        editor.cancelList();
     }
 
     void rendersMarkdownPreviewWithinSmokeBudget()

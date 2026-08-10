@@ -7,7 +7,11 @@
 #include <QDir>
 #include <QFileInfo>
 #include <QFileSystemModel>
+#include <QFutureWatcher>
 #include <QFont>
+#include <QThreadPool>
+#include <QTimer>
+#include <QtConcurrent>
 
 namespace {
 
@@ -16,17 +20,23 @@ QString normalizedAbsolutePath(const QString &path)
     return DocumentPath::normalized(path);
 }
 
-bool isPathInsideDirectory(const QString &path, const QString &directory)
+QString lexicalPathKey(const QString &path)
 {
-    return DocumentPath::isInsideDirectory(path, directory);
+    QString key = QDir::cleanPath(QDir::fromNativeSeparators(
+        QFileInfo(path).absoluteFilePath()));
+#ifdef Q_OS_WIN
+    key = key.toCaseFolded();
+#endif
+    return key;
 }
 
-bool isAncestorOfPath(const QString &candidateAncestor, const QString &path)
+bool isPathKeyInsideDirectory(const QString &pathKey, QString directoryKey)
 {
-    const QString normalizedAncestor = normalizedAbsolutePath(candidateAncestor);
-    const QString normalizedPath = normalizedAbsolutePath(path);
-    return normalizedAncestor != normalizedPath
-           && isPathInsideDirectory(normalizedPath, normalizedAncestor);
+    if (pathKey == directoryKey)
+        return true;
+    if (!directoryKey.endsWith(QLatin1Char('/')))
+        directoryKey += QLatin1Char('/');
+    return pathKey.startsWith(directoryKey);
 }
 
 } // namespace
@@ -44,8 +54,23 @@ FileTypeFilterProxyModel::FileTypeFilterProxyModel(QObject *parent)
           QStringLiteral("DerivedData"),
           QStringLiteral("__pycache__")
       })
+    , m_supportPool(new QThreadPool(this))
+    , m_filterRefreshTimer(new QTimer(this))
 {
     setRecursiveFilteringEnabled(true);
+    m_supportCache.setMaxCost(PerformanceConstants::SupportCacheLimit);
+    m_supportPool->setMaxThreadCount(2);
+    m_supportPool->setExpiryTimeout(10000);
+    m_filterRefreshTimer->setSingleShot(true);
+    m_filterRefreshTimer->setInterval(40);
+    connect(m_filterRefreshTimer, &QTimer::timeout, this, [this]() {
+#if QT_VERSION >= QT_VERSION_CHECK(6, 10, 0)
+        beginFilterChange();
+        endFilterChange(QSortFilterProxyModel::Direction::Rows);
+#else
+        invalidateFilter();
+#endif
+    });
 }
 
 void FileTypeFilterProxyModel::setVisibleRootDirectory(const QString &dirPath)
@@ -59,6 +84,8 @@ void FileTypeFilterProxyModel::setVisibleRootDirectory(const QString &dirPath)
 #if QT_VERSION >= QT_VERSION_CHECK(6, 10, 0)
     beginFilterChange();
     m_visibleRootDirectory = normalizedPath;
+    m_visibleRootPathKey = lexicalPathKey(dirPath);
+    m_visibleRootCanonicalPathKey = lexicalPathKey(normalizedPath);
     if (QFileSystemModel *model = fileSystemModel())
     {
         m_visibleRootIndex = model->index(m_visibleRootDirectory);
@@ -70,6 +97,8 @@ void FileTypeFilterProxyModel::setVisibleRootDirectory(const QString &dirPath)
     endFilterChange(QSortFilterProxyModel::Direction::Rows);
 #else
     m_visibleRootDirectory = normalizedPath;
+    m_visibleRootPathKey = lexicalPathKey(dirPath);
+    m_visibleRootCanonicalPathKey = lexicalPathKey(normalizedPath);
     if (QFileSystemModel *model = fileSystemModel())
     {
         m_visibleRootIndex = model->index(m_visibleRootDirectory);
@@ -133,17 +162,32 @@ bool FileTypeFilterProxyModel::filterAcceptsRow(int sourceRow, const QModelIndex
     const QString filePath = model->filePath(index);
     if (!m_visibleRootDirectory.isEmpty())
     {
-        if (normalizedAbsolutePath(filePath) == m_visibleRootDirectory)
+        QString filePathKey = lexicalPathKey(filePath);
+        if (model->fileInfo(index).isSymLink())
+        {
+            // Preserve the old containment rule for the comparatively rare
+            // symlink entry without canonicalizing every ordinary tree row.
+            filePathKey = lexicalPathKey(normalizedAbsolutePath(filePath));
+        }
+        const bool isRoot = filePathKey == m_visibleRootPathKey
+                            || filePathKey == m_visibleRootCanonicalPathKey;
+        if (isRoot)
         {
             return true;
         }
 
-        if (isAncestorOfPath(filePath, m_visibleRootDirectory))
+        const bool isRootAncestor =
+            isPathKeyInsideDirectory(m_visibleRootPathKey, filePathKey)
+            || isPathKeyInsideDirectory(m_visibleRootCanonicalPathKey, filePathKey);
+        if (isRootAncestor)
         {
             return true;
         }
 
-        if (!isPathInsideDirectory(filePath, m_visibleRootDirectory))
+        const bool isInsideRoot =
+            isPathKeyInsideDirectory(filePathKey, m_visibleRootPathKey)
+            || isPathKeyInsideDirectory(filePathKey, m_visibleRootCanonicalPathKey);
+        if (!isInsideRoot)
         {
             return false;
         }
@@ -169,13 +213,18 @@ bool FileTypeFilterProxyModel::isIgnoredDirectory(const QString &filePath) const
         return false;
     }
 
-    const QString normalizedPath = normalizedAbsolutePath(filePath);
-    if (normalizedPath == m_visibleRootDirectory || isAncestorOfPath(filePath, m_visibleRootDirectory))
+    const QString normalizedPath = lexicalPathKey(filePath);
+    if (normalizedPath == m_visibleRootPathKey
+        || normalizedPath == m_visibleRootCanonicalPathKey
+        || isPathKeyInsideDirectory(m_visibleRootPathKey, normalizedPath)
+        || isPathKeyInsideDirectory(m_visibleRootCanonicalPathKey, normalizedPath))
     {
         return false;
     }
 
-    return m_ignoredDirectoryNames.contains(QFileInfo(filePath).fileName());
+    const QString name = QFileInfo(filePath).fileName();
+    return m_ignoredDirectoryNames.contains(name)
+           || name.startsWith(QStringLiteral("cmake-build-"));
 }
 
 bool FileTypeFilterProxyModel::isSupportedTextFile(const QString &filePath) const
@@ -187,19 +236,54 @@ bool FileTypeFilterProxyModel::isSupportedTextFile(const QString &filePath) cons
     }
 
     const QString absolutePath = fileInfo.absoluteFilePath();
-    const CacheEntry cached = m_supportCache.value(absolutePath);
-    if (m_supportCache.contains(absolutePath)
-        && cached.size == fileInfo.size()
-        && cached.lastModified == fileInfo.lastModified())
+    if (!SupportedFilePolicy::hasSupportedTextType(fileInfo))
+        return false;
+    if (fileInfo.size() == 0)
+        return true;
+
+    if (const CacheEntry *cached = m_supportCache.object(absolutePath);
+        cached && cached->size == fileInfo.size()
+        && cached->lastModified == fileInfo.lastModified())
     {
-        return cached.supported;
+        return cached->supported;
     }
 
-    const bool supported = SupportedFilePolicy::isSupportedTextFile(absolutePath);
-    if (m_supportCache.size() >= PerformanceConstants::SupportCacheLimit)
-    {
-        m_supportCache.clear();
-    }
-    m_supportCache.insert(absolutePath, { fileInfo.size(), fileInfo.lastModified(), supported });
-    return supported;
+    // QFileSystemModel discovers entries off-thread, but proxy filtering itself
+    // runs on the GUI thread. Keep eligible files visible while the 4 KiB binary
+    // probe runs in a bounded pool; a coalesced filter refresh removes a binary
+    // entry once classification completes.
+    scheduleSupportCheck(absolutePath, fileInfo.size(), fileInfo.lastModified());
+    return true;
+}
+
+void FileTypeFilterProxyModel::scheduleSupportCheck(
+    const QString &filePath, qint64 size, const QDateTime &lastModified) const
+{
+    if (m_supportChecksInFlight.contains(filePath))
+        return;
+
+    m_supportChecksInFlight.insert(filePath);
+    auto *watcher = new QFutureWatcher<bool>(const_cast<FileTypeFilterProxyModel *>(this));
+    connect(watcher, &QFutureWatcher<bool>::finished,
+            const_cast<FileTypeFilterProxyModel *>(this),
+            [this, watcher, filePath, size, lastModified]() {
+        const bool supported = watcher->result();
+        watcher->deleteLater();
+        m_supportChecksInFlight.remove(filePath);
+
+        const QFileInfo current(filePath);
+        if (current.isFile() && current.size() == size
+            && current.lastModified() == lastModified)
+        {
+            m_supportCache.insert(filePath,
+                                  new CacheEntry{size, lastModified, supported});
+        }
+        // Refresh even when the file changed during the probe. In that case
+        // the next filter pass schedules a classification for the new
+        // metadata instead of leaving the provisional row visible forever.
+        m_filterRefreshTimer->start();
+    });
+    watcher->setFuture(QtConcurrent::run(m_supportPool, [filePath]() {
+        return SupportedFilePolicy::isSupportedTextFile(filePath);
+    }));
 }

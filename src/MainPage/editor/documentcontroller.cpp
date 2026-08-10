@@ -12,6 +12,7 @@
 #include "editor/editormanager.h"
 #include "editor/externalfilewatcher.h"
 #include "editor/filesavedialog.h"
+#include "editor/performanceconstants.h"
 #include <NotePeek/lexerfactory.h>
 #include "editor/editorpane.h"
 #include "find/findreplacemanager.h"
@@ -217,12 +218,7 @@ void DocumentController::newDocument()
 
 bool DocumentController::save()
 {
-    CustomEditor *editor = currentEditor();
-    if (!editor)
-        return false;
-
-    const QString filePath = editor->filePath();
-    return filePath.isEmpty() ? saveAs() : saveFile(editor, filePath);
+    return saveEditor(currentEditor());
 }
 
 bool DocumentController::saveAs()
@@ -236,6 +232,46 @@ bool DocumentController::saveAs()
         return false;
 
     return saveFile(editor, fileName);
+}
+
+bool DocumentController::saveEditor(CustomEditor *editor)
+{
+    if (!editor || m_drainingSaves || isEditorLoading(editor))
+        return false;
+
+    QString filePath = editor->filePath();
+    if (filePath.isEmpty())
+    {
+        m_pane->focusEditor(editor);
+        filePath = m_persistence->promptSaveFileName(m_pane);
+        if (filePath.isEmpty())
+            return false;
+    }
+    return saveFile(editor, filePath);
+}
+
+bool DocumentController::saveAll(QSet<void *> *processedDocuments)
+{
+    if (m_drainingSaves)
+        return false;
+
+    for (CustomEditor *editor : m_editorManager->getEditors())
+    {
+        if (!editor || !editor->isModified() || isEditorLoading(editor))
+            continue;
+
+        void *document = editor->SendScintillaPtrResult(QsciScintillaBase::SCI_GETDOCPOINTER);
+        if (!document)
+            document = editor;
+        if (processedDocuments && processedDocuments->contains(document))
+            continue;
+
+        if (!saveEditor(editor))
+            return false;
+        if (processedDocuments)
+            processedDocuments->insert(document);
+    }
+    return true;
 }
 
 bool DocumentController::maybeSave(CustomEditor *editor)
@@ -546,20 +582,25 @@ void DocumentController::onFileLoaded(const DocumentLoadResult &result)
     const DocumentFormat format = result.format;
     const QString filePath = result.filePath;
     const bool largeFile = result.largeFile;
+    const LexerFactory::Language detectedLanguage =
+        static_cast<LexerFactory::Language>(result.detectedLanguage);
     const bool activate = pending.activate;
     const int previousIndex = pending.previousIndex;
     const bool recommendEmojiFont = isMarkdownPath(filePath)
                                     && EmojiFontSupport::shouldRecommendInstallation(
                                         result.content,
                                         EmojiFontSupport::hasSystemEmojiFont());
+    if (largeFile)
+        m_editorManager->promoteToLargeFileMode(editor);
     insertContentInChunks(editor, result.content,
-                          [this, editorGuard, pageGuard, format, filePath, largeFile, activate, previousIndex, recommendEmojiFont]() {
+                          [this, editorGuard, pageGuard, format, filePath, largeFile, detectedLanguage, activate, previousIndex, recommendEmojiFont]() {
         if (!editorGuard)
             return;
 
         CustomEditor *editor = editorGuard.data();
         editor->setDocumentFormat(format);
         applyDocumentLineEnding(editor, format.lineEnding);
+        m_editorManager->updateEditorSyntax(editor, filePath, detectedLanguage);
         editor->setUpdatesEnabled(true);
         editor->setReadOnly(false);
 
@@ -1024,7 +1065,9 @@ bool DocumentController::hasTrackedFile(const QString &filePath) const
 
 bool DocumentController::applyReloadedContent(const QString &filePath,
                                               const QByteArray &utf8Content,
-                                              const DocumentFormat &format)
+                                              const DocumentFormat &format,
+                                              bool performanceDegraded,
+                                              int detectedLanguage)
 {
     const QString normalizedPath = DocumentRegistry::normalizedFilePath(filePath);
     if (m_drainingSaves || normalizedPath.isEmpty() || !hasTrackedFile(normalizedPath))
@@ -1074,6 +1117,10 @@ bool DocumentController::applyReloadedContent(const QString &filePath,
         const int firstVisibleLine = editor->SendScintilla(QsciScintillaBase::SCI_GETFIRSTVISIBLELINE);
         const int xOffset = editor->SendScintilla(QsciScintillaBase::SCI_GETXOFFSET);
 
+        const bool largeFileContent = performanceDegraded
+                                      || utf8Content.size() > PerformanceConstants::LargeFileSize;
+        if (largeFileContent)
+            m_editorManager->promoteToLargeFileMode(editor);
         const QSignalBlocker blocker(editor);
         if (!replaceContentWithEventLoopYield(editor, utf8Content))
         {
@@ -1083,6 +1130,8 @@ bool DocumentController::applyReloadedContent(const QString &filePath,
         applyDocumentLineEnding(editor, format.lineEnding);
         editor->setExternalConflict(false);
         editor->setModified(false);
+        m_editorManager->updateEditorSyntax(
+            editor, normalizedPath, static_cast<LexerFactory::Language>(detectedLanguage));
 
         const int targetLine = qBound(0, line, qMax(0, editor->lines() - 1));
         const int targetIndex = qBound(0, index, editor->lineLength(targetLine));
@@ -1148,6 +1197,8 @@ void DocumentController::reopenCurrentWithEncoding(DocumentEncoding encoding)
     struct EncodedReloadResult
     {
         bool success = false;
+        bool performanceDegraded = false;
+        int detectedLanguage = int(LexerFactory::Unknown);
         QByteArray content;
         DocumentFormat format;
         QString errorMessage;
@@ -1203,6 +1254,10 @@ void DocumentController::reopenCurrentWithEncoding(DocumentEncoding encoding)
         editor->getCursorPosition(&line, &index);
         const int firstVisibleLine = editor->SendScintilla(QsciScintillaBase::SCI_GETFIRSTVISIBLELINE);
 
+        const bool largeFileContent = result.performanceDegraded
+                                      || result.content.size() > PerformanceConstants::LargeFileSize;
+        if (largeFileContent)
+            m_editorManager->promoteToLargeFileMode(editor);
         {
             const QSignalBlocker blocker(editor);
             if (!replaceContentWithEventLoopYield(editor, result.content))
@@ -1214,6 +1269,8 @@ void DocumentController::reopenCurrentWithEncoding(DocumentEncoding encoding)
             editor->setExternalConflict(false);
             editor->setModified(false);
             editor->setPersistenceState(DocumentPersistenceState::Clean);
+            m_editorManager->updateEditorSyntax(
+                editor, filePath, static_cast<LexerFactory::Language>(result.detectedLanguage));
 
             const int targetLine = qBound(0, line, qMax(0, editor->lines() - 1));
             editor->setCursorPosition(targetLine, qBound(0, index, editor->lineLength(targetLine)));
@@ -1240,6 +1297,18 @@ void DocumentController::reopenCurrentWithEncoding(DocumentEncoding encoding)
                                                                 &result.content,
                                                                 &result.format,
                                                                 &result.errorMessage);
+        if (result.success && result.content.size() <= PerformanceConstants::LargeFileSize)
+        {
+            result.performanceDegraded =
+                PerformanceConstants::containsAbnormallyLongLine(result.content);
+            if (!result.performanceDegraded)
+            {
+                LexerFactory::Language language = LexerFactory::languageFromFilePath(filePath);
+                if (language == LexerFactory::Unknown)
+                    language = LexerFactory::languageFromContent(result.content);
+                result.detectedLanguage = int(language);
+            }
+        }
         return result;
     }));
 }

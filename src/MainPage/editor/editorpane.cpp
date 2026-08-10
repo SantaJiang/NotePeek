@@ -5,12 +5,12 @@
 #include "editor/documentpage.h"
 #include "editor/editorswitchpopup.h"
 #include "themecolors.h"
+#include "widgets/iconfont.h"
 
 #include <QAbstractItemView>
 #include <QComboBox>
 #include <QEvent>
 #include <QFrame>
-#include <QFontDatabase>
 #include <QHBoxLayout>
 #include <QPainter>
 #include <QPointer>
@@ -98,13 +98,13 @@ EditorPane::EditorPane(QWidget *parent)
     ui->comboBox_files->setItemDelegate(new FileComboPopupDelegate(ui->comboBox_files));
     applyChromeTheme();
 
-    const int fontId = QFontDatabase::addApplicationFont("://resource/fontawesome-webfont.ttf");
-    const QStringList fontFamilies = QFontDatabase::applicationFontFamilies(fontId);
-    if (!fontFamilies.isEmpty())
+    const QString &iconFontFamily = IconFont::fontAwesomeFamily();
+    if (!iconFontFamily.isEmpty())
     {
-        ui->pushButton_closeDoc->setFont(QFont(fontFamilies.first()));
-        ui->pushButton_splitView->setFont(QFont(fontFamilies.first()));
-        ui->pushButton_sidePreview->setFont(QFont(fontFamilies.first()));
+        const QFont iconFont(iconFontFamily);
+        ui->pushButton_closeDoc->setFont(iconFont);
+        ui->pushButton_splitView->setFont(iconFont);
+        ui->pushButton_sidePreview->setFont(iconFont);
     }
     ui->pushButton_closeDoc->setText(QChar(0xf00d));
     ui->pushButton_closeDoc->setToolTip(tr("Close current document"));

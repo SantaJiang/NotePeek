@@ -3,6 +3,7 @@
 
 #include <Qsci/qsciglobal.h>
 #include <Qsci/qscilexer.h>
+#include <QByteArray>
 #include <QString>
 #include <QStringList>
 #include <QHash>
@@ -66,6 +67,9 @@ public:
     static Language languageFromExtension(const QString& ext);
     static Language languageFromFileName(const QString& fileName);
     static Language languageFromFilePath(const QString& filePath);
+    // Recognizes only high-confidence content signatures. Callers should use
+    // this as a fallback when the file name does not identify a language.
+    static Language languageFromContent(const QByteArray& utf8Content);
     static QString languageName(Language lang);
     static QStringList supportedExtensions();
     static QStringList supportedFileNames();

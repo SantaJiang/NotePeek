@@ -104,6 +104,18 @@ void DocumentPersistenceService::loadFileAsync(const DocumentLoadRequest &reques
                                                     &result.content,
                                                     &result.format,
                                                     &result.errorMessage);
+        if (result.success && !result.largeFile)
+        {
+            result.abnormallyLongLine = PerformanceConstants::containsAbnormallyLongLine(result.content);
+            result.largeFile = result.largeFile || result.abnormallyLongLine;
+            if (!result.largeFile)
+            {
+                LexerFactory::Language language = LexerFactory::languageFromFilePath(request.filePath);
+                if (language == LexerFactory::Unknown)
+                    language = LexerFactory::languageFromContent(result.content);
+                result.detectedLanguage = int(language);
+            }
+        }
         return result;
     }));
 }

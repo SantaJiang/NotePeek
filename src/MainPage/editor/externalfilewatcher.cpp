@@ -216,11 +216,21 @@ QString ExternalFileWatcher::normalizedFilePath(const QString &filePath) const
 void ExternalFileWatcher::startBaselineHash(const QString &filePath,
                                             const WatchedFileState &expectedState)
 {
+    if (m_baselineHashesInFlight.contains(filePath))
+    {
+        // Saves and reloads can record the same document several times before
+        // the single hash worker finishes. Keep only the newest snapshot.
+        m_pendingBaselineStates.insert(filePath, expectedState);
+        return;
+    }
+
+    m_baselineHashesInFlight.insert(filePath);
     auto *watcher = new QFutureWatcher<QByteArray>(this);
     connect(watcher, &QFutureWatcher<QByteArray>::finished, this,
             [this, watcher, filePath, expectedState]() {
         const QByteArray hash = watcher->result();
         watcher->deleteLater();
+        m_baselineHashesInFlight.remove(filePath);
         auto it = m_fileStates.find(filePath);
         if (it != m_fileStates.end()
             && it->exists == expectedState.exists
@@ -228,6 +238,27 @@ void ExternalFileWatcher::startBaselineHash(const QString &filePath,
             && it->lastModified == expectedState.lastModified)
         {
             it->contentHash = hash;
+        }
+
+        if (!m_pendingBaselineStates.contains(filePath))
+        {
+            return;
+        }
+
+        const WatchedFileState pendingState = m_pendingBaselineStates.take(filePath);
+        const bool sameSnapshot = pendingState.exists == expectedState.exists
+                                  && pendingState.size == expectedState.size
+                                  && pendingState.lastModified == expectedState.lastModified;
+        if (!sameSnapshot || hash.isEmpty())
+        {
+            const auto current = m_fileStates.constFind(filePath);
+            if (current != m_fileStates.cend()
+                && current->exists == pendingState.exists
+                && current->size == pendingState.size
+                && current->lastModified == pendingState.lastModified)
+            {
+                startBaselineHash(filePath, pendingState);
+            }
         }
     });
     watcher->setFuture(QtConcurrent::run(m_hashPool, [filePath]() { return fileContentHash(filePath); }));

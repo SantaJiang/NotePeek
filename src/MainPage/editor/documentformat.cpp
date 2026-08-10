@@ -5,10 +5,9 @@
 
 namespace {
 
-bool isValidUtf8(const QByteArray &bytes)
+bool isValidUtf8(const char *rawData, qsizetype size)
 {
-    const auto *data = reinterpret_cast<const unsigned char *>(bytes.constData());
-    const qsizetype size = bytes.size();
+    const auto *data = reinterpret_cast<const unsigned char *>(rawData);
     qsizetype index = 0;
     while (index < size)
     {
@@ -63,6 +62,99 @@ bool isValidUtf8(const QByteArray &bytes)
             return false;
         }
     }
+    return true;
+}
+
+bool isValidUtf8(const QByteArray &bytes)
+{
+    return isValidUtf8(bytes.constData(), bytes.size());
+}
+
+DocumentLineEnding detectUtf8LineEnding(const char *data, qsizetype size,
+                                        DocumentLineEnding fallback)
+{
+    qsizetype crlf = 0;
+    qsizetype lf = 0;
+    qsizetype cr = 0;
+    for (qsizetype index = 0; index < size; ++index)
+    {
+        if (data[index] == '\r')
+        {
+            if (index + 1 < size && data[index + 1] == '\n')
+            {
+                ++crlf;
+                ++index;
+            }
+            else
+            {
+                ++cr;
+            }
+        }
+        else if (data[index] == '\n')
+        {
+            ++lf;
+        }
+    }
+    const int kinds = int(crlf > 0) + int(lf > 0) + int(cr > 0);
+    if (kinds == 0)
+        return fallback;
+    if (kinds > 1)
+        return DocumentLineEnding::Mixed;
+    if (crlf > 0)
+        return DocumentLineEnding::CrLf;
+    if (cr > 0)
+        return DocumentLineEnding::Cr;
+    return DocumentLineEnding::Lf;
+}
+
+QByteArray normalizedUtf8Bytes(const QByteArray &bytes, qsizetype offset,
+                               DocumentLineEnding ending)
+{
+    if (ending == DocumentLineEnding::Lf && offset == 0)
+        return bytes;
+    if (ending == DocumentLineEnding::Lf)
+        return bytes.mid(offset);
+
+    QByteArray normalized;
+    normalized.reserve(bytes.size() - offset);
+    const char *data = bytes.constData();
+    for (qsizetype index = offset; index < bytes.size(); ++index)
+    {
+        if (data[index] == '\r')
+        {
+            if (index + 1 < bytes.size() && data[index + 1] == '\n')
+                ++index;
+            normalized.append('\n');
+        }
+        else
+        {
+            normalized.append(data[index]);
+        }
+    }
+    return normalized;
+}
+
+bool decodeUtf8ToEditorBytes(const QByteArray &bytes, qsizetype offset,
+                             DocumentEncoding encoding, QByteArray *utf8Content,
+                             DocumentFormat *format, QString *errorMessage)
+{
+    const qsizetype payloadSize = bytes.size() - offset;
+    if (!isValidUtf8(bytes.constData() + offset, payloadSize))
+    {
+        if (errorMessage)
+            *errorMessage = QStringLiteral("The file contains invalid UTF-8 data.");
+        return false;
+    }
+
+    DocumentFormat detected = DocumentFormatCodec::defaultFormat();
+    detected.encoding = encoding;
+    detected.lineEnding = detectUtf8LineEnding(bytes.constData() + offset,
+                                               payloadSize,
+                                               detected.lineEnding);
+    if (utf8Content)
+        *utf8Content = normalizedUtf8Bytes(bytes, offset, detected.lineEnding);
+    if (format)
+        *format = detected;
     return true;
 }
 
@@ -273,6 +365,26 @@ bool DocumentFormatCodec::decode(const QByteArray &bytes,
     return true;
 }
 
+bool DocumentFormatCodec::decodeToEditorBytes(const QByteArray &bytes,
+                                              QByteArray *utf8Content,
+                                              DocumentFormat *format,
+                                              QString *errorMessage)
+{
+    if (bytes.startsWith("\xef\xbb\xbf"))
+        return decodeUtf8ToEditorBytes(bytes, 3, DocumentEncoding::Utf8Bom,
+                                       utf8Content, format, errorMessage);
+    if (!bytes.startsWith("\xff\xfe") && !bytes.startsWith("\xfe\xff"))
+        return decodeUtf8ToEditorBytes(bytes, 0, DocumentEncoding::Utf8,
+                                       utf8Content, format, errorMessage);
+
+    QString text;
+    if (!decode(bytes, &text, format, errorMessage))
+        return false;
+    if (utf8Content)
+        *utf8Content = text.toUtf8();
+    return true;
+}
+
 bool DocumentFormatCodec::decodeWithEncoding(const QByteArray &bytes,
                                              DocumentEncoding encoding,
                                              QString *text,
@@ -342,6 +454,27 @@ bool DocumentFormatCodec::decodeWithEncoding(const QByteArray &bytes,
         *text = normalizedEditorText(decoded);
     if (format)
         *format = resolved;
+    return true;
+}
+
+bool DocumentFormatCodec::decodeToEditorBytesWithEncoding(
+    const QByteArray &bytes, DocumentEncoding encoding, QByteArray *utf8Content,
+    DocumentFormat *format, QString *errorMessage)
+{
+    if (encoding == DocumentEncoding::Utf8 || encoding == DocumentEncoding::Utf8Bom)
+    {
+        const bool hasBom = bytes.startsWith("\xef\xbb\xbf");
+        return decodeUtf8ToEditorBytes(bytes, hasBom ? 3 : 0,
+                                       hasBom ? DocumentEncoding::Utf8Bom
+                                              : DocumentEncoding::Utf8,
+                                       utf8Content, format, errorMessage);
+    }
+
+    QString text;
+    if (!decodeWithEncoding(bytes, encoding, &text, format, errorMessage))
+        return false;
+    if (utf8Content)
+        *utf8Content = text.toUtf8();
     return true;
 }
 

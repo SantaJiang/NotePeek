@@ -1,3 +1,4 @@
+#include <QAction>
 #include <QMenu>
 #include <QComboBox>
 #include <QDockWidget>
@@ -16,6 +17,7 @@
 #include "editor/customeditor.h"
 #include "editor/documentcontroller.h"
 #include "editor/documentformat.h"
+#include "editor/documentpath.h"
 #include "editor/documentsavecoordinator.h"
 #include "editor/editorpane.h"
 #include "editor/editormanager.h"
@@ -97,6 +99,45 @@ private slots:
         fileWindow.show();
         QVERIFY(fileWindow.isVisible());
         QVERIFY(fileWindow.findChild<QMenu *>() != nullptr);
+    }
+
+    void saveAllActionSavesTheOpenDocument()
+    {
+        QTemporaryDir dir;
+        QVERIFY(dir.isValid());
+        const QString filePath = dir.filePath(QStringLiteral("save-all.txt"));
+        writeFile(filePath, QByteArrayLiteral("before"));
+
+        MainWindow window(nullptr, { filePath });
+        window.show();
+        CustomEditor *editor = nullptr;
+        QTRY_VERIFY_WITH_TIMEOUT(([&window, &editor, &filePath]() {
+            for (EditorPane *pane : window.findChildren<EditorPane *>())
+            {
+                for (int index = 0; index < pane->count(); ++index)
+                {
+                    CustomEditor *candidate = pane->editorAt(index);
+                    if (candidate && DocumentPath::equivalent(candidate->filePath(), filePath)
+                        && !candidate->isReadOnly())
+                    {
+                        editor = candidate;
+                        return true;
+                    }
+                }
+            }
+            return false;
+        })(), 3000);
+        QVERIFY(editor);
+        editor->append(QStringLiteral("-after"));
+
+        QAction *saveAllAction = window.findChild<QAction *>(QStringLiteral("action_saveAll"));
+        QVERIFY(saveAllAction);
+        saveAllAction->trigger();
+        QTRY_COMPARE_WITH_TIMEOUT(QFileInfo(filePath).size(), qint64(12), 3000);
+
+        QFile saved(filePath);
+        QVERIFY(saved.open(QIODevice::ReadOnly));
+        QCOMPARE(saved.readAll(), QByteArrayLiteral("before-after"));
     }
 
     void paletteChangeThemeRefreshDoesNotRecurse()
@@ -196,12 +237,18 @@ private slots:
         QTemporaryDir root;
         QVERIFY(root.isValid());
         QVERIFY(QDir(root.path()).mkpath(QStringLiteral("sub")));
+        QVERIFY(QDir(root.path()).mkpath(QStringLiteral("build")));
+        QVERIFY(QDir(root.path()).mkpath(QStringLiteral("node_modules/package")));
         writeFile(root.filePath(QStringLiteral("alpha.txt")),
                   QByteArrayLiteral("needle here\nno match\nanother needle\n"));
         writeFile(root.filePath(QStringLiteral("sub/beta.cpp")),
                   QByteArrayLiteral("int needle = 0;\n"));
         writeFile(root.filePath(QStringLiteral("binary.bin")),
                   QByteArray("nee\x00dle", 7));
+        writeFile(root.filePath(QStringLiteral("build/generated.txt")),
+                  QByteArrayLiteral("needle must be ignored\n"));
+        writeFile(root.filePath(QStringLiteral("node_modules/package/index.js")),
+                  QByteArrayLiteral("needle must be ignored\n"));
 
         FileSearcher searcher;
         QSignalSpy finished(&searcher, &FileSearcher::searchFinished);
@@ -210,6 +257,7 @@ private slots:
 
         const auto outcome = finished.takeFirst().first().value<FileSearchOutcome>();
         QCOMPARE(outcome.summary.matchCount, 3);
+        QCOMPARE(outcome.summary.scannedFileCount, 2);
         QVERIFY(!outcome.summary.truncated);
         QVERIFY(!outcome.summary.canceled);
 
@@ -572,6 +620,49 @@ private slots:
         QCOMPARE(LexerFactory::languageFromFilePath(QStringLiteral("/x/Dockerfile")), LexerFactory::DOCKERFILE);
         QCOMPARE(LexerFactory::languageFromFilePath(QStringLiteral("/x/CMakeLists.txt")), LexerFactory::CMAKE);
         QCOMPARE(LexerFactory::languageFromFilePath(QStringLiteral("/x/unknown.zzz")), LexerFactory::Unknown);
+    }
+
+    void identifiesLanguagesFromHighConfidenceContent()
+    {
+        QCOMPARE(LexerFactory::languageFromContent(
+                     QByteArrayLiteral("#!/usr/bin/env python3\nprint('hello')\n")),
+                 LexerFactory::Python);
+        QCOMPARE(LexerFactory::languageFromContent(
+                     QByteArrayLiteral("#!/bin/zsh\necho hello\n")),
+                 LexerFactory::SHELL);
+        QCOMPARE(LexerFactory::languageFromContent(
+                     QByteArrayLiteral("  <?xml version=\"1.0\"?><root/>")),
+                 LexerFactory::XML);
+        QCOMPARE(LexerFactory::languageFromContent(
+                     QByteArrayLiteral("{\"name\": \"NotePeek\", \"enabled\": true}")),
+                 LexerFactory::JSON);
+        QCOMPARE(LexerFactory::languageFromContent(
+                     QByteArrayLiteral("ordinary prose with { punctuation }")),
+                 LexerFactory::Unknown);
+        QCOMPARE(LexerFactory::languageFromContent(
+                     QByteArrayLiteral("<htmlish is not an HTML root tag>")),
+                 LexerFactory::Unknown);
+        QCOMPARE(LexerFactory::languageFromContent(
+                     QByteArrayLiteral("<!doctype htmlish>")),
+                 LexerFactory::Unknown);
+    }
+
+    void appliesContentDetectedLexerAfterAsynchronousOpen()
+    {
+        QTemporaryDir dir;
+        QVERIFY(dir.isValid());
+        const QString filePath = dir.filePath(QStringLiteral("extensionless-script"));
+        writeFile(filePath, QByteArrayLiteral("#!/usr/bin/env python3\nprint('hello')\n"));
+
+        EditorPane pane;
+        DocumentController controller(&pane, false);
+        controller.openFile(filePath);
+        QTRY_VERIFY_WITH_TIMEOUT(controller.currentEditor()
+                                     && !controller.currentEditor()->isReadOnly(),
+                                 3000);
+        QVERIFY(qobject_cast<QsciLexerPython *>(controller.currentEditor()->lexer()));
+        QCOMPARE(controller.currentEditor()->property("notepeekLexerLanguage").toInt(),
+                 int(LexerFactory::Python));
     }
 
     void mapsLexerStylesThroughCustomizedLibraryRoles()
@@ -945,6 +1036,42 @@ private slots:
         QTRY_VERIFY(!action->isEnabled());
     }
 
+    void asynchronousFormattingNeverOverwritesANewerEdit()
+    {
+        QTemporaryDir dir;
+        QVERIFY(dir.isValid());
+        const QString jsonPath = dir.filePath(QStringLiteral("concurrent.json"));
+        writeFile(jsonPath, QByteArrayLiteral("{\"value\":1}\n"));
+
+        MainWindow window(nullptr, {jsonPath});
+        window.show();
+        auto *action = window.findChild<QAction *>(QStringLiteral("action_formatCode"));
+        QVERIFY(action);
+
+        CustomEditor *editor = nullptr;
+        QTRY_VERIFY([&]() {
+            for (CustomEditor *candidate : window.findChildren<CustomEditor *>())
+            {
+                if (QFileInfo(candidate->filePath()) == QFileInfo(jsonPath))
+                {
+                    editor = candidate;
+                    return candidate->text() == QStringLiteral("{\"value\":1}\n");
+                }
+            }
+            return false;
+        }());
+        QTRY_VERIFY(action->isEnabled());
+
+        action->trigger();
+        QVERIFY(!action->isEnabled());
+        editor->setCursorPosition(0, 1);
+        editor->insert(QStringLiteral("user-edit"));
+        const QString editedText = editor->text();
+
+        QTRY_VERIFY_WITH_TIMEOUT(action->isEnabled(), 3000);
+        QCOMPARE(editor->text(), editedText);
+    }
+
     // A name column wider than the viewport is clipped by the viewport instead
     // of being elided, so the column has to follow the dock's width.
     void fileTreeNameColumnTracksTheViewport()
@@ -991,16 +1118,54 @@ private slots:
         QCOMPARE(proxy.data(proxyIndex, Qt::ToolTipRole).toString(), longName);
     }
 
+    void fileTreeClassifiesBinaryFilesOffTheUiThread()
+    {
+        QTemporaryDir dir;
+        QVERIFY(dir.isValid());
+        const QString textPath = dir.filePath(QStringLiteral("visible.txt"));
+        const QString binaryPath = dir.filePath(QStringLiteral("binary.txt"));
+        writeFile(textPath, QByteArrayLiteral("plain text\n"));
+        writeFile(binaryPath, QByteArray("prefix\0binary", 13));
+
+        QFileSystemModel model;
+        model.setFilter(QDir::AllEntries | QDir::NoDotAndDotDot | QDir::AllDirs);
+        FileTypeFilterProxyModel proxy;
+        proxy.setSourceModel(&model);
+        model.setRootPath(dir.path());
+        proxy.setVisibleRootDirectory(dir.path());
+
+        QTRY_VERIFY([&]() {
+            const QModelIndex source = model.index(textPath);
+            return source.isValid() && proxy.mapFromSource(source).isValid();
+        }());
+        // Eligible extensions are provisionally visible while the bounded
+        // background probe runs, then binary content is removed.
+        proxy.mapFromSource(model.index(binaryPath));
+        QTRY_VERIFY_WITH_TIMEOUT([&]() {
+            const QModelIndex source = model.index(binaryPath);
+            return source.isValid() && !proxy.mapFromSource(source).isValid();
+        }(), 3000);
+        QVERIFY(proxy.mapFromSource(model.index(textPath)).isValid());
+    }
+
     void highlightsAllMatchesInEditor()
     {
         CustomEditor editor;
         editor.setText(QStringLiteral("foo bar foo\nbaz foo\n"));
+        editor.setSelection(0, 0, 0, 3);
 
         FindReplaceManager manager;
         manager.setCurrentEditor(&editor);
         manager.setFindText(QStringLiteral("foo"));
         manager.highlightAllMatches();
         QCOMPARE(manager.searchResults().size(), 3);
+        int fromLine = -1;
+        int fromIndex = -1;
+        int toLine = -1;
+        int toIndex = -1;
+        editor.getSelection(&fromLine, &fromIndex, &toLine, &toIndex);
+        QCOMPARE(QVector<int>({fromLine, fromIndex, toLine, toIndex}),
+                 QVector<int>({0, 0, 0, 3}));
 
         manager.setCaseSensitive(true);
         manager.setFindText(QStringLiteral("FOO"));

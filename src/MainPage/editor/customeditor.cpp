@@ -54,6 +54,24 @@ void CustomEditor::shareDocumentSessionFrom(const CustomEditor *source)
         m_documentSession = source->m_documentSession;
 }
 
+bool CustomEditor::sharesDocumentSessionWith(const CustomEditor *other) const
+{
+    return other && m_documentSession == other->m_documentSession;
+}
+
+void CustomEditor::setLargeFileMode(bool enabled)
+{
+    // Promotion is sticky.  Re-enabling expensive editor services after a
+    // temporary shrink can immediately stall on the next undo or external
+    // reload that restores the large buffer.
+    m_documentSession->largeFileMode = m_documentSession->largeFileMode || enabled;
+}
+
+bool CustomEditor::isLargeFileMode() const
+{
+    return m_documentSession->largeFileMode;
+}
+
 void CustomEditor::setPersistenceState(DocumentPersistenceState state)
 {
     m_documentSession->persistenceState = state;

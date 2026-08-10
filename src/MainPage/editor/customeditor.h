@@ -23,6 +23,9 @@ public:
     bool hasExternalConflict() const;
     bool wasDeletedExternally() const;
     void shareDocumentSessionFrom(const CustomEditor *source);
+    bool sharesDocumentSessionWith(const CustomEditor *other) const;
+    void setLargeFileMode(bool enabled);
+    bool isLargeFileMode() const;
     void setPersistenceState(DocumentPersistenceState state);
     DocumentPersistenceState persistenceState() const;
     bool isModified() const;

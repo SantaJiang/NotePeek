@@ -5,6 +5,7 @@
 #include "editor/editorpane.h"
 #include "editor/editormanager.h"
 #include "editor/externalfilewatcher.h"
+#include "editor/performanceconstants.h"
 #include "editor/spliteditorcoordinator.h"
 #include "decorators/highlightedscrollbar.h"
 #include "decorators/highlightedscrollbardecorator.h"
@@ -126,6 +127,10 @@ private slots:
         QCOMPARE(editor->autoCompletionSource(), CustomEditor::AcsDocument);
         QCOMPARE(editor->autoCompletionThreshold(), 3);
 
+        QsciLexer *cppLexer = editor->lexer();
+        manager.updateEditorSyntax(editor, QStringLiteral("renamed.hpp"));
+        QCOMPARE(editor->lexer(), cppLexer);
+
         manager.updateEditorSyntax(editor, QStringLiteral("Dockerfile"));
         QVERIFY(editor->codeEditingFeaturesEnabled());
         QCOMPARE(editor->folding(), CustomEditor::NoFoldStyle);
@@ -142,6 +147,127 @@ private slots:
         editor->setText(QString());
         QTest::keyClicks(editor, QStringLiteral("("));
         QCOMPARE(editor->text(), QStringLiteral("("));
+    }
+
+    void largeFileModeSurvivesSyntaxAndPreferenceRefreshes()
+    {
+        EditorManager manager;
+        CustomEditor *editor = manager.createEditor();
+        editor->setFilePath(QStringLiteral("large.cpp"));
+        manager.updateEditorSyntax(editor, editor->filePath());
+        CustomEditor *split = manager.createEditorSharingDocument(editor);
+        QVERIFY(split);
+        QVERIFY(editor->lexer());
+        QVERIFY(split->lexer());
+
+        manager.promoteToLargeFileMode(editor);
+
+        const auto verifyLargePolicy = [](CustomEditor *candidate) {
+            QVERIFY(candidate->isLargeFileMode());
+            QVERIFY(candidate->lexer() == nullptr);
+            QVERIFY(!candidate->codeEditingFeaturesEnabled());
+            QVERIFY(!candidate->bracketAssistanceEnabled());
+            QVERIFY(!candidate->documentCompletionEnabled());
+            QCOMPARE(candidate->wrapMode(), CustomEditor::WrapNone);
+            QCOMPARE(candidate->folding(), CustomEditor::NoFoldStyle);
+            QCOMPARE(candidate->autoCompletionSource(), CustomEditor::AcsNone);
+            QCOMPARE(candidate->autoCompletionThreshold(), -1);
+        };
+        verifyLargePolicy(editor);
+
+        // Save-as/rename and each live preference refresh used to re-enable
+        // expensive lexing because only the original QFileInfo size was used.
+        editor->setFilePath(QStringLiteral("renamed.py"));
+        manager.updateEditorSyntax(editor, editor->filePath());
+        manager.applyCodeFeaturePreferences();
+        manager.applyFontPreferences();
+        manager.reapplyThemeToAllEditors();
+        verifyLargePolicy(editor);
+        verifyLargePolicy(split);
+
+        editor->setLargeFileMode(false);
+        editor->setText(QStringLiteral("small after reload"));
+        verifyLargePolicy(editor);
+        verifyLargePolicy(split);
+    }
+
+    void usesVisibleIdleStylingAndDisablesItAfterDegradation()
+    {
+        EditorManager manager;
+        CustomEditor *editor = manager.createEditor();
+        manager.updateEditorSyntax(editor, QStringLiteral("example.cpp"));
+
+        QCOMPARE(editor->SendScintilla(QsciScintillaBase::SCI_GETIDLESTYLING),
+                 long(QsciScintillaBase::SC_IDLESTYLING_TOVISIBLE));
+
+        manager.promoteToLargeFileMode(editor);
+        QCOMPARE(editor->SendScintilla(QsciScintillaBase::SCI_GETIDLESTYLING),
+                 long(QsciScintillaBase::SC_IDLESTYLING_NONE));
+    }
+
+    void degradesWhenEditingCreatesAnAbnormallyLongLine()
+    {
+        EditorManager manager;
+        CustomEditor *editor = manager.createEditor();
+        manager.updateEditorSyntax(editor, QStringLiteral("generated.cpp"));
+
+        editor->setText(QString(PerformanceConstants::AbnormallyLongLineBytes,
+                                QLatin1Char('x'))
+                        + QStringLiteral("\r\nnext"));
+        QVERIFY(!editor->isLargeFileMode());
+        editor->setCursorPosition(0, int(PerformanceConstants::AbnormallyLongLineBytes));
+        editor->insert(QStringLiteral("x"));
+
+        QVERIFY(editor->isLargeFileMode());
+        QVERIFY(editor->lexer() == nullptr);
+        QCOMPARE(editor->wrapMode(), CustomEditor::WrapNone);
+        QCOMPARE(editor->SendScintilla(QsciScintillaBase::SCI_GETIDLESTYLING),
+                 long(QsciScintillaBase::SC_IDLESTYLING_NONE));
+    }
+
+    void savesAllModifiedDocumentsInOnePane()
+    {
+        QTemporaryDir tempDir;
+        QVERIFY(tempDir.isValid());
+        const QString firstPath = tempDir.filePath(QStringLiteral("first.txt"));
+        const QString secondPath = tempDir.filePath(QStringLiteral("second.txt"));
+        {
+            QFile first(firstPath);
+            QVERIFY(first.open(QIODevice::WriteOnly));
+            QCOMPARE(first.write("first"), qint64(5));
+            QFile second(secondPath);
+            QVERIFY(second.open(QIODevice::WriteOnly));
+            QCOMPARE(second.write("second"), qint64(6));
+        }
+
+        EditorPane pane;
+        DocumentController controller(&pane, false);
+        controller.openFile(firstPath);
+        QTRY_VERIFY_WITH_TIMEOUT(controller.currentEditor()
+                                     && !controller.currentEditor()->isReadOnly(),
+                                 3000);
+        controller.openFile(secondPath);
+        QTRY_COMPARE_WITH_TIMEOUT(pane.count(), 2, 3000);
+        QTRY_VERIFY_WITH_TIMEOUT(controller.currentEditor()
+                                     && !controller.currentEditor()->isReadOnly(),
+                                 3000);
+
+        CustomEditor *firstEditor = controller.editorManager()->getEditorByFilePath(firstPath);
+        CustomEditor *secondEditor = controller.editorManager()->getEditorByFilePath(secondPath);
+        QVERIFY(firstEditor);
+        QVERIFY(secondEditor);
+        firstEditor->append(QStringLiteral("-changed"));
+        secondEditor->append(QStringLiteral("-changed"));
+
+        QVERIFY(controller.saveAll());
+        controller.waitForPendingSaves();
+
+        QFile first(firstPath);
+        QVERIFY(first.open(QIODevice::ReadOnly));
+        QCOMPARE(first.readAll(), QByteArrayLiteral("first-changed"));
+        QFile second(secondPath);
+        QVERIFY(second.open(QIODevice::ReadOnly));
+        QCOMPARE(second.readAll(), QByteArrayLiteral("second-changed"));
     }
 
     void movesToMatchingBracket()
@@ -351,7 +477,7 @@ private slots:
     {
         QTemporaryDir tempDir;
         QVERIFY(tempDir.isValid());
-        const QString path = tempDir.filePath(QStringLiteral("shared.txt"));
+        const QString path = tempDir.filePath(QStringLiteral("shared.cpp"));
         QFile file(path);
         QVERIFY(file.open(QIODevice::WriteOnly));
         QCOMPARE(file.write("shared content"), qint64(14));
@@ -375,6 +501,24 @@ private slots:
         QVERIFY(right.currentEditor());
         QCOMPARE(left.currentEditor()->SendScintillaPtrResult(QsciScintillaBase::SCI_GETDOCPOINTER),
                  right.currentEditor()->SendScintillaPtrResult(QsciScintillaBase::SCI_GETDOCPOINTER));
+
+        CustomEditor *leftEditor = left.currentEditor();
+        CustomEditor *rightEditor = right.currentEditor();
+        QVERIFY(leftEditor->lexer());
+        QVERIFY(rightEditor->lexer());
+
+        left.editorManager()->promoteToLargeFileMode(leftEditor);
+        QVERIFY(leftEditor->isLargeFileMode());
+        QVERIFY(rightEditor->isLargeFileMode());
+        QVERIFY(leftEditor->lexer() == nullptr);
+        // Each pane owns a separate EditorManager.  The second manager must
+        // still apply its local view policy after the shared session was
+        // already promoted by the first manager.
+        QVERIFY(rightEditor->lexer());
+        right.editorManager()->promoteToLargeFileMode(rightEditor);
+        QVERIFY(rightEditor->lexer() == nullptr);
+        QVERIFY(!rightEditor->codeEditingFeaturesEnabled());
+        QCOMPARE(rightEditor->autoCompletionSource(), CustomEditor::AcsNone);
     }
 
     void externalFileWatcherReportsChangedMetadata()
@@ -503,6 +647,28 @@ private slots:
         QCOMPARE(shifted.at(1).line, 3);
         QCOMPARE(shifted.at(0).role, NotePeek::SyntaxRole::Variable);
         QCOMPARE(shifted.at(1).role, NotePeek::SyntaxRole::Property);
+    }
+
+    void removesAndShiftsCachedSemanticTokensAfterLineDeletion()
+    {
+        CustomEditor editor;
+        editor.setText(QStringLiteral("first\nsecond\nthird\nfourth\n"));
+        QVERIFY(editor.setSemanticTokens(editor.documentRevision(), {
+            {0, 0, 5, NotePeek::SyntaxRole::Function},
+            {1, 0, 6, NotePeek::SyntaxRole::Variable},
+            {2, 0, 5, NotePeek::SyntaxRole::Property},
+            {3, 0, 6, NotePeek::SyntaxRole::Builtin}
+        }));
+
+        editor.setSelection(1, 0, 2, 0);
+        editor.removeSelectedText();
+
+        const QVector<NotePeek::SemanticToken> shifted = editor.semanticTokens();
+        QCOMPARE(shifted.size(), 2);
+        QCOMPARE(shifted.at(0).line, 1);
+        QCOMPARE(shifted.at(0).role, NotePeek::SyntaxRole::Property);
+        QCOMPARE(shifted.at(1).line, 2);
+        QCOMPARE(shifted.at(1).role, NotePeek::SyntaxRole::Builtin);
     }
 
     void semanticServiceIsIdleForHiddenEditorsAndCoalescesNavigation()

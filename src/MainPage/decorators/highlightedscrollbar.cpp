@@ -144,8 +144,12 @@ void HighlightedScrollBar::refreshSearchMarkers()
             QsciScintillaBase::SCI_INDICATOREND, searchIndicator, currentPos));
         if (endPos <= currentPos)
             break;
-        m_searchLines.append(int(editor->SendScintilla(
-            QsciScintillaBase::SCI_LINEFROMPOSITION, currentPos)));
+        const int line = int(editor->SendScintilla(
+            QsciScintillaBase::SCI_LINEFROMPOSITION, currentPos));
+        // Multiple matches on one line map to the same pixel. Keeping one line
+        // entry avoids redundant paint work without changing the overlay.
+        if (m_searchLines.isEmpty() || m_searchLines.constLast() != line)
+            m_searchLines.append(line);
         currentPos = endPos;
     }
     update();

@@ -28,6 +28,8 @@ struct DocumentLoadResult
     qint64 fileSize = 0;
     bool success = false;
     bool largeFile = false;
+    bool abnormallyLongLine = false;
+    int detectedLanguage = 0;
     DocumentFormat format;
 };
 

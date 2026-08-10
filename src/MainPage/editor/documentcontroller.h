@@ -53,6 +53,10 @@ public:
     void newDocument();
     bool save();
     bool saveAs();
+    bool saveEditor(CustomEditor *editor);
+    // Saves every modified document owned by this pane. The optional set lets
+    // callers deduplicate Scintilla documents shared by split views.
+    bool saveAll(QSet<void *> *processedDocuments = nullptr);
     bool maybeSave(CustomEditor *editor);
     bool saveEditorForClose(CustomEditor *editor);
     bool saveFile(CustomEditor *editor, const QString &filePath);
@@ -80,7 +84,9 @@ public:
     bool hasTrackedFile(const QString &filePath) const;
     bool applyReloadedContent(const QString &filePath,
                               const QByteArray &utf8Content,
-                              const DocumentFormat &format);
+                              const DocumentFormat &format,
+                              bool performanceDegraded = false,
+                              int detectedLanguage = 0);
     bool hasModifiedEditorForFile(const QString &filePath) const;
     void markExternalConflict(const QString &filePath, bool deleted);
 

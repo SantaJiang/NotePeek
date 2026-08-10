@@ -9,6 +9,8 @@
 #include <QtGlobal>
 #include <memory>
 
+#include <NotePeek/lexerfactory.h>
+
 class CustomEditor;
 class SemanticHighlightingEngine;
 class EditorManager : public QObject
@@ -28,6 +30,10 @@ public:
     void setupEditor(CustomEditor *editor);
     void updateLineNumberMarginWidth(CustomEditor *editor);
     void updateEditorSyntax(CustomEditor *editor, const QString &filePath);
+    void updateEditorSyntax(CustomEditor *editor,
+                            const QString &filePath,
+                            LexerFactory::Language detectedLanguage);
+    void promoteToLargeFileMode(CustomEditor *editor);
 
     // Re-apply theme colours to every open editor (call on palette change)
     void reapplyThemeToAllEditors();
@@ -48,6 +54,7 @@ private:
     // The text font for prose files, the code font for source files, as
     // configured in AppPreferences.
     QFont fontForPath(const QString &filePath) const;
+    QFont fontForEditor(CustomEditor *editor, const QString &filePath) const;
     void setMarginsFont(CustomEditor *editor, const QFont &font);
     void applyDisplayPolicy(CustomEditor *editor, const QString &filePath);
     void purgeOldEditorPointers();

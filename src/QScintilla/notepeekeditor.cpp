@@ -339,26 +339,25 @@ void Editor::handleSemanticModification(int modificationType, int linesAdded, in
     if ((modificationType & (SC_MOD_INSERTTEXT | SC_MOD_DELETETEXT)) == 0)
         return;
 
-    for (int i = m_semanticTokens.size() - 1; i >= 0; --i)
+    // Tokens are sorted by line. Remove the invalidated run in one splice and
+    // adjust only the remaining tail; removeAt() in a reverse loop repeatedly
+    // shifted the vector and made dense edits unnecessarily expensive.
+    const auto byLine = [](const SemanticToken &token, int value) {
+        return token.line < value;
+    };
+    const int deletedLastLine = linesAdded < 0 ? line - linesAdded : line;
+    const auto firstInvalid = std::lower_bound(m_semanticTokens.begin(),
+                                               m_semanticTokens.end(),
+                                               line, byLine);
+    const auto firstRetained = std::upper_bound(
+        firstInvalid, m_semanticTokens.end(), deletedLastLine,
+        [](int value, const SemanticToken &token) { return value < token.line; });
+    const int tailIndex = int(firstInvalid - m_semanticTokens.begin());
+    m_semanticTokens.erase(firstInvalid, firstRetained);
+    if (linesAdded != 0)
     {
-        SemanticToken &token = m_semanticTokens[i];
-        if (token.line == line)
-        {
-            m_semanticTokens.removeAt(i);
-            continue;
-        }
-        if (linesAdded > 0 && token.line > line)
-        {
-            token.line += linesAdded;
-        }
-        else if (linesAdded < 0 && token.line > line)
-        {
-            const int deletedLastLine = line - linesAdded;
-            if (token.line <= deletedLastLine)
-                m_semanticTokens.removeAt(i);
-            else
-                token.line += linesAdded;
-        }
+        for (int i = tailIndex; i < m_semanticTokens.size(); ++i)
+            m_semanticTokens[i].line += linesAdded;
     }
     clearSemanticIndicatorLines(line, line + qMax(0, linesAdded));
 }

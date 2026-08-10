@@ -97,6 +97,8 @@ add_library(notepeek_widgets STATIC
     widgets/filetreeview.h
     widgets/filetypefilterproxymodel.cpp
     widgets/filetypefilterproxymodel.h
+    widgets/iconfont.cpp
+    widgets/iconfont.h
     widgets/qscieditorinfostatusbar.cpp
     widgets/qscieditorinfostatusbar.h
     widgets/searchresultsdock.cpp

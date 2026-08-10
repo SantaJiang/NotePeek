@@ -64,7 +64,6 @@ private:
     void updateScrollBarMarkers();
     void initializeEditor();
     bool isLargeFile() const;
-    bool selectionMatchesSearchResults(int position, int length) const;
     void prepareFindOptions(bool &re, bool &cs, bool &wo, bool &wrap, bool &forward, bool wrapAround = false) const;
 
     QPointer<CustomEditor> m_editor;

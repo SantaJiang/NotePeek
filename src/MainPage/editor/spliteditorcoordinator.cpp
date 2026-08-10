@@ -9,6 +9,7 @@
 #include "editor/editorpane.h"
 #include "editor/externalfilewatcher.h"
 #include "editor/performanceconstants.h"
+#include <NotePeek/lexerfactory.h>
 
 #include <QFileInfo>
 #include <QFutureWatcher>
@@ -515,6 +516,18 @@ void SplitEditorCoordinator::reloadExternallyChangedFile(DocumentController *sou
                                                     &result.content,
                                                     &result.format,
                                                     &result.errorMessage);
+        if (result.success && result.content.size() <= PerformanceConstants::LargeFileSize)
+        {
+            result.performanceDegraded =
+                PerformanceConstants::containsAbnormallyLongLine(result.content);
+            if (!result.performanceDegraded)
+            {
+                LexerFactory::Language language = LexerFactory::languageFromFilePath(filePath);
+                if (language == LexerFactory::Unknown)
+                    language = LexerFactory::languageFromContent(result.content);
+                result.detectedLanguage = int(language);
+            }
+        }
         return result;
     }));
 }
@@ -535,13 +548,17 @@ void SplitEditorCoordinator::applyExternalReload(DocumentController *source,
     bool reloaded = false;
     if (source)
     {
-        reloaded = source->applyReloadedContent(filePath, result.content, result.format);
+        reloaded = source->applyReloadedContent(filePath, result.content, result.format,
+                                                result.performanceDegraded,
+                                                result.detectedLanguage);
     }
     for (DocumentController *controller : controllers())
     {
         if (controller != source)
         {
-            reloaded = controller->applyReloadedContent(filePath, result.content, result.format)
+            reloaded = controller->applyReloadedContent(filePath, result.content, result.format,
+                                                        result.performanceDegraded,
+                                                        result.detectedLanguage)
                        || reloaded;
         }
     }

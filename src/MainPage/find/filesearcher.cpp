@@ -4,9 +4,11 @@
 #include "editor/performanceconstants.h"
 #include "editor/supportedfilepolicy.h"
 
-#include <QDirIterator>
+#include <QDir>
 #include <QFile>
+#include <QFileInfo>
 #include <QFutureWatcher>
+#include <QSet>
 #include <QtConcurrent>
 
 namespace {
@@ -35,15 +37,22 @@ void collectMatchesInFile(const QString &filePath,
                           const QString &pattern,
                           Qt::CaseSensitivity caseSensitivity,
                           bool wholeWord,
-                          FileSearchOutcome *outcome)
+                          FileSearchOutcome *outcome,
+                          const std::shared_ptr<std::atomic_bool> &cancelRequested)
 {
     int searchFrom = 0;
     int lineScanPosition = 0;
     int currentLine = 0;
     int currentLineStart = 0;
+    int visitedCandidates = 0;
 
     while (true)
     {
+        if ((visitedCandidates++ & 0xff) == 0 && cancelRequested->load())
+        {
+            outcome->summary.canceled = true;
+            return;
+        }
         const int position = text.indexOf(pattern, searchFrom, caseSensitivity);
         if (position < 0)
         {
@@ -109,13 +118,17 @@ FileSearchOutcome runSearch(const QString &rootDirectory,
                             std::shared_ptr<std::atomic_bool> cancelRequested)
 {
     FileSearchOutcome outcome;
+    outcome.matches.reserve(FileSearcher::MaximumMatches);
     const Qt::CaseSensitivity caseSensitivity = caseSensitive ? Qt::CaseSensitive
                                                               : Qt::CaseInsensitive;
 
-    QDirIterator iterator(rootDirectory,
-                          QDir::Files | QDir::NoDotAndDotDot | QDir::Readable,
-                          QDirIterator::Subdirectories);
-    while (iterator.hasNext())
+    static const QSet<QString> ignoredDirectoryNames = {
+        QStringLiteral(".git"), QStringLiteral(".svn"), QStringLiteral(".hg"),
+        QStringLiteral("build"), QStringLiteral("node_modules"),
+        QStringLiteral("DerivedData"), QStringLiteral("__pycache__")
+    };
+    QStringList pendingDirectories{QDir(rootDirectory).absolutePath()};
+    while (!pendingDirectories.isEmpty())
     {
         if (cancelRequested->load())
         {
@@ -127,33 +140,53 @@ FileSearchOutcome runSearch(const QString &rootDirectory,
             return outcome;
         }
 
-        const QString filePath = iterator.next();
-        if (iterator.fileInfo().size() > PerformanceConstants::LargeFileSize)
+        const QString directoryPath = pendingDirectories.takeLast();
+        const QFileInfoList entries = QDir(directoryPath).entryInfoList(
+            QDir::Dirs | QDir::Files | QDir::NoDotAndDotDot | QDir::Readable,
+            QDir::Name | QDir::DirsFirst);
+        for (const QFileInfo &entry : entries)
         {
-            continue;
-        }
-        if (!SupportedFilePolicy::isSupportedTextFile(filePath))
-        {
-            continue;
-        }
+            if (cancelRequested->load())
+            {
+                outcome.summary.canceled = true;
+                return outcome;
+            }
+            if (entry.isDir())
+            {
+                const QString name = entry.fileName();
+                if (!entry.isSymLink()
+                    && !ignoredDirectoryNames.contains(name)
+                    && !name.startsWith(QStringLiteral("cmake-build-")))
+                {
+                    pendingDirectories.append(entry.absoluteFilePath());
+                }
+                continue;
+            }
+            if (entry.size() > PerformanceConstants::LargeFileSize
+                || !SupportedFilePolicy::hasSupportedTextType(entry))
+            {
+                continue;
+            }
 
-        QFile file(filePath);
-        if (!file.open(QFile::ReadOnly))
-        {
-            continue;
-        }
-        const QByteArray bytes = file.readAll();
-        file.close();
+            const QString filePath = entry.absoluteFilePath();
+            QFile file(filePath);
+            if (!file.open(QFile::ReadOnly))
+                continue;
+            const QByteArray bytes = file.readAll();
+            if (SupportedFilePolicy::looksLikeBinaryData(bytes))
+                continue;
 
-        QString text;
-        DocumentFormat format;
-        if (!DocumentFormatCodec::decode(bytes, &text, &format, nullptr))
-        {
-            continue;
-        }
+            QString text;
+            DocumentFormat format;
+            if (!DocumentFormatCodec::decode(bytes, &text, &format, nullptr))
+                continue;
 
-        ++outcome.summary.scannedFileCount;
-        collectMatchesInFile(filePath, text, pattern, caseSensitivity, wholeWord, &outcome);
+            ++outcome.summary.scannedFileCount;
+            collectMatchesInFile(filePath, text, pattern, caseSensitivity,
+                                 wholeWord, &outcome, cancelRequested);
+            if (outcome.summary.canceled || outcome.summary.truncated)
+                return outcome;
+        }
     }
 
     return outcome;

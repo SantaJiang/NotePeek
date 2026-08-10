@@ -12,7 +12,6 @@
 #include <QGuiApplication>
 #include <QPainter>
 #include <QScrollBar>
-#include <QSet>
 #include <QSplitter>
 #include <QTimer>
 #include <QVBoxLayout>
@@ -122,8 +121,10 @@ MarkdownDocumentPage::MarkdownDocumentPage(CustomEditor *editor, QWidget *parent
     , m_preview(nullptr)
     , m_previewer(nullptr)
     , m_updateTimer(new QTimer(this))
+    , m_scrollMapTimer(new QTimer(this))
     , m_previewLineMarker(nullptr)
     , m_currentSourceLine(1)
+    , m_pendingScrollMapSourceLine(1)
     , m_syncingScroll(false)
     , m_latestPreviewRequestId(0)
     , m_mode(SourceOnly)
@@ -137,13 +138,33 @@ MarkdownDocumentPage::MarkdownDocumentPage(CustomEditor *editor, QWidget *parent
     m_splitter->setChildrenCollapsible(false);
 
     m_updateTimer->setSingleShot(true);
-    m_updateTimer->setInterval(180);
+    m_updateTimer->setInterval(PerformanceConstants::MarkdownPreviewDelayMs);
+    m_scrollMapTimer->setSingleShot(true);
+    m_scrollMapTimer->setInterval(40);
 
     connect(editor, &CustomEditor::copyAvailable, this, &DocumentPage::copyAvailableChanged);
     connect(editor, &CustomEditor::textChanged, this, &MarkdownDocumentPage::schedulePreviewUpdate);
     connect(editor, &CustomEditor::cursorPositionChanged,
             this, &MarkdownDocumentPage::onEditorCursorMoved);
     connect(m_updateTimer, &QTimer::timeout, this, &MarkdownDocumentPage::updatePreview);
+    connect(m_scrollMapTimer, &QTimer::timeout, this, [this]() {
+        if (!isPreviewVisible() || !m_preview)
+        {
+            return;
+        }
+
+        rebuildPreviewScrollMap();
+        const int y = previewYForSourceLine(m_pendingScrollMapSourceLine);
+        if (y >= 0 && !m_syncingScroll)
+        {
+            m_syncingScroll = true;
+            QScrollBar *bar = m_preview->verticalScrollBar();
+            const int centeredY = y - m_preview->viewport()->height() / 2;
+            bar->setValue(qBound(bar->minimum(), centeredY, bar->maximum()));
+            m_syncingScroll = false;
+        }
+        updatePreviewLineMarker();
+    });
     connect(editor->verticalScrollBar(), &QScrollBar::valueChanged,
             this, &MarkdownDocumentPage::syncPreviewScrollFromEditor);
     connect(m_splitter, &QSplitter::splitterMoved,
@@ -529,19 +550,13 @@ void MarkdownDocumentPage::rebuildPreviewScrollMap()
         return;
     }
 
-    QSet<int> seenLines;
+    m_previewLineMap.reserve(m_previewSourceLines.size());
     for (int line : std::as_const(m_previewSourceLines))
     {
-        if (seenLines.contains(line))
-        {
-            continue;
-        }
-
         const int y = m_preview->anchorY(QStringLiteral("np-src-line-%1").arg(line));
         if (y >= 0)
         {
             m_previewLineMap.append(qMakePair(line, y));
-            seenLines.insert(line);
         }
     }
 
@@ -558,25 +573,8 @@ void MarkdownDocumentPage::schedulePreviewScrollMapRebuild()
         return;
     }
 
-    const int sourceLine = sourceLineAtEditorCenter();
-    QTimer::singleShot(0, this, [this, sourceLine]() {
-        if (!isPreviewVisible() || !m_preview)
-        {
-            return;
-        }
-
-        rebuildPreviewScrollMap();
-        const int y = previewYForSourceLine(sourceLine);
-        if (y >= 0 && !m_syncingScroll)
-        {
-            m_syncingScroll = true;
-            QScrollBar *bar = m_preview->verticalScrollBar();
-            const int centeredY = y - m_preview->viewport()->height() / 2;
-            bar->setValue(qBound(bar->minimum(), centeredY, bar->maximum()));
-            m_syncingScroll = false;
-        }
-        updatePreviewLineMarker();
-    });
+    m_pendingScrollMapSourceLine = sourceLineAtEditorCenter();
+    m_scrollMapTimer->start();
 }
 
 void MarkdownDocumentPage::onEditorCursorMoved(int line, int /*index*/)

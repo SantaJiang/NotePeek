@@ -205,54 +205,81 @@ void FindReplaceManager::highlightAllMatches()
 
     clearHighlights();
 
-    int originalLine, originalIndex;
+    int originalLine = 0;
+    int originalIndex = 0;
     m_editor->getCursorPosition(&originalLine, &originalIndex);
-    const int firstVisibleLine = m_editor->SendScintilla(QsciScintillaBase::SCI_GETFIRSTVISIBLELINE);
-    const int xOffset = m_editor->SendScintilla(QsciScintillaBase::SCI_GETXOFFSET);
-    bool hadSelection = m_editor->hasSelectedText();
-    int selLineFrom = 0;
-    int selIndexFrom = 0;
-    int selLineTo = 0;
-    int selIndexTo = 0;
+    const int firstVisibleLine = int(m_editor->SendScintilla(
+        QsciScintillaBase::SCI_GETFIRSTVISIBLELINE));
+    const int xOffset = int(m_editor->SendScintilla(QsciScintillaBase::SCI_GETXOFFSET));
+    const bool hadSelection = m_editor->hasSelectedText();
+    int selectionFromLine = 0;
+    int selectionFromIndex = 0;
+    int selectionToLine = 0;
+    int selectionToIndex = 0;
     int selectionPosition = -1;
     int selectionLength = 0;
-    if (hadSelection) {
-        m_editor->getSelection(&selLineFrom, &selIndexFrom, &selLineTo, &selIndexTo);
-        selectionPosition = m_editor->positionFromLineIndex(selLineFrom, selIndexFrom);
-        selectionLength = m_editor->positionFromLineIndex(selLineTo, selIndexTo) - selectionPosition;
+    if (hadSelection)
+    {
+        m_editor->getSelection(&selectionFromLine, &selectionFromIndex,
+                               &selectionToLine, &selectionToIndex);
+        selectionPosition = m_editor->positionFromLineIndex(selectionFromLine,
+                                                            selectionFromIndex);
+        selectionLength = m_editor->positionFromLineIndex(selectionToLine,
+                                                          selectionToIndex)
+                          - selectionPosition;
     }
-
-    bool re, cs, wo, wrap, forward;
-    prepareFindOptions(re, cs, wo, wrap, forward, false);
-    forward = true; // Always forward for highlightAllMatches
-
-    m_editor->setCursorPosition(0, 0);
-    bool found = m_editor->findFirst(m_findText, re, cs, wo, wrap, forward);
+    bool selectedMatchFound = false;
 
     m_searchResults.clear();
+    const QByteArray needle = m_findText.toUtf8();
+    const long documentLength = m_editor->SendScintilla(QsciScintillaBase::SCI_GETLENGTH);
+    int searchFlags = 0;
+    if (m_caseSensitive)
+        searchFlags |= QsciScintillaBase::SCFIND_MATCHCASE;
+    if (m_wholeWord)
+        searchFlags |= QsciScintillaBase::SCFIND_WHOLEWORD;
+    m_editor->SendScintilla(QsciScintillaBase::SCI_SETSEARCHFLAGS, searchFlags);
+    m_editor->SendScintilla(QsciScintillaBase::SCI_SETINDICATORCURRENT,
+                            m_highlightIndicator);
 
-    while (found) {
-        int lineFrom, indexFrom, lineTo, indexTo;
-        m_editor->getSelection(&lineFrom, &indexFrom, &lineTo, &indexTo);
+    long searchFrom = 0;
+    while (searchFrom < documentLength)
+    {
+        m_editor->SendScintilla(QsciScintillaBase::SCI_SETTARGETSTART, searchFrom);
+        m_editor->SendScintilla(QsciScintillaBase::SCI_SETTARGETEND, documentLength);
+        const long position = m_editor->SendScintilla(
+            QsciScintillaBase::SCI_SEARCHINTARGET, needle.size(), needle.constData());
+        if (position < 0)
+            break;
+        const long matchEnd = m_editor->SendScintilla(QsciScintillaBase::SCI_GETTARGETEND);
+        const long matchLength = qMax(0L, matchEnd - position);
+        if (matchLength <= 0)
+            break;
 
-        m_editor->fillIndicatorRange(lineFrom, indexFrom, lineTo, indexTo, m_highlightIndicator);
-
+        m_editor->SendScintilla(QsciScintillaBase::SCI_INDICATORFILLRANGE,
+                                position, matchLength);
         SearchResult result;
-        result.position = m_editor->positionFromLineIndex(lineFrom, indexFrom);
-        result.length = (lineFrom == lineTo) ? (indexTo - indexFrom) :
-                            (m_editor->positionFromLineIndex(lineTo, indexTo) - result.position);
+        result.position = int(position);
+        result.length = int(matchLength);
         result.text = m_findText;
         m_searchResults.append(result);
-
-        found = m_editor->findNext();
+        selectedMatchFound = selectedMatchFound
+                             || (result.position == selectionPosition
+                                 && result.length == selectionLength);
+        searchFrom = matchEnd;
     }
 
-    if (hadSelection && selectionMatchesSearchResults(selectionPosition, selectionLength)) {
-        m_editor->setSelection(selLineFrom, selIndexFrom, selLineTo, selIndexTo);
-    } else {
+    if (hadSelection && selectedMatchFound)
+    {
+        m_editor->setSelection(selectionFromLine, selectionFromIndex,
+                               selectionToLine, selectionToIndex);
+    }
+    else
+    {
         m_editor->setCursorPosition(originalLine, originalIndex);
     }
-    m_editor->SendScintilla(QsciScintillaBase::SCI_SETFIRSTVISIBLELINE, firstVisibleLine);
+    m_editor->SendScintilla(QsciScintillaBase::SCI_SETFIRSTVISIBLELINE,
+                            firstVisibleLine);
     m_editor->SendScintilla(QsciScintillaBase::SCI_SETXOFFSET, xOffset);
 
     updateScrollBarMarkers();
@@ -374,19 +401,6 @@ bool FindReplaceManager::isLargeFile() const
     // The in-memory buffer is the authority: an unsaved buffer has no on-disk
     // size, and the disk size can differ from what is actually being searched.
     return m_editor->length() > PerformanceConstants::LargeFileSize;
-}
-
-bool FindReplaceManager::selectionMatchesSearchResults(int position, int length) const
-{
-    for (const SearchResult &result : m_searchResults)
-    {
-        if (result.position == position && result.length == length)
-        {
-            return true;
-        }
-    }
-
-    return false;
 }
 
 void FindReplaceManager::prepareFindOptions(bool &re, bool &cs, bool &wo, bool &wrap, bool &forward, bool wrapAround) const
