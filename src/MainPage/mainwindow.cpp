@@ -134,6 +134,7 @@ MainWindow::MainWindow(QWidget *parent,
 {
     ui->setupUi(this);
     setAcceptDrops(false); // Drag and drop is handled by the editors.
+    ui->statusbar->setVisible(AppPreferences::instance().showStatusBar());
 
     const bool hasFileArg = !initialFiles.isEmpty();
     m_singleFileWindow = singleFileWindow;
@@ -648,6 +649,7 @@ void MainWindow::applyPreferences()
     m_editorCoordinator->applyCodeFeaturePreferencesToEditors();
     m_editorCoordinator->reapplyThemeToEditorPanes();
     m_editorCoordinator->refreshVisibleMarkdownPreviews();
+    ui->statusbar->setVisible(AppPreferences::instance().showStatusBar());
     if (CustomEditor *editor = activeController()->currentEditor())
     {
         updateEditActions(editor->hasSelectedText());

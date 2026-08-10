@@ -39,6 +39,11 @@ public:
     bool showFileTreeOnStartup() const { return m_showFileTreeOnStartup; }
     void setShowFileTreeOnStartup(bool show) { m_showFileTreeOnStartup = show; }
 
+    // Show the editor information bar along the bottom of the main window.
+    // Unlike the file-tree startup preference, this is applied immediately.
+    bool showStatusBar() const { return m_showStatusBar; }
+    void setShowStatusBar(bool show) { m_showStatusBar = show; }
+
     // When true, freshly opened Markdown files start in preview mode instead
     // of source mode.
     bool markdownDefaultPreview() const { return m_markdownDefaultPreview; }
@@ -89,6 +94,7 @@ private:
     int m_codeFontSize;
     QString m_syntaxThemeId;
     bool m_showFileTreeOnStartup;
+    bool m_showStatusBar;
     bool m_markdownDefaultPreview;
     bool m_untitledUsesCodeMode;
     bool m_overwriteMode;

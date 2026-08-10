@@ -251,6 +251,7 @@ PreferencesDialog::PreferencesDialog(QWidget *parent)
     , m_codeFontSize(new QComboBox(this))
     , m_syntaxThemeCombo(new QComboBox(this))
     , m_showFileTree(new QCheckBox(tr("Show file tree on startup"), this))
+    , m_showStatusBar(new QCheckBox(tr("Show bottom status bar"), this))
     , m_markdownSidePreview(new QCheckBox(tr("Open with side preview"), this))
     , m_untitledModeCombo(new QComboBox(this))
     , m_overtypeMode(new QComboBox(this))
@@ -265,6 +266,7 @@ PreferencesDialog::PreferencesDialog(QWidget *parent)
 {
     setWindowTitle(tr("Preferences"));
     setModal(true);
+    m_showStatusBar->setObjectName(QStringLiteral("showStatusBarCheckBox"));
     polishDialogPalette(this);
     setStyleSheet(preferencesStyleSheet());
 
@@ -320,6 +322,7 @@ PreferencesDialog::PreferencesDialog(QWidget *parent)
     auto *generalSection = makeSection(tr("General"), this);
     auto *generalLayout = qobject_cast<QVBoxLayout *>(generalSection->layout());
     generalLayout->addLayout(makeSettingsRow(tr("Language"), m_languageCombo, generalSection));
+    generalLayout->addLayout(makeSettingsRow(tr("Interface"), m_showStatusBar, generalSection));
     generalLayout->addLayout(makeSettingsRow(tr("Startup"), m_showFileTree, generalSection));
     generalLayout->addLayout(makeSettingsRow(tr("New document"), m_untitledModeCombo, generalSection));
     generalLayout->addLayout(makeSettingsRow(tr("Typing"), m_overtypeMode, generalSection));
@@ -409,6 +412,7 @@ void PreferencesDialog::loadFromPreferences()
     const int themeIndex = m_syntaxThemeCombo->findData(prefs.syntaxThemeId());
     m_syntaxThemeCombo->setCurrentIndex(themeIndex >= 0 ? themeIndex : 0);
     m_showFileTree->setChecked(prefs.showFileTreeOnStartup());
+    m_showStatusBar->setChecked(prefs.showStatusBar());
     m_markdownSidePreview->setChecked(prefs.markdownDefaultPreview());
     const int untitledModeIndex = m_untitledModeCombo->findData(prefs.untitledUsesCodeMode());
     m_untitledModeCombo->setCurrentIndex(untitledModeIndex >= 0 ? untitledModeIndex : 0);
@@ -432,6 +436,7 @@ void PreferencesDialog::commit()
     prefs.setCodeFont(m_codeFontCombo->currentFont().family(), currentFontSize(m_codeFontSize));
     prefs.setSyntaxThemeId(m_syntaxThemeCombo->currentData().toString());
     prefs.setShowFileTreeOnStartup(m_showFileTree->isChecked());
+    prefs.setShowStatusBar(m_showStatusBar->isChecked());
     prefs.setMarkdownDefaultPreview(m_markdownSidePreview->isChecked());
     prefs.setUntitledUsesCodeMode(m_untitledModeCombo->currentData().toBool());
     prefs.setOverwriteMode(m_overtypeMode->currentData().toBool());

@@ -1,4 +1,5 @@
 #include <QAction>
+#include <QCheckBox>
 #include <QMenu>
 #include <QComboBox>
 #include <QDockWidget>
@@ -798,6 +799,33 @@ private slots:
         QVERIFY(themeCombo);
         QCOMPARE(themeCombo->count(), 9); // automatic + eight built-ins
         QCOMPARE(themeCombo->itemData(0).toString(), QStringLiteral("auto"));
+    }
+
+    void statusBarVisibilityFollowsPreferences()
+    {
+        AppPreferences &preferences = AppPreferences::instance();
+        const bool previousVisibility = preferences.showStatusBar();
+
+        preferences.setShowStatusBar(false);
+        MainWindow hiddenWindow;
+        auto *hiddenStatusBar = hiddenWindow.findChild<QsciEditorInfoStatusBar *>();
+        QVERIFY(hiddenStatusBar);
+        QVERIFY(hiddenStatusBar->isHidden());
+
+        PreferencesDialog dialog;
+        auto *statusBarCheckBox =
+            dialog.findChild<QCheckBox *>(QStringLiteral("showStatusBarCheckBox"));
+        QVERIFY(statusBarCheckBox);
+        QVERIFY(!statusBarCheckBox->isChecked());
+
+        preferences.setShowStatusBar(true);
+        MainWindow visibleWindow;
+        visibleWindow.show();
+        auto *visibleStatusBar = visibleWindow.findChild<QsciEditorInfoStatusBar *>();
+        QVERIFY(visibleStatusBar);
+        QTRY_VERIFY(visibleStatusBar->isVisible());
+
+        preferences.setShowStatusBar(previousVisibility);
     }
 
     void classifiesRepresentativeSemanticNames()

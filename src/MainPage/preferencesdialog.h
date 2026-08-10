@@ -40,6 +40,7 @@ private:
     QComboBox *m_codeFontSize;
     QComboBox *m_syntaxThemeCombo;
     QCheckBox *m_showFileTree;
+    QCheckBox *m_showStatusBar;
     QCheckBox *m_markdownSidePreview;
     QComboBox *m_untitledModeCombo;
     QComboBox *m_overtypeMode;
