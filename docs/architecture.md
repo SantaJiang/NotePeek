@@ -32,6 +32,11 @@ main.cpp
       -> HeaderSourceManager
       -> MarkdownPreviewer
 
+BackgroundWorkScheduler
+  -> interactive pool (formatting, search, semantic analysis)
+  -> IO pool (load, save, external reload)
+  -> background pool (Markdown rendering, file-type filtering)
+
 EditorPane (view)
   -> DocumentPage (one per tab, plain or Markdown-capable)
 ```
@@ -50,7 +55,31 @@ Owns the file-system browser dock, including the `QFileSystemModel`, file-type f
 
 ### `widgets/SearchResultsDock` and `find/FileSearcher`
 
-`SearchResultsDock` is the project-wide search UI: query row, status line, and a file-grouped result tree that emits `matchActivated` for jump-to-match. `FileSearcher` walks the directory tree and matches text on a worker thread, filtering candidates through `SupportedFilePolicy` and capping results at `FileSearcher::MaximumMatches`. Searches are cancellable and only the newest search reports.
+`SearchResultsDock` is the project-wide search UI: query and exclude-pattern
+rows, status line, and a file-grouped result tree that emits `matchActivated`
+for jump-to-match. `FileSearcher` walks the directory tree and matches text on
+an interactive worker. It shares `ProjectPathFilter` with the file tree, honors
+the project-root `.gitignore` plus user-supplied exclusion globs, filters
+candidates through `SupportedFilePolicy`, and caps results at
+`FileSearcher::MaximumMatches`. Files are decoded incrementally in bounded
+chunks instead of being copied into one byte buffer and one full `QString`.
+Searches are cancellable during traversal and decoding, and only the newest
+search reports.
+
+### `editor/BackgroundWorkScheduler`
+
+Provides process-wide, bounded pools for interactive computation, disk IO, and
+low-priority background maintenance. Services borrow these pools instead of
+creating an unbounded collection of private threads or implicitly competing on
+Qt's global pool. This keeps foreground search and semantic work responsive
+while bounding save, reload, preview, and file-filter concurrency.
+
+### `editor/ProjectPathFilter`
+
+Centralizes directory exclusions for project traversal. Standard generated and
+metadata directories are skipped consistently, root `.gitignore` rules retain
+their order and negation semantics, and callers may add temporary glob rules
+without changing repository files.
 
 ### `editor/EditorPane`
 
@@ -74,17 +103,19 @@ Application-scoped FIFO and generation tracker. It serializes writes per normali
 
 `DocumentPath` is the single file-identity policy, including canonical-parent handling for files that do not exist yet and Windows case folding. `DocumentFormat` strictly validates UTF-8/BOM-marked UTF-16 and preserves uniform line endings; mixed endings are normalized to LF on save. `decodeWithEncoding()` bypasses detection for the user-chosen encoding behind Tools ▸ Encoding.
 
-### `editor/EditorManager`
+### `editor/EditorManager` and `editor/SemanticHighlightingEngine`
 
 Creates and configures `CustomEditor` instances, applies fonts, asks the
-exported language registry for syntax lexers, schedules semantic-token refresh,
-and owns application-only editor decorators. Reusable editing and rendering
-mechanics live in the NotePeekScintilla fork.
+exported language registry for syntax lexers, attaches the semantic engine, and
+owns application-only editor decorators. `SemanticHighlightingEngine` owns the
+viewport snapshot, debounce, cancellation, worker dispatch, and guarded result
+application. Reusable editing and rendering mechanics live in the
+NotePeekScintilla fork.
 
 Semantic refresh is a visible-range incremental service: the UI thread copies
-only 40 lines behind and 80 lines ahead of the viewport, then a single
-low-priority worker analyzes that bounded snapshot with cancellation and a 2 ms
-budget. Edits are debounced for 120 ms, completed navigation for 45 ms, hidden
+only 40 lines behind and 80 lines ahead of the viewport, then a bounded
+interactive worker analyzes that snapshot with cancellation and a 2 ms budget.
+Edits are debounced for 120 ms, completed navigation for 45 ms, hidden
 editors schedule no work, and stale revisions never reach the widget. Results
 replace only their analyzed line range and the token cache is capped at 12,000
 entries. Dynamic diagnostic properties on each editor expose snapshot size,

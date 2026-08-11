@@ -20,11 +20,13 @@ jobs:
             artifact-name: notepeek-macos-arm64
             package-suffix: Darwin-arm64
             performance-open-budget-ms: 24000
+            macos-min-version: '13.0'
           - os: macos-15-intel
             cpack-generator: DragNDrop
             artifact-name: notepeek-macos-x86_64
             package-suffix: Darwin-x86_64
             performance-open-budget-ms: 24000
+            macos-min-version: '13.0'
           - os: windows-2022
             cpack-generator: NSIS
             artifact-name: notepeek-windows
@@ -35,11 +37,13 @@ jobs:
             cpack-generator: 'DEB;RPM'
             artifact-name: notepeek-linux-x86_64
             package-suffix: Linux-x86_64
+            glibc-min-version: '2.35'
           - os: ubuntu-24.04-arm
             cpack-generator: 'DEB;RPM'
             artifact-name: notepeek-linux-arm64
             package-suffix: Linux-arm64
             qt-arch: linux_gcc_arm64
+            glibc-min-version: '2.39'
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v6
@@ -58,6 +62,7 @@ jobs:
           cmake -S . -B build-release -G Ninja
           -DCMAKE_BUILD_TYPE=Release
           -DNOTEPEEK_PACKAGE_SUFFIX=${{ matrix.package-suffix }}
+          -DNOTEPEEK_LINUX_GLIBC_MIN_VERSION=${{ matrix.glibc-min-version }}
       - name: Build
         run: cmake --build build-release --parallel 2
       - name: Test
@@ -67,6 +72,21 @@ jobs:
           python scripts/ci_command.py
           --title "Release tests failed on ${{ runner.os }}"
           -- ctest --test-dir build-release --output-on-failure
+      - name: Install compatibility fixture
+        if: runner.os != 'Windows'
+        run: cmake --install build-release --prefix "${{ runner.temp }}/notepeek-compat"
+      - name: Verify macOS deployment target
+        if: runner.os == 'macOS'
+        run: >-
+          python3 scripts/verify_binary_compat.py
+          "${{ runner.temp }}/notepeek-compat"
+          --macos "${{ matrix.macos-min-version }}"
+      - name: Verify Linux glibc contract
+        if: runner.os == 'Linux'
+        run: >-
+          python3 scripts/verify_binary_compat.py
+          "${{ runner.temp }}/notepeek-compat"
+          --glibc "${{ matrix.glibc-min-version }}"
       - name: Package
         run: >-
           python scripts/ci_command.py
