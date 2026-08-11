@@ -1,7 +1,15 @@
 cmake_minimum_required(VERSION 3.16)
 
+# Keep the compiler/linker deployment target aligned with Info.plist. Merely
+# setting LSMinimumSystemVersion changes the bundle metadata but does not stop
+# the linker from emitting a binary that requires the build host's macOS.
+if(CMAKE_HOST_SYSTEM_NAME STREQUAL "Darwin" AND NOT CMAKE_OSX_DEPLOYMENT_TARGET)
+    set(CMAKE_OSX_DEPLOYMENT_TARGET "13.0" CACHE STRING
+        "Minimum supported macOS version" FORCE)
+endif()
+
 project(NotePeek
-    VERSION 1.6.1
+    VERSION 1.6.2
     DESCRIPTION "A modern code/text editor"
     HOMEPAGE_URL "https://github.com/SantaSpeeds/NotePeek"
     LANGUAGES C CXX
@@ -9,6 +17,8 @@ project(NotePeek
 
 set(NOTEPEEK_APP_ID "com.santa.notepeek" CACHE STRING "Reverse-DNS application identifier")
 set(NOTEPEEK_PACKAGE_SUFFIX "" CACHE STRING "Optional architecture-aware suffix for CPack output files")
+set(NOTEPEEK_LINUX_GLIBC_MIN_VERSION "" CACHE STRING
+    "glibc version declared by Linux packages; defaults to the build host")
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -17,6 +27,12 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 option(NOTEPEEK_WARNINGS_AS_ERRORS "Treat NotePeek source warnings as errors" OFF)
 option(NOTEPEEK_ENABLE_SANITIZERS "Enable AddressSanitizer and UndefinedBehaviorSanitizer" OFF)
+option(NOTEPEEK_ENABLE_COVERAGE "Instrument NotePeek targets for source coverage" OFF)
+option(NOTEPEEK_ENABLE_CLANG_TIDY "Run clang-tidy on NotePeek-owned targets" OFF)
+
+if(NOTEPEEK_ENABLE_CLANG_TIDY)
+    find_program(NOTEPEEK_CLANG_TIDY_EXECUTABLE NAMES clang-tidy REQUIRED)
+endif()
 
 function(notepeek_configure_project_target target)
     if(MSVC)
@@ -33,6 +49,14 @@ function(notepeek_configure_project_target target)
             target_compile_options(${target} PRIVATE -fsanitize=address,undefined -fno-omit-frame-pointer)
             target_link_options(${target} PRIVATE -fsanitize=address,undefined)
         endif()
+        if(NOTEPEEK_ENABLE_COVERAGE)
+            target_compile_options(${target} PRIVATE --coverage -O0 -g)
+            target_link_options(${target} PRIVATE --coverage)
+        endif()
+    endif()
+    if(NOTEPEEK_ENABLE_CLANG_TIDY)
+        set_target_properties(${target} PROPERTIES CXX_CLANG_TIDY
+            "${NOTEPEEK_CLANG_TIDY_EXECUTABLE};-checks=bugprone-*,performance-*;-warnings-as-errors=bugprone-*,performance-*")
     endif()
 endfunction()
 
@@ -95,8 +119,28 @@ elseif(UNIX)
     # capabilities for the freedesktop metadata files.
     set(CPACK_RPM_PACKAGE_AUTOREQ "no")
     set(CPACK_RPM_PACKAGE_AUTOPROV "no")
-    set(CPACK_DEBIAN_PACKAGE_DEPENDS "libc6 (>= 2.28), libstdc++6 (>= 9), libqt6widgets6 (>= 6.2), libqt6printsupport6 (>= 6.2), libqt6svg6 (>= 6.2)")
-    set(CPACK_RPM_PACKAGE_REQUIRES "qt6-qtbase >= 6.2, qt6-qtsvg >= 6.2")
+    if(NOT NOTEPEEK_LINUX_GLIBC_MIN_VERSION)
+        execute_process(
+            COMMAND getconf GNU_LIBC_VERSION
+            OUTPUT_VARIABLE NOTEPEEK_BUILD_GLIBC
+            OUTPUT_STRIP_TRAILING_WHITESPACE
+            ERROR_QUIET
+        )
+        if(NOTEPEEK_BUILD_GLIBC MATCHES "glibc ([0-9]+\\.[0-9]+)")
+            set(NOTEPEEK_LINUX_GLIBC_MIN_VERSION "${CMAKE_MATCH_1}")
+        else()
+            message(FATAL_ERROR
+                "Could not determine the build host glibc version. "
+                "Set NOTEPEEK_LINUX_GLIBC_MIN_VERSION explicitly.")
+        endif()
+    endif()
+    # Linux packages intentionally use the system Qt runtime. Require the Qt
+    # minor used to build the package: Qt guarantees forward, not backward,
+    # binary compatibility between minor releases.
+    set(CPACK_DEBIAN_PACKAGE_DEPENDS
+        "libc6 (>= ${NOTEPEEK_LINUX_GLIBC_MIN_VERSION}), libstdc++6 (>= 9), libqt6widgets6 (>= ${Qt6_VERSION}), libqt6printsupport6 (>= ${Qt6_VERSION}), libqt6svg6 (>= ${Qt6_VERSION})")
+    set(CPACK_RPM_PACKAGE_REQUIRES
+        "glibc >= ${NOTEPEEK_LINUX_GLIBC_MIN_VERSION}, qt6-qtbase >= ${Qt6_VERSION}, qt6-qtsvg >= ${Qt6_VERSION}")
 endif()
 
 include(CPack)

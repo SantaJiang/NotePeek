@@ -53,7 +53,8 @@ NotePeek’s syntax highlighting covers **50+ languages and file formats** via i
 |----------|----------------|----------------|
 | **macOS** | `.dmg` (Drag‑and‑Drop disk image) | macOS 13.0+ |
 | **Windows** | NSIS installer (`.exe`) | Windows 10/11 (64‑bit) |
-| **Linux** | DEB (Debian/Ubuntu) & RPM (Fedora/openSUSE) | glibc 2.28+ |
+| **Linux x86_64** | DEB (Debian/Ubuntu) & RPM (Fedora/openSUSE) | glibc 2.35+ |
+| **Linux arm64** | DEB (Debian/Ubuntu) & RPM (Fedora/openSUSE) | glibc 2.39+ |
 
 ## 🚀 Getting Started
 
