@@ -1,4 +1,5 @@
 #include "tool/markdown/markdownpreviewer.h"
+#include "editor/backgroundworkscheduler.h"
 #include "apppreferences.h"
 #include "editor/documentpath.h"
 #include "themecolors.h"
@@ -14,7 +15,6 @@
 #include <QRegularExpression>
 #include <QSet>
 #include <QFutureWatcher>
-#include <QThreadPool>
 #include <QUuid>
 #include <QUrl>
 #include <QtConcurrent>
@@ -369,10 +369,7 @@ QByteArray loadPreviewResource(const QUrl &url, const QString &rootPath)
 
 MarkdownPreviewer::MarkdownPreviewer(QObject *parent)
     : QObject(parent)
-    , m_renderPool(new QThreadPool(this))
 {
-    m_renderPool->setMaxThreadCount(1);
-    m_renderPool->setExpiryTimeout(30000);
 }
 
 bool MarkdownPreviewer::isMarkdownFile(const QString &filePath) const
@@ -520,7 +517,7 @@ void MarkdownPreviewer::startAsyncRender(const PendingRender &render)
         m_activeCancellation.reset();
         startNextPendingRender();
     });
-    watcher->setFuture(QtConcurrent::run(m_renderPool, [requestId, markdown, filePath, style, cancellation]() {
+    watcher->setFuture(QtConcurrent::run(BackgroundWorkScheduler::backgroundPool(), [requestId, markdown, filePath, style, cancellation]() {
         return renderMarkdownDocumentWithStyle(requestId,
                                                markdown,
                                                filePath,

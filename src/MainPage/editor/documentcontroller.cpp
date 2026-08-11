@@ -3,6 +3,7 @@
 #include "apppreferences.h"
 #include "decorators/highlightedscrollbardecorator.h"
 #include "editor/customeditor.h"
+#include "editor/backgroundworkscheduler.h"
 #include "editor/documentio.h"
 #include "editor/documentpath.h"
 #include "editor/documentpage.h"
@@ -1290,7 +1291,7 @@ void DocumentController::reopenCurrentWithEncoding(DocumentEncoding encoding)
             emit currentFileChanged(editor, filePath);
         }
     });
-    watcher->setFuture(QtConcurrent::run([filePath, encoding]() {
+    watcher->setFuture(QtConcurrent::run(BackgroundWorkScheduler::ioPool(), [filePath, encoding]() {
         EncodedReloadResult result;
         result.success = DocumentIO::loadEditorFileWithEncoding(filePath,
                                                                 encoding,

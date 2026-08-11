@@ -10,6 +10,7 @@
 #include <QLabel>
 #include <QLineEdit>
 #include <QPainter>
+#include <QRegularExpression>
 #include <QSignalBlocker>
 #include <QStyle>
 #include <QStyledItemDelegate>
@@ -162,6 +163,7 @@ SearchResultsDock::SearchResultsDock(QWidget *parent)
     : QObject(parent)
     , m_dock(new QDockWidget(tr("Search Results"), parent))
     , m_patternEdit(new QLineEdit)
+    , m_excludeEdit(new QLineEdit)
     , m_caseButton(new QToolButton)
     , m_wholeWordButton(new QToolButton)
     , m_searchButton(new QToolButton)
@@ -177,6 +179,12 @@ SearchResultsDock::SearchResultsDock(QWidget *parent)
     m_patternEdit->setPlaceholderText(tr("Search in files..."));
     m_patternEdit->setObjectName(QStringLiteral("searchResultsPatternEdit"));
     m_patternEdit->setClearButtonEnabled(true);
+
+    m_excludeEdit->setPlaceholderText(tr("Exclude globs (comma-separated)"));
+    m_excludeEdit->setObjectName(QStringLiteral("searchResultsExcludeEdit"));
+    m_excludeEdit->setClearButtonEnabled(true);
+    m_excludeEdit->setMaximumWidth(260);
+    m_excludeEdit->setAccessibleName(tr("File exclusion patterns"));
 
     m_caseButton->setText(QStringLiteral("Aa"));
     m_caseButton->setObjectName(QStringLiteral("searchResultsCaseButton"));
@@ -209,6 +217,7 @@ SearchResultsDock::SearchResultsDock(QWidget *parent)
     queryRow->setContentsMargins(0, 0, 0, 0);
     queryRow->setSpacing(4);
     queryRow->addWidget(m_patternEdit, 1);
+    queryRow->addWidget(m_excludeEdit);
     queryRow->addWidget(m_caseButton);
     queryRow->addWidget(m_wholeWordButton);
     queryRow->addWidget(m_searchButton);
@@ -251,6 +260,8 @@ SearchResultsDock::SearchResultsDock(QWidget *parent)
     reapplyTheme();
 
     connect(m_patternEdit, &QLineEdit::returnPressed,
+            this, &SearchResultsDock::startOrCancelSearch);
+    connect(m_excludeEdit, &QLineEdit::returnPressed,
             this, &SearchResultsDock::startOrCancelSearch);
     connect(m_searchButton, &QToolButton::clicked,
             this, &SearchResultsDock::startOrCancelSearch);
@@ -361,7 +372,9 @@ void SearchResultsDock::startOrCancelSearch()
     m_searcher->start(m_searchRoot,
                       pattern,
                       m_caseButton->isChecked(),
-                      m_wholeWordButton->isChecked());
+                      m_wholeWordButton->isChecked(),
+                      m_excludeEdit->text().split(
+                          QRegularExpression(QStringLiteral("[,;]")), Qt::SkipEmptyParts));
 }
 
 void SearchResultsDock::onSearchFinished(const FileSearchOutcome &outcome)
@@ -456,6 +469,7 @@ void SearchResultsDock::setSearchingState(bool searching)
 {
     m_searchButton->setText(searching ? tr("Cancel") : tr("Search"));
     m_patternEdit->setEnabled(!searching);
+    m_excludeEdit->setEnabled(!searching);
     m_caseButton->setEnabled(!searching);
     m_wholeWordButton->setEnabled(!searching);
 }

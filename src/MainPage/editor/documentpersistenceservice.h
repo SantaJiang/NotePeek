@@ -11,7 +11,6 @@
 class CustomEditor;
 class DocumentSaveCoordinator;
 class QWidget;
-class QThreadPool;
 
 struct DocumentLoadRequest
 {
@@ -73,7 +72,6 @@ signals:
 
 private:
     DocumentSaveCoordinator *m_saveCoordinator;
-    QThreadPool *m_loadPool;
 };
 
 #endif // DOCUMENTPERSISTENCESERVICE_H

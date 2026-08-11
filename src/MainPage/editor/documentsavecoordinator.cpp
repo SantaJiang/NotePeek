@@ -1,18 +1,16 @@
 #include "editor/documentsavecoordinator.h"
 
 #include "editor/documentio.h"
+#include "editor/backgroundworkscheduler.h"
 #include "editor/documentpath.h"
 
 #include <QEventLoop>
 #include <QFutureWatcher>
-#include <QThreadPool>
 #include <QtConcurrent>
 
 DocumentSaveCoordinator::DocumentSaveCoordinator(QObject *parent)
     : QObject(parent)
-    , m_savePool(new QThreadPool(this))
 {
-    m_savePool->setMaxThreadCount(2);
 }
 
 void DocumentSaveCoordinator::enqueue(DocumentPersistenceService *receiver,
@@ -114,7 +112,7 @@ void DocumentSaveCoordinator::startNext(const QString &path)
         if (job.receiver)
             emit job.receiver->fileSaved(result);
     });
-    watcher->setFuture(QtConcurrent::run(m_savePool, [request = job.request]() {
+    watcher->setFuture(QtConcurrent::run(BackgroundWorkScheduler::ioPool(), [request = job.request]() {
         DocumentSaveResult result;
         result.requestId = request.requestId;
         result.filePath = request.filePath;

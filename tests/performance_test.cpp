@@ -8,6 +8,7 @@
 #include "editor/editorpane.h"
 #include "editor/performanceconstants.h"
 #include "find/findreplacemanager.h"
+#include "find/filesearcher.h"
 #include "decorators/highlightedscrollbar.h"
 #include "decorators/highlightedscrollbardecorator.h"
 #include "tool/markdown/markdownpreviewer.h"
@@ -17,6 +18,7 @@
 #include <Qsci/qscilexercpp.h>
 
 #include <QElapsedTimer>
+#include <QDir>
 #include <QFile>
 #include <QSignalSpy>
 #include <QTemporaryDir>
@@ -126,6 +128,11 @@ class PerformanceTest : public QObject
     Q_OBJECT
 
 private slots:
+    void initTestCase()
+    {
+        qRegisterMetaType<FileSearchOutcome>("FileSearchOutcome");
+    }
+
     void decodesTenMegabytesWithinSmokeBudget()
     {
         QByteArray input;
@@ -158,6 +165,76 @@ private slots:
         QVERIFY2(persistence.saveEditorSnapshot(&editor, &snapshot, &error), qPrintable(error));
         QVERIFY2(timer.elapsed() < 2000, "2 MB snapshot exceeded the 2 second smoke budget");
         QCOMPARE(snapshot.size(), 2 * 1024 * 1024);
+    }
+
+    void snapshotsFiftyMegabytesWithinSmokeBudget()
+    {
+        CustomEditor editor;
+        editor.setDocumentFormat({DocumentEncoding::Utf8, DocumentLineEnding::Lf});
+        editor.setText(QString(50 * 1024 * 1024, QLatin1Char('x')));
+        DocumentSaveCoordinator coordinator;
+        DocumentPersistenceService persistence(&coordinator);
+
+        QByteArray snapshot;
+        QString error;
+        QElapsedTimer timer;
+        timer.start();
+        QVERIFY2(persistence.saveEditorSnapshot(&editor, &snapshot, &error), qPrintable(error));
+        QVERIFY2(timer.elapsed() < 5000, "50 MB snapshot exceeded the 5 second smoke budget");
+        QCOMPARE(snapshot.size(), 50 * 1024 * 1024);
+    }
+
+    void streamsFindInFilesAboveTenMegabytes()
+    {
+        QTemporaryDir root;
+        QVERIFY(root.isValid());
+        QFile file(root.filePath(QStringLiteral("large.txt")));
+        QVERIFY(file.open(QFile::WriteOnly));
+        const QByteArray block(64 * 1024, 'x');
+        for (int i = 0; i < 192; ++i)
+            QCOMPARE(file.write(block), qint64(block.size()));
+        QCOMPARE(file.write("\nneedle\n", 8), qint64(8));
+        file.close();
+
+        FileSearcher searcher;
+        QSignalSpy finished(&searcher, &FileSearcher::searchFinished);
+        QElapsedTimer timer;
+        timer.start();
+        searcher.start(root.path(), QStringLiteral("needle"), true, false);
+        QTRY_COMPARE_WITH_TIMEOUT(finished.count(), 1, 15000);
+        QVERIFY2(timer.elapsed() < 10000, "Streaming a 12 MB search file exceeded 10 seconds");
+        const auto outcome = finished.takeFirst().first().value<FileSearchOutcome>();
+        QCOMPARE(outcome.summary.matchCount, 1);
+        QCOMPARE(outcome.summary.scannedFileCount, 1);
+    }
+
+    void searchesTwoThousandFileTreeWithinSmokeBudget()
+    {
+        QTemporaryDir root;
+        QVERIFY(root.isValid());
+        for (int directory = 0; directory < 40; ++directory)
+        {
+            const QString relative = QStringLiteral("dir-%1").arg(directory, 2, 10, QLatin1Char('0'));
+            QVERIFY(QDir(root.path()).mkpath(relative));
+            for (int fileIndex = 0; fileIndex < 50; ++fileIndex)
+            {
+                QFile file(QDir(root.filePath(relative)).filePath(
+                    QStringLiteral("file-%1.txt").arg(fileIndex, 2, 10, QLatin1Char('0'))));
+                QVERIFY(file.open(QFile::WriteOnly));
+                QCOMPARE(file.write("ordinary project text\n", 22), qint64(22));
+            }
+        }
+
+        FileSearcher searcher;
+        QSignalSpy finished(&searcher, &FileSearcher::searchFinished);
+        QElapsedTimer timer;
+        timer.start();
+        searcher.start(root.path(), QStringLiteral("absent-needle"), true, false);
+        QTRY_COMPARE_WITH_TIMEOUT(finished.count(), 1, 15000);
+        QVERIFY2(timer.elapsed() < 12000, "Searching a 2,000-file tree exceeded 12 seconds");
+        const auto outcome = finished.takeFirst().first().value<FileSearchOutcome>();
+        QCOMPARE(outcome.summary.scannedFileCount, 2000);
+        QCOMPARE(outcome.summary.matchCount, 0);
     }
 
     void asynchronouslyOpensTenMegabytesWithinSmokeBudget()

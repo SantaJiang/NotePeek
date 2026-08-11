@@ -28,6 +28,7 @@
 
 #include <utility>
 #include "editor/documentformat.h"
+#include "editor/backgroundworkscheduler.h"
 #include "editor/customeditor.h"
 #include "editor/documentcontroller.h"
 #include "editor/documentpath.h"
@@ -859,7 +860,7 @@ void MainWindow::on_action_formatCode_triggered()
             editor->setFocus();
         }
     });
-    watcher->setFuture(QtConcurrent::run([original, filePath, options]() {
+    watcher->setFuture(QtConcurrent::run(BackgroundWorkScheduler::interactivePool(), [original, filePath, options]() {
         return CodeFormatter::format(original, filePath, options);
     }));
 }

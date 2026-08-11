@@ -275,6 +275,41 @@ private slots:
         QCOMPARE(alphaMatches, 2);
     }
 
+    void searchRespectsGitIgnoreAndExplicitExcludes()
+    {
+        QTemporaryDir root;
+        QVERIFY(root.isValid());
+        writeFile(root.filePath(QStringLiteral(".gitignore")),
+                  QByteArrayLiteral("ignored-*\n!keep-generated.txt\n"));
+        writeFile(root.filePath(QStringLiteral("keep.txt")),
+                  QByteArrayLiteral("needle\n"));
+        writeFile(root.filePath(QStringLiteral("keep-generated.txt")),
+                  QByteArrayLiteral("needle\n"));
+        writeFile(root.filePath(QStringLiteral("ignored-generated.txt")),
+                  QByteArrayLiteral("needle\n"));
+        writeFile(root.filePath(QStringLiteral("explicit.log")),
+                  QByteArrayLiteral("needle\n"));
+        QVERIFY(QDir(root.path()).mkpath(QStringLiteral("ignored-directory")));
+        writeFile(root.filePath(QStringLiteral("ignored-directory/nested.txt")),
+                  QByteArrayLiteral("needle\n"));
+
+        FileSearcher searcher;
+        QSignalSpy finished(&searcher, &FileSearcher::searchFinished);
+        searcher.start(root.path(), QStringLiteral("needle"), true, false,
+                       {QStringLiteral("*.log")});
+        QTRY_COMPARE(finished.count(), 1);
+
+        const auto outcome = finished.takeFirst().first().value<FileSearchOutcome>();
+        QCOMPARE(outcome.summary.matchCount, 2);
+        QStringList matchedFiles;
+        for (const FileSearchMatch &match : outcome.matches)
+            matchedFiles.append(QFileInfo(match.filePath).fileName());
+        matchedFiles.sort();
+        QCOMPARE(matchedFiles,
+                 QStringList({QStringLiteral("keep-generated.txt"),
+                              QStringLiteral("keep.txt")}));
+    }
+
     void searchResultDoubleClickActivatesOnlyOnce()
     {
         QMainWindow window;

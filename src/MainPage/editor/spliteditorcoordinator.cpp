@@ -2,6 +2,7 @@
 
 #include "editor/customeditor.h"
 #include "editor/documentcontroller.h"
+#include "editor/backgroundworkscheduler.h"
 #include "editor/documentio.h"
 #include "editor/documentpath.h"
 #include "editor/editormanager.h"
@@ -510,7 +511,7 @@ void SplitEditorCoordinator::reloadExternallyChangedFile(DocumentController *sou
             reloadExternallyChangedFile(nullptr, filePath);
         }
     });
-    watcher->setFuture(QtConcurrent::run([filePath]() {
+    watcher->setFuture(QtConcurrent::run(BackgroundWorkScheduler::ioPool(), [filePath]() {
         ExternalReloadResult result;
         result.success = DocumentIO::loadEditorFile(filePath,
                                                     &result.content,

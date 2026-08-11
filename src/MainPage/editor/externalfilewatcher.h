@@ -10,7 +10,6 @@
 
 class QFileSystemWatcher;
 class QTimer;
-class QThreadPool;
 
 class ExternalFileWatcher : public QObject
 {
@@ -55,7 +54,6 @@ private:
     QHash<QString, WatchedFileState> m_pendingBaselineStates;
     QSet<QString> m_hashChecksInFlight;
     QSet<QString> m_hashRecheckRequested;
-    QThreadPool *m_hashPool;
 };
 
 #endif // EXTERNALFILEWATCHER_H

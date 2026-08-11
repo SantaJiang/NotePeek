@@ -14,7 +14,6 @@
 
 class QWidget;
 class QLiteHtmlWidget;
-class QThreadPool;
 
 namespace MarkdownPreviewLayout {
 inline constexpr int ScreenHorizontalMargin = 34;
@@ -78,7 +77,6 @@ private:
     // Request ids are handed out from this single shared previewer so they are
     // unique across every page/pane; per-page counters would collide.
     quint64 m_nextRequestId = 1;
-    QThreadPool *m_renderPool;
     bool m_renderActive = false;
     QPointer<QObject> m_activeOwner;
     std::shared_ptr<std::atomic_bool> m_activeCancellation;

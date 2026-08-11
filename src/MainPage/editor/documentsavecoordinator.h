@@ -10,7 +10,6 @@
 #include "editor/documentpersistenceservice.h"
 
 class QEventLoop;
-class QThreadPool;
 
 // Application-scoped owner of serialized file writes and shared-document save
 // generations. Keeping this state explicit avoids process-lifetime singletons
@@ -44,7 +43,6 @@ private:
     QHash<QString, QList<QPointer<QEventLoop>>> m_waiters;
     QHash<void *, quint64> m_latestDocumentGenerations;
     quint64 m_nextGeneration = 1;
-    QThreadPool *m_savePool;
 };
 
 #endif // DOCUMENTSAVECOORDINATOR_H

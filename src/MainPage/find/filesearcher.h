@@ -3,6 +3,7 @@
 
 #include <QObject>
 #include <QString>
+#include <QStringList>
 #include <QVector>
 
 #include <atomic>
@@ -50,7 +51,8 @@ public:
     void start(const QString &rootDirectory,
                const QString &pattern,
                bool caseSensitive,
-               bool wholeWord);
+               bool wholeWord,
+               const QStringList &excludeGlobs = {});
     void cancel();
 
 signals:

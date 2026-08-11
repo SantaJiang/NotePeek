@@ -1,6 +1,7 @@
 #include "editor/externalfilewatcher.h"
 
 #include "editor/performanceconstants.h"
+#include "editor/backgroundworkscheduler.h"
 #include "editor/documentpath.h"
 
 #include <QCryptographicHash>
@@ -10,7 +11,6 @@
 #include <QFileSystemWatcher>
 #include <QFutureWatcher>
 #include <QTimer>
-#include <QThreadPool>
 #include <QtConcurrent>
 
 namespace {
@@ -37,9 +37,7 @@ ExternalFileWatcher::ExternalFileWatcher(QObject *parent)
     : QObject(parent)
     , m_fileWatcher(new QFileSystemWatcher(this))
     , m_changeCheckTimer(new QTimer(this))
-    , m_hashPool(new QThreadPool(this))
 {
-    m_hashPool->setMaxThreadCount(1);
     m_changeCheckTimer->setSingleShot(true);
     connect(m_fileWatcher, &QFileSystemWatcher::fileChanged,
             this, &ExternalFileWatcher::watchedFileChanged);
@@ -261,7 +259,7 @@ void ExternalFileWatcher::startBaselineHash(const QString &filePath,
             }
         }
     });
-    watcher->setFuture(QtConcurrent::run(m_hashPool, [filePath]() { return fileContentHash(filePath); }));
+    watcher->setFuture(QtConcurrent::run(BackgroundWorkScheduler::ioPool(), [filePath]() { return fileContentHash(filePath); }));
 }
 
 void ExternalFileWatcher::checkFileStateAsync(const QString &filePath)
@@ -316,7 +314,7 @@ void ExternalFileWatcher::checkFileStateAsync(const QString &filePath)
             checkFileStateAsync(normalizedPath);
         }
     });
-    watcher->setFuture(QtConcurrent::run(m_hashPool, [normalizedPath]() {
+    watcher->setFuture(QtConcurrent::run(BackgroundWorkScheduler::ioPool(), [normalizedPath]() {
         return fileContentHash(normalizedPath);
     }));
 }

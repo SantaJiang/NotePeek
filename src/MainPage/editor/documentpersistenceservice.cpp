@@ -1,6 +1,7 @@
 #include "editor/documentpersistenceservice.h"
 
 #include "editor/customeditor.h"
+#include "editor/backgroundworkscheduler.h"
 #include "editor/documentio.h"
 #include "editor/documentsavecoordinator.h"
 #include <NotePeek/lexerfactory.h>
@@ -9,7 +10,6 @@
 #include <QFileDialog>
 #include <QFileInfo>
 #include <QFutureWatcher>
-#include <QThreadPool>
 #include <QRegularExpression>
 #include <QtConcurrent>
 #include <Qsci/qsciscintillabase.h>
@@ -20,10 +20,8 @@ DocumentPersistenceService::DocumentPersistenceService(DocumentSaveCoordinator *
                                                        QObject *parent)
     : QObject(parent)
     , m_saveCoordinator(saveCoordinator)
-    , m_loadPool(new QThreadPool(this))
 {
     Q_ASSERT(m_saveCoordinator);
-    m_loadPool->setMaxThreadCount(2);
 }
 
 bool DocumentPersistenceService::saveEditorSnapshot(CustomEditor *editor,
@@ -62,10 +60,12 @@ bool DocumentPersistenceService::saveEditorSnapshot(CustomEditor *editor,
                 *errorMessage = tr("Cannot access editor buffer.");
             return false;
         }
-        utf8Content->clear();
-        if (format.encoding == DocumentEncoding::Utf8Bom)
-            utf8Content->append("\xef\xbb\xbf", 3);
-        utf8Content->append(buffer, int(length));
+        const int bomSize = format.encoding == DocumentEncoding::Utf8Bom ? 3 : 0;
+        utf8Content->resize(bomSize + int(length));
+        if (bomSize != 0)
+            std::memcpy(utf8Content->data(), "\xef\xbb\xbf", 3);
+        if (length > 0)
+            std::memcpy(utf8Content->data() + bomSize, buffer, size_t(length));
     }
     else
     {
@@ -89,7 +89,7 @@ void DocumentPersistenceService::loadFileAsync(const DocumentLoadRequest &reques
         emit fileLoaded(result);
     });
 
-    watcher->setFuture(QtConcurrent::run(m_loadPool, [request]() {
+    watcher->setFuture(QtConcurrent::run(BackgroundWorkScheduler::ioPool(), [request]() {
         DocumentLoadResult result;
         result.requestId = request.requestId;
         result.filePath = request.filePath;

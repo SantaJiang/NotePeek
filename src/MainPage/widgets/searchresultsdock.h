@@ -14,8 +14,8 @@ class QTreeWidget;
 class QTreeWidgetItem;
 class QWidget;
 
-// Bottom dock for project-wide search: a query row (pattern, case and
-// whole-word toggles), a status line, and a file-grouped result tree.
+// Bottom dock for project-wide search: a query row (pattern, exclusions, case
+// and whole-word toggles), a status line, and a file-grouped result tree.
 // The search itself runs in FileSearcher off the UI thread.
 class SearchResultsDock : public QObject
 {
@@ -44,6 +44,7 @@ private:
 
     QDockWidget *m_dock;
     QLineEdit *m_patternEdit;
+    QLineEdit *m_excludeEdit;
     QToolButton *m_caseButton;
     QToolButton *m_wholeWordButton;
     QToolButton *m_searchButton;

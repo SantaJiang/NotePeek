@@ -1,7 +1,9 @@
 #include "widgets/filetypefilterproxymodel.h"
 
 #include "editor/performanceconstants.h"
+#include "editor/backgroundworkscheduler.h"
 #include "editor/documentpath.h"
+#include "editor/projectpathfilter.h"
 #include "editor/supportedfilepolicy.h"
 
 #include <QDir>
@@ -9,7 +11,6 @@
 #include <QFileSystemModel>
 #include <QFutureWatcher>
 #include <QFont>
-#include <QThreadPool>
 #include <QTimer>
 #include <QtConcurrent>
 
@@ -43,24 +44,10 @@ bool isPathKeyInsideDirectory(const QString &pathKey, QString directoryKey)
 
 FileTypeFilterProxyModel::FileTypeFilterProxyModel(QObject *parent)
     : QSortFilterProxyModel(parent)
-    , m_ignoredDirectoryNames({
-          QStringLiteral(".git"),
-          QStringLiteral(".svn"),
-          QStringLiteral(".hg"),
-          QStringLiteral("build"),
-          QStringLiteral("cmake-build-debug"),
-          QStringLiteral("cmake-build-release"),
-          QStringLiteral("node_modules"),
-          QStringLiteral("DerivedData"),
-          QStringLiteral("__pycache__")
-      })
-    , m_supportPool(new QThreadPool(this))
     , m_filterRefreshTimer(new QTimer(this))
 {
     setRecursiveFilteringEnabled(true);
     m_supportCache.setMaxCost(PerformanceConstants::SupportCacheLimit);
-    m_supportPool->setMaxThreadCount(2);
-    m_supportPool->setExpiryTimeout(10000);
     m_filterRefreshTimer->setSingleShot(true);
     m_filterRefreshTimer->setInterval(40);
     connect(m_filterRefreshTimer, &QTimer::timeout, this, [this]() {
@@ -223,8 +210,7 @@ bool FileTypeFilterProxyModel::isIgnoredDirectory(const QString &filePath) const
     }
 
     const QString name = QFileInfo(filePath).fileName();
-    return m_ignoredDirectoryNames.contains(name)
-           || name.startsWith(QStringLiteral("cmake-build-"));
+    return ProjectPathFilter::isStandardIgnoredDirectoryName(name);
 }
 
 bool FileTypeFilterProxyModel::isSupportedTextFile(const QString &filePath) const
@@ -283,7 +269,7 @@ void FileTypeFilterProxyModel::scheduleSupportCheck(
         // metadata instead of leaving the provisional row visible forever.
         m_filterRefreshTimer->start();
     });
-    watcher->setFuture(QtConcurrent::run(m_supportPool, [filePath]() {
+    watcher->setFuture(QtConcurrent::run(BackgroundWorkScheduler::backgroundPool(), [filePath]() {
         return SupportedFilePolicy::isSupportedTextFile(filePath);
     }));
 }

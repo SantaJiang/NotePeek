@@ -5,6 +5,7 @@
 
 #include <QDir>
 #include <QFileInfo>
+#include <QRandomGenerator>
 #include <QTemporaryDir>
 #include <QtTest>
 
@@ -13,6 +14,34 @@ class DocumentIOTest : public QObject
     Q_OBJECT
 
 private slots:
+    void randomizedCodecInputsNeverCrash()
+    {
+        QRandomGenerator random(0x4e6f7465U);
+        const QList<DocumentEncoding> encodings = DocumentFormatCodec::supportedEncodings();
+        for (int iteration = 0; iteration < 2500; ++iteration)
+        {
+            QByteArray bytes(int(random.bounded(4097)), Qt::Uninitialized);
+            for (char &byte : bytes)
+                byte = char(random.generate() & 0xffU);
+            if (iteration % 7 == 0)
+                bytes.prepend("\xef\xbb\xbf", 3);
+            else if (iteration % 11 == 0)
+                bytes.prepend("\xff\xfe", 2);
+
+            QByteArray editorBytes;
+            DocumentFormat format;
+            QString error;
+            DocumentFormatCodec::decodeToEditorBytes(bytes, &editorBytes, &format, &error);
+            for (DocumentEncoding encoding : encodings)
+            {
+                QString text;
+                DocumentFormat forcedFormat;
+                DocumentFormatCodec::decodeWithEncoding(bytes, encoding, &text,
+                                                        &forcedFormat, &error);
+            }
+        }
+    }
+
     void loadAndSaveUtf8Text()
     {
         QTemporaryDir tempDir;

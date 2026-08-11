@@ -9,7 +9,6 @@
 #include <QString>
 
 class QFileSystemModel;
-class QThreadPool;
 class QTimer;
 
 class FileTypeFilterProxyModel : public QSortFilterProxyModel
@@ -46,10 +45,8 @@ private:
     QString m_visibleRootPathKey;
     QString m_visibleRootCanonicalPathKey;
     QPersistentModelIndex m_visibleRootIndex;
-    QSet<QString> m_ignoredDirectoryNames;
     mutable QCache<QString, CacheEntry> m_supportCache;
     mutable QSet<QString> m_supportChecksInFlight;
-    QThreadPool *m_supportPool;
     QTimer *m_filterRefreshTimer;
 };
 

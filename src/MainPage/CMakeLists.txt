@@ -8,7 +8,11 @@ set(NOTEPEEK_QT_LIBS
 add_library(notepeek_core STATIC
     apppreferences.cpp
     apppreferences.h
+    editor/backgroundworkscheduler.cpp
+    editor/backgroundworkscheduler.h
     editor/performanceconstants.h
+    editor/projectpathfilter.cpp
+    editor/projectpathfilter.h
     editor/documentformat.cpp
     editor/documentformat.h
     editor/documentpath.cpp
@@ -70,6 +74,8 @@ add_library(notepeek_widgets STATIC
     editor/documentpage.h
     editor/editormanager.cpp
     editor/editormanager.h
+    editor/semantichighlightingengine.cpp
+    editor/semantichighlightingengine.h
     editor/editorswitchpopup.cpp
     editor/editorswitchpopup.h
     editor/externalfilewatcher.cpp

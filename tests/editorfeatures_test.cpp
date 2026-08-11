@@ -696,8 +696,13 @@ private slots:
         QCOMPARE(editor->property("semanticStartedRequestCount").toInt(), beforeNavigation);
         QTRY_COMPARE_WITH_TIMEOUT(editor->property("semanticStartedRequestCount").toInt(),
                                   beforeNavigation + 1, 1000);
+        QTRY_VERIFY_WITH_TIMEOUT(!editor->property("semanticAnalysisInFlight").toBool(), 1000);
 
+        const int canceledBeforeHide =
+            editor->property("semanticCanceledRequestCount").toInt();
         editor->hide();
+        QCOMPARE(editor->property("semanticCanceledRequestCount").toInt(),
+                 canceledBeforeHide);
         const int beforeHiddenEdit = editor->property("semanticStartedRequestCount").toInt();
         editor->append(QStringLiteral("int hiddenEdit = 1;\n"));
         QTest::qWait(180);
