@@ -863,6 +863,15 @@ void DocumentController::waitForPendingSaves(CustomEditor *editor)
         QEventLoop loop;
         connect(m_persistence, &DocumentPersistenceService::fileSaved,
                 &loop, &QEventLoop::quit);
+        // A very small save can finish after the condition above is checked
+        // but before exec() starts, particularly on Windows. QEventLoop does
+        // not remember a quit requested before it starts, so recheck from
+        // inside the nested loop to avoid waiting forever for a signal that
+        // has already been delivered.
+        QTimer::singleShot(0, &loop, [this, editor, &loop]() {
+            if (!hasPendingSave(editor))
+                loop.quit();
+        });
         loop.exec(QEventLoop::ExcludeUserInputEvents);
     }
 }
