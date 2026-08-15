@@ -111,6 +111,20 @@ private slots:
         QCOMPARE(editor.selectedText(), QStringLiteral("值abc"));
     }
 
+    void editorTopPaddingMatchesHorizontalPadding()
+    {
+        CustomEditor editor;
+        editor.resize(320, 240);
+
+        const int horizontalPadding = static_cast<int>(editor.SendScintilla(
+            QsciScintillaBase::SCI_GETMARGINLEFT));
+        const int topPadding = editor.viewport()->geometry().top()
+                               - editor.contentsRect().top();
+
+        QCOMPARE(topPadding, horizontalPadding);
+        QCOMPARE(topPadding, 5);
+    }
+
     void configuresFeaturesForCodeOnly()
     {
         EditorManager manager;

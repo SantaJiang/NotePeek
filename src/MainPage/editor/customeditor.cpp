@@ -1,13 +1,19 @@
 #include "editor/customeditor.h"
-#include <QMimeData>
 #include <QFrame>
+#include <QMimeData>
+
+namespace {
+constexpr int EditorContentPadding = 5;
+}
 
 CustomEditor::CustomEditor(QWidget *parent)
     : NotePeek::Editor{parent}
 {
     setAcceptDrops(true);
     setFrameShape(QFrame::NoFrame);
-    SendScintilla(QsciScintillaBase::SCI_SETMARGINLEFT, 0UL, 5L);
+    SendScintilla(QsciScintillaBase::SCI_SETMARGINLEFT, 0UL, EditorContentPadding);
+    // Padding the viewport keeps line height unchanged, unlike extra ascent.
+    setViewportMargins(0, EditorContentPadding, 0, 0);
 }
 
 void CustomEditor::setFilePath(const QString &path)
