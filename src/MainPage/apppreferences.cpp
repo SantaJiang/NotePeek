@@ -1,6 +1,7 @@
 #include "apppreferences.h"
 
 #include <QFontDatabase>
+#include <QFontMetrics>
 #include <QSettings>
 #include <QtGlobal>
 #include <NotePeek/syntaxtheme.h>
@@ -13,11 +14,6 @@ constexpr int kMaxFontSize = 288;
 bool familyInstalled(const QString &family)
 {
     return QFontDatabase::hasFamily(family);
-}
-
-bool familyFixedPitch(const QString &family)
-{
-    return QFontDatabase::isFixedPitch(family);
 }
 
 // The first font family from candidates that is actually installed.  The
@@ -112,6 +108,42 @@ int AppPreferences::defaultFontSize()
 #endif
 }
 
+bool AppPreferences::isMonospaceFamily(const QString &family)
+{
+    if (family.isEmpty() || !familyInstalled(family))
+    {
+        return false;
+    }
+    // Trust the font's own fixed-pitch metadata when present — fast and
+    // unambiguous (Menlo, Consolas, Source Code Pro, Fira Code, ...).
+    if (QFontDatabase::isFixedPitch(family))
+    {
+        return true;
+    }
+    // Some genuinely-monospace fonts ship an incorrect post.isFixedPitch
+    // bit (proportional), e.g. certain Nerd Font builds.  Detect them by
+    // confirming that glyphs which diverge widely in proportional faces
+    // all share the same advance width.  'M'/'W' are tested against 'i'
+    // first so proportional families fail after a single comparison.
+    const QFont font(family);
+    const QFontMetrics metrics(font);
+    const QChar probes[] = {QChar('i'), QChar('M'), QChar('W'),
+                            QChar('l'), QChar('.'), QChar(' '), QChar('0')};
+    const int width = metrics.horizontalAdvance(probes[0]);
+    if (width <= 0)
+    {
+        return false;
+    }
+    for (QChar ch : probes)
+    {
+        if (metrics.horizontalAdvance(ch) != width)
+        {
+            return false;
+        }
+    }
+    return true;
+}
+
 void AppPreferences::load()
 {
     QSettings settings;
@@ -127,8 +159,9 @@ void AppPreferences::load()
         settings.value(QStringLiteral("codeFontFamily"), defaultCodeFontFamily()).toString(),
         defaultCodeFontFamily());
     // The code font must be monospaced; migrate a stale/proportional choice
-    // (e.g. an earlier build's default) back to a fixed-pitch family.
-    if (!familyFixedPitch(codeFamily))
+    // (e.g. an earlier build's default, or a family that is no longer
+    // recognised as monospaced) back to a fixed-pitch family.
+    if (!isMonospaceFamily(codeFamily))
     {
         codeFamily = defaultCodeFontFamily();
     }

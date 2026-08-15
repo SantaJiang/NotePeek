@@ -8,7 +8,9 @@
 #include <QCheckBox>
 #include <QComboBox>
 #include <QDialogButtonBox>
+#include <QFont>
 #include <QFontComboBox>
+#include <QFontDatabase>
 #include <QFrame>
 #include <QHBoxLayout>
 #include <QIntValidator>
@@ -19,6 +21,7 @@
 #include <QPalette>
 #include <QPushButton>
 #include <QStackedWidget>
+#include <QVariant>
 #include <QVBoxLayout>
 
 namespace {
@@ -86,10 +89,45 @@ QFrame *makeSection(const QString &title, QWidget *parent)
     return section;
 }
 
-void configureFontCombo(QFontComboBox *combo)
+void configureFontCombo(QComboBox *combo)
 {
     combo->setEditable(false);
     combo->setInsertPolicy(QComboBox::NoInsert);
+}
+
+// Populate the code-font picker with every installed monospace family.
+// Unlike QFontComboBox::MonospacedFonts (which only honours the font's
+// fixed-pitch bit), this also includes genuinely-monospace families whose
+// metadata is wrong, via AppPreferences::isMonospaceFamily.  Each entry is
+// rendered in its own family so the dropdown doubles as a preview.
+void populateCodeFontCombo(QComboBox *combo)
+{
+    combo->clear();
+    for (const QString &family : QFontDatabase::families())
+    {
+        if (!AppPreferences::isMonospaceFamily(family))
+        {
+            continue;
+        }
+        combo->addItem(family);
+        combo->setItemData(combo->count() - 1, QVariant::fromValue(QFont(family)), Qt::FontRole);
+    }
+}
+
+// Mirror the relevant slice of QFontComboBox's API so the code-font picker
+// stays drop-in compatible with the text-font one at the call sites.
+void setComboCurrentFont(QComboBox *combo, const QFont &font)
+{
+    const int index = combo->findText(font.family());
+    if (index >= 0)
+    {
+        combo->setCurrentIndex(index);
+    }
+}
+
+QFont comboCurrentFont(const QComboBox *combo)
+{
+    return QFont(combo->currentText());
 }
 
 void configureFontSizeCombo(QComboBox *combo)
@@ -131,8 +169,10 @@ void setCurrentFontSize(QComboBox *combo, int pointSize)
 }
 
 // A family picker paired with a point-size dropdown, laid out horizontally so
-// the two fonts line up neatly in the form.
-QWidget *makeFontRow(QFontComboBox *combo, QComboBox *size, QWidget *parent)
+// the two fonts line up neatly in the form.  Accepts a plain QComboBox so the
+// same row layout serves the QFontComboBox text picker and the custom code
+// picker.
+QWidget *makeFontRow(QComboBox *combo, QComboBox *size, QWidget *parent)
 {
     auto *row = new QWidget(parent);
     auto *layout = new QHBoxLayout(row);
@@ -247,7 +287,7 @@ PreferencesDialog::PreferencesDialog(QWidget *parent)
     : QDialog(parent)
     , m_textFontCombo(new QFontComboBox(this))
     , m_textFontSize(new QComboBox(this))
-    , m_codeFontCombo(new QFontComboBox(this))
+    , m_codeFontCombo(new QComboBox(this))
     , m_codeFontSize(new QComboBox(this))
     , m_syntaxThemeCombo(new QComboBox(this))
     , m_showFileTree(new QCheckBox(tr("Show file tree on startup"), this))
@@ -270,10 +310,13 @@ PreferencesDialog::PreferencesDialog(QWidget *parent)
     polishDialogPalette(this);
     setStyleSheet(preferencesStyleSheet());
 
-    // The code font must be monospaced; restrict the picker accordingly.
+    // The text font picker shows every family; the code font picker is
+    // restricted to monospaced families, including ones whose fixed-pitch
+    // metadata is wrong (detected by glyph width) so e.g. "IoskeleyMono
+    // Nerd Font" still appears.
     configureFontCombo(m_textFontCombo);
     configureFontCombo(m_codeFontCombo);
-    m_codeFontCombo->setFontFilters(QFontComboBox::MonospacedFonts);
+    populateCodeFontCombo(m_codeFontCombo);
     configureFontSizeCombo(m_textFontSize);
     configureFontSizeCombo(m_codeFontSize);
 
@@ -407,7 +450,7 @@ void PreferencesDialog::loadFromPreferences()
 
     m_textFontCombo->setCurrentFont(QFont(prefs.textFontFamily()));
     setCurrentFontSize(m_textFontSize, prefs.textFontSize());
-    m_codeFontCombo->setCurrentFont(QFont(prefs.codeFontFamily()));
+    setComboCurrentFont(m_codeFontCombo, QFont(prefs.codeFontFamily()));
     setCurrentFontSize(m_codeFontSize, prefs.codeFontSize());
     const int themeIndex = m_syntaxThemeCombo->findData(prefs.syntaxThemeId());
     m_syntaxThemeCombo->setCurrentIndex(themeIndex >= 0 ? themeIndex : 0);
@@ -433,7 +476,7 @@ void PreferencesDialog::commit()
     AppPreferences &prefs = AppPreferences::instance();
 
     prefs.setTextFont(m_textFontCombo->currentFont().family(), currentFontSize(m_textFontSize));
-    prefs.setCodeFont(m_codeFontCombo->currentFont().family(), currentFontSize(m_codeFontSize));
+    prefs.setCodeFont(comboCurrentFont(m_codeFontCombo).family(), currentFontSize(m_codeFontSize));
     prefs.setSyntaxThemeId(m_syntaxThemeCombo->currentData().toString());
     prefs.setShowFileTreeOnStartup(m_showFileTree->isChecked());
     prefs.setShowStatusBar(m_showStatusBar->isChecked());

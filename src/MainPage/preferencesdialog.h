@@ -36,7 +36,7 @@ private:
 
     QFontComboBox *m_textFontCombo;
     QComboBox *m_textFontSize;
-    QFontComboBox *m_codeFontCombo;
+    QComboBox *m_codeFontCombo;
     QComboBox *m_codeFontSize;
     QComboBox *m_syntaxThemeCombo;
     QCheckBox *m_showFileTree;

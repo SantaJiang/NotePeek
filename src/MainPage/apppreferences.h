@@ -83,6 +83,12 @@ public:
     static QString defaultTextFontFamily();
     static int defaultFontSize();
 
+    // True when family renders as monospaced.  Prefers the font's own
+    // fixed-pitch metadata and falls back to a glyph-width check so fonts
+    // that ship an incorrect post.isFixedPitch bit (e.g. some Nerd Font
+    // builds such as "IoskeleyMono Nerd Font") are still recognised.
+    static bool isMonospaceFamily(const QString &family);
+
 private:
     AppPreferences();
     AppPreferences(const AppPreferences &) = delete;
