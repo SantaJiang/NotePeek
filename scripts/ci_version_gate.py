@@ -14,14 +14,6 @@ VERSION_PATTERN = re.compile(
     re.DOTALL,
 )
 ZERO_SHA = "0" * 40
-CI_INFRASTRUCTURE_PATHS = {
-    ".github/workflows/ci.yml",
-    ".github/workflows/release.yml",
-    "scripts/ci_command.py",
-    "scripts/ci_version_gate.py",
-    "scripts/verify_install.py",
-    "tests/performance_test.cpp",
-}
 # Versions at or below this line predate automatic releases. This prevents the
 # initial workflow rollout from publishing an existing, untagged version.
 AUTO_RELEASE_BASELINE = (1, 3)
@@ -44,10 +36,6 @@ def project_version(revision: str) -> tuple[int, int, int]:
     if not match:
         raise ValueError(f"Could not find NotePeek's semantic version at {revision}")
     return tuple(int(component) for component in match.groups())
-
-
-def changed_paths(before: str, after: str) -> set[str]:
-    return set(filter(None, git("diff", "--name-only", before, after).splitlines()))
 
 
 def minor_line_has_release_tag(version: tuple[int, int, int]) -> bool:
@@ -78,11 +66,16 @@ def main() -> int:
             emit(True, False, version, "new branch or repository history")
             return 0
 
-        paths = changed_paths(args.before, args.after)
         before_version = project_version(args.before)
     except (subprocess.CalledProcessError, ValueError) as error:
         print(str(error), file=sys.stderr)
-        emit(True, False, "", "version comparison unavailable; fail open")
+        emit(
+            False,
+            False,
+            "",
+            "version comparison unavailable; skipped to preserve CI quota "
+            "(run via workflow_dispatch if this push bumps the minor version)",
+        )
         return 0
 
     if after_version[:2] > before_version[:2]:
@@ -90,15 +83,15 @@ def main() -> int:
             True,
             True,
             version,
-            f"major/minor version changed from {before_version[0]}.{before_version[1]} "
+            f"minor version bumped from {before_version[0]}.{before_version[1]} "
             f"to {after_version[0]}.{after_version[1]}",
         )
     elif before_version[:2] != after_version[:2]:
         emit(
-            True,
+            False,
             False,
             version,
-            f"major/minor version did not increase: {before_version[0]}.{before_version[1]} "
+            f"minor version did not increase: {before_version[0]}.{before_version[1]} "
             f"to {after_version[0]}.{after_version[1]}",
         )
     elif (
@@ -111,14 +104,12 @@ def main() -> int:
             version,
             f"retrying unpublished {after_version[0]}.{after_version[1]} release",
         )
-    elif paths & CI_INFRASTRUCTURE_PATHS:
-        emit(True, False, version, "CI infrastructure changed")
     else:
         emit(
             False,
             False,
             version,
-            f"major/minor version remains {after_version[0]}.{after_version[1]}",
+            f"minor version remains {after_version[0]}.{after_version[1]}; no CI run",
         )
     return 0
 

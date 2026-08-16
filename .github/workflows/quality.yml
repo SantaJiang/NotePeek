@@ -1,8 +1,10 @@
-name: Scheduled quality audit
+name: Quality audit (manual)
 
+# Manual only. The weekly schedule was removed so that no automated workflow
+# runs unless the minor (middle) version number is bumped; run this on demand
+# from the Actions UI when you want a fresh strict-build / sanitizer / coverage
+# audit.
 on:
-  schedule:
-    - cron: '17 3 * * 1'
   workflow_dispatch:
 
 concurrency:

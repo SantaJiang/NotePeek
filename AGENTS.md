@@ -7,10 +7,14 @@ adds the guardrails an AI agent must self-enforce.
 
 ## 1. Verify CI compatibility after every change
 
-CI only runs the full matrix when `scripts/ci_version_gate.py` says so —
-typically on a `PROJECT_VERSION` bump or a release. A version bump therefore
-triggers every job below, so treat a one-line version edit as a full-CI event,
-not a trivial safe change.
+CI only runs the full matrix when `scripts/ci_version_gate.py` says so — and
+that now happens **only on a minor (middle) version bump or an
+unpublished-release retry**. Patch-only version bumps, edits to CI
+infrastructure files, and pushes whose history cannot be compared are skipped
+to preserve GitHub Actions quota; trigger them manually via
+`workflow_dispatch` when needed. A minor version bump therefore triggers
+every job below, so treat a one-line version edit as a full-CI event, not a
+trivial safe change.
 
 **CI matrix** (`build-and-test`): Ubuntu x86_64, Ubuntu arm64, Windows, macOS
 arm64, macOS Intel — all on Qt 6.8.3.
@@ -101,7 +105,10 @@ would expect:
 ## CI reference (quick)
 
 - Workflows: `.github/workflows/ci.yml` (build + test), `release.yml`.
-- Version gate: `scripts/ci_version_gate.py`.
+- Version gate: `scripts/ci_version_gate.py` — the expensive `build-and-test`
+  matrix runs only when the minor (middle) version number increases or an
+  unpublished release is retried; on every other push only the lightweight
+  gate job runs. `quality.yml` is `workflow_dispatch`-only (no schedule).
 - Translation tooling: `NotePeek_lupdate` target → regenerates
   `i18n/notepeek_zh_CN.ts`; the app build then `lrelease`s it into the bundled
   `.qm` resource.
