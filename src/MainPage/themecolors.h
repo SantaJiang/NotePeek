@@ -40,7 +40,6 @@ inline bool isDarkMode()
 enum class ColorRole
 {
     // Editor (QScintilla)
-    EditorMarginBg,
     EditorMarginFg,
     EditorCaretLineBg,
     EditorCaretFg,
@@ -87,7 +86,7 @@ enum class ColorRole
     SplitterHandleBg,
     SplitterHandleBorder,
     // Editor pane top bar
-    TopBarBackground,
+    ChromeBackground,
     TopBarBorder,
     TopBarText,
     TopBarMutedText,
@@ -146,7 +145,6 @@ inline RoleColors roleColors(ColorRole role)
 {
     switch (role)
     {
-    case ColorRole::EditorMarginBg:          return {qRgb(0xf0,0xf0,0xf0), qRgb(0x2d,0x2d,0x2d)};
     case ColorRole::EditorMarginFg:          return {qRgb(0x66,0x66,0x66), qRgb(0x85,0x85,0x85)};
     case ColorRole::EditorCaretLineBg:       return {qRgb(0xe8,0xe8,0xff), qRgb(0x2a,0x2a,0x2a)};
     case ColorRole::EditorCaretFg:           return {qRgb(0x00,0x00,0x00), qRgb(0xff,0xff,0xff)};
@@ -193,7 +191,7 @@ inline RoleColors roleColors(ColorRole role)
     case ColorRole::SplitterHandleBg:        return {qRgb(0xd0,0xd4,0xdc), qRgb(0x3a,0x3a,0x3a)};
     case ColorRole::SplitterHandleBorder:    return {qRgb(0xa8,0xaf,0xba), qRgb(0x5a,0x5a,0x5a)};
 
-    case ColorRole::TopBarBackground:        return {qRgb(0xf3,0xf3,0xf3), qRgb(0x2b,0x2b,0x2b)};
+    case ColorRole::ChromeBackground:        return {qRgb(0xfa,0xfa,0xfa), qRgb(0x33,0x33,0x33)};
     case ColorRole::TopBarBorder:            return {qRgb(0xd6,0xd6,0xd6), qRgb(0x45,0x45,0x45)};
     case ColorRole::TopBarText:              return {qRgb(0x5f,0x5f,0x5f), qRgb(0xd0,0xd0,0xd0)};
     case ColorRole::TopBarMutedText:         return {qRgb(0x78,0x78,0x78), qRgb(0x9a,0x9a,0x9a)};
@@ -203,7 +201,7 @@ inline RoleColors roleColors(ColorRole role)
     case ColorRole::TopBarSelectionBg:       return {qRgb(0xd9,0xe8,0xff), qRgb(0x09,0x47,0x7b)};
     case ColorRole::TopBarSelectionText:     return {qRgb(0x1f,0x1f,0x1f), qRgb(0xff,0xff,0xff)};
 
-    case ColorRole::FileTreeBackground:      return {qRgb(0xfb,0xfb,0xfb), qRgb(0x18,0x18,0x18)};
+    case ColorRole::FileTreeBackground:      return {qRgb(0xfa,0xfa,0xfa), qRgb(0x26,0x26,0x26)};
     case ColorRole::FileTreeText:            return {qRgb(0x1f,0x23,0x28), qRgb(0xee,0xee,0xee)};
     case ColorRole::FileTreeSelectionBg:     return {qRgb(0xd9,0xe8,0xff), qRgb(0x2f,0x5d,0x8c)};
     case ColorRole::FileTreeSelectionText:   return {qRgb(0x1f,0x23,0x28), qRgb(0xff,0xff,0xff)};
@@ -251,7 +249,6 @@ inline QColor color(ColorRole role)
 // ---------- editor (QScintilla) ----------
 
 namespace Editor {
-    inline QColor marginBg()           { return color(ColorRole::EditorMarginBg); }
     inline QColor marginFg()           { return color(ColorRole::EditorMarginFg); }
     inline QColor caretLineBg()        { return color(ColorRole::EditorCaretLineBg); }
     inline QColor caretFg()            { return color(ColorRole::EditorCaretFg); }
@@ -349,7 +346,7 @@ namespace Splitter {
 // ---------- editor pane top bar ----------
 
 namespace EditorTopBar {
-    inline QColor background()         { return color(ColorRole::TopBarBackground); }
+    inline QColor background()         { return color(ColorRole::ChromeBackground); }
     inline QColor border()             { return color(ColorRole::TopBarBorder); }
     inline QColor text()               { return color(ColorRole::TopBarText); }
     inline QColor mutedText()          { return color(ColorRole::TopBarMutedText); }

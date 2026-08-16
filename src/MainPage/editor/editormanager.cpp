@@ -747,7 +747,6 @@ void EditorManager::applyEditorColors(CustomEditor *editor)
     if (!editor) return;
 
     const NotePeek::SyntaxTheme theme = currentSyntaxTheme();
-    const QColor marginBackground = theme.editorColor(QStringLiteral("marginBackground"), ThemeColors::Editor::marginBg());
     const QColor marginForeground = theme.editorColor(QStringLiteral("marginForeground"), ThemeColors::Editor::marginFg());
     const QColor background = theme.editorColor(QStringLiteral("background"), ThemeColors::Editor::background());
 
@@ -755,16 +754,16 @@ void EditorManager::applyEditorColors(CustomEditor *editor)
     // the correct way to set the background of a NumberMargin.  In contrast,
     // setMarginBackgroundColor(margin, ...) uses SCI_SETMARGINBACKN which only
     // works for SC_MARGIN_COLOUR type margins.
-    editor->setMarginsBackgroundColor(marginBackground);
+    editor->setMarginsBackgroundColor(background);
     editor->setMarginsForegroundColor(marginForeground);
-    editor->setFoldMarginColors(marginBackground, marginBackground);
+    editor->setFoldMarginColors(background, background);
     editor->setIndentationGuidesBackgroundColor(background);
     editor->setIndentationGuidesForegroundColor(theme.editorColor(QStringLiteral("indentGuide"), ThemeColors::Editor::indentGuide()));
     for (int marker = QsciScintillaBase::SC_MARKNUM_FOLDEREND;
          marker <= static_cast<int>(QsciScintillaBase::SC_MARKNUM_FOLDEROPEN);
          ++marker)
     {
-        editor->setMarkerForegroundColor(marginBackground, marker);
+        editor->setMarkerForegroundColor(background, marker);
         editor->setMarkerBackgroundColor(theme.editorColor(QStringLiteral("foldMarker"), ThemeColors::Editor::foldMarker()), marker);
     }
     const QColor caret = theme.editorColor(QStringLiteral("caret"), ThemeColors::Editor::caretFg());
@@ -786,18 +785,16 @@ void EditorManager::applyBaseEditorColors(CustomEditor *editor)
     const QColor foreground = theme.editorColor(QStringLiteral("foreground"), ThemeColors::Editor::foreground());
     const QColor background = theme.editorColor(QStringLiteral("background"), ThemeColors::Editor::background());
     const QColor marginForeground = theme.editorColor(QStringLiteral("marginForeground"), ThemeColors::Editor::marginFg());
-    const QColor marginBackground = theme.editorColor(QStringLiteral("marginBackground"), ThemeColors::Editor::marginBg());
     const long fore = toScintillaColor(foreground);
     const long back = toScintillaColor(background);
     const long marginFore = toScintillaColor(marginForeground);
-    const long marginBack = toScintillaColor(marginBackground);
 
     editor->SendScintilla(QsciScintillaBase::SCI_STYLESETFORE, 0, fore);
     editor->SendScintilla(QsciScintillaBase::SCI_STYLESETFORE, QsciScintillaBase::STYLE_DEFAULT, fore);
     editor->SendScintilla(QsciScintillaBase::SCI_STYLESETBACK, 0, back);
     editor->SendScintilla(QsciScintillaBase::SCI_STYLESETBACK, QsciScintillaBase::STYLE_DEFAULT, back);
     editor->SendScintilla(QsciScintillaBase::SCI_STYLESETFORE, QsciScintillaBase::STYLE_LINENUMBER, marginFore);
-    editor->SendScintilla(QsciScintillaBase::SCI_STYLESETBACK, QsciScintillaBase::STYLE_LINENUMBER, marginBack);
+    editor->SendScintilla(QsciScintillaBase::SCI_STYLESETBACK, QsciScintillaBase::STYLE_LINENUMBER, back);
 }
 
 void EditorManager::applyLexerTheme(QsciLexer *lexer)

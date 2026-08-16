@@ -320,6 +320,23 @@ void SearchResultsDock::reapplyTheme()
     {
         m_searchButton->setStyleSheet(searchButtonStyle);
     }
+
+    const QString fileTreeBg = ThemeColors::FileTree::background().name(QColor::HexRgb);
+    const QString inputStyle = QStringLiteral(
+        "QLineEdit { background-color: %1; }"
+    ).arg(fileTreeBg);
+    if (m_dock->widget()->styleSheet() != inputStyle)
+    {
+        m_dock->widget()->setStyleSheet(inputStyle);
+    }
+
+    const QString treeStyle = QStringLiteral(
+        "QTreeWidget { background-color: %1; }"
+    ).arg(fileTreeBg);
+    if (m_resultsTree->styleSheet() != treeStyle)
+    {
+        m_resultsTree->setStyleSheet(treeStyle);
+    }
 }
 
 void SearchResultsDock::setVisible(bool visible)

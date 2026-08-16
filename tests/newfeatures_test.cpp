@@ -56,6 +56,11 @@ void writeFile(const QString &path, const QByteArray &content)
     QCOMPARE(file.write(content), qint64(content.size()));
 }
 
+long scintillaColorValue(const QColor &color)
+{
+    return (color.blue() << 16) | (color.green() << 8) | color.red();
+}
+
 } // namespace
 
 class NewFeaturesTest : public QObject
@@ -175,6 +180,23 @@ private slots:
                  QApplication::palette().color(QPalette::Button));
         QCOMPARE(editor->verticalScrollBar()->palette().color(QPalette::Mid),
                  QApplication::palette().color(QPalette::Mid));
+    }
+
+    void usesRequestedChromeBackgroundColors()
+    {
+        const ThemeColors::RoleColors chrome =
+            ThemeColors::roleColors(ThemeColors::ColorRole::ChromeBackground);
+        const ThemeColors::RoleColors fileTree =
+            ThemeColors::roleColors(ThemeColors::ColorRole::FileTreeBackground);
+
+        QCOMPARE(chrome.light, qRgb(250, 250, 250));
+        QCOMPARE(chrome.dark, qRgb(51, 51, 51));
+        QCOMPARE(fileTree.light, qRgb(250, 250, 250));
+        QCOMPARE(fileTree.dark, qRgb(38, 38, 38));
+
+        FindReplaceWidget findReplace;
+        QVERIFY(findReplace.styleSheet().contains(
+            ThemeColors::EditorTopBar::background().name(QColor::HexRgb)));
     }
 
     void usesUntranslatedNameForUntitledDocuments()
@@ -816,6 +838,10 @@ private slots:
                  midnight.syntaxColors.value(NotePeek::SyntaxRole::Function));
         QCOMPARE(python->paper(QsciLexerPython::Default),
                  midnight.editorColor(QStringLiteral("background")));
+        const long midnightMarginBackground = editor->SendScintilla(
+            QsciScintillaBase::SCI_STYLEGETBACK, QsciScintillaBase::STYLE_LINENUMBER);
+        QCOMPARE(midnightMarginBackground,
+                 scintillaColorValue(midnight.editorColor(QStringLiteral("background"))));
 
         preferences.setSyntaxThemeId(QStringLiteral("notepeek-light-modern"));
         manager.reapplyThemeToAllEditors();
@@ -823,6 +849,10 @@ private slots:
             QStringLiteral("notepeek-light-modern"), false);
         QCOMPARE(python->color(QsciLexerPython::FunctionMethodName),
                  light.syntaxColors.value(NotePeek::SyntaxRole::Function));
+        const long lightMarginBackground = editor->SendScintilla(
+            QsciScintillaBase::SCI_STYLEGETBACK, QsciScintillaBase::STYLE_LINENUMBER);
+        QCOMPARE(lightMarginBackground,
+                 scintillaColorValue(light.editorColor(QStringLiteral("background"))));
 
         preferences.setSyntaxThemeId(previousTheme);
     }

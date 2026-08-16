@@ -63,6 +63,7 @@ void FindReplaceWidget::applyChromeTheme()
 
     const QString style = QStringLiteral(
         "FindReplaceWidget {"
+        "  background-color: %5;"
         "  border-top: 1px solid %1;"
         "}"
         "QToolButton#buttonFind,"
@@ -97,10 +98,18 @@ void FindReplaceWidget::applyChromeTheme()
         "QToolButton#buttonClose:pressed {"
         "  background-color: %4;"
         "}"
+        "QLineEdit,"
+        "QComboBox,"
+        "QComboBox QLineEdit,"
+        "QCheckBox::indicator {"
+        "  background-color: %6;"
+        "}"
     ).arg(border().name(QColor::HexRgb),
           ThemeColors::Editor::foreground().name(QColor::HexRgb),
           hoverBg().name(QColor::HexRgb),
-          pressedBg().name(QColor::HexRgb));
+          pressedBg().name(QColor::HexRgb),
+          background().name(QColor::HexRgb),
+          ThemeColors::FileTree::background().name(QColor::HexRgb));
 
     if (styleSheet() != style)
     {
