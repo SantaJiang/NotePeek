@@ -16,11 +16,30 @@
 #include <NotePeek/semantictokens.h>
 
 #include <QFile>
+#include <QFocusEvent>
+#include <QImage>
 #include <QKeyEvent>
+#include <QPaintEvent>
 #include <QScrollBar>
 #include <QTemporaryDir>
 #include <QSplitter>
 #include <QtTest>
+#include <algorithm>
+
+namespace {
+class PaintTrackingEditor final : public CustomEditor
+{
+public:
+    QList<QRect> paintRects;
+
+protected:
+    void paintEvent(QPaintEvent *event) override
+    {
+        paintRects.append(event->rect());
+        CustomEditor::paintEvent(event);
+    }
+};
+}
 
 class EditorFeaturesTest : public QObject
 {
@@ -123,6 +142,110 @@ private slots:
 
         QCOMPARE(topPadding, horizontalPadding);
         QCOMPARE(topPadding, 5);
+    }
+
+    void editorPaddingUsesDocumentAndCaretLineBackgrounds()
+    {
+        CustomEditor editor;
+        editor.resize(320, 240);
+        editor.setMargins(0);
+        editor.SendScintilla(QsciScintillaBase::SCI_SETMARGINRIGHT, 0UL, 5L);
+
+        const QColor documentBackground(24, 48, 72);
+        const QColor caretLineBackground(180, 90, 30);
+        editor.setPaper(documentBackground);
+        editor.setCaretLineBackgroundColor(caretLineBackground);
+        editor.setCaretLineVisible(true);
+        QPalette palette = editor.palette();
+        palette.setColor(QPalette::Base, documentBackground);
+        editor.setPalette(palette);
+        editor.setText(QStringLiteral("current\nnext"));
+        editor.setCursorPosition(0, 0);
+        editor.ensurePolished();
+        QApplication::processEvents();
+
+        QFocusEvent focusIn(QEvent::FocusIn, Qt::OtherFocusReason);
+        QApplication::sendEvent(&editor, &focusIn);
+
+        const auto renderEditor = [&editor]() {
+            QImage rendered(editor.size(), QImage::Format_RGB32);
+            rendered.fill(Qt::transparent);
+            editor.render(&rendered);
+            return rendered;
+        };
+        QImage rendered = renderEditor();
+
+        const QRect viewportGeometry = editor.viewport()->geometry();
+        const int lineHeight = static_cast<int>(editor.SendScintilla(
+            QsciScintillaBase::SCI_TEXTHEIGHT, 0UL));
+        const int currentLineY = viewportGeometry.top() + lineHeight / 2;
+        const int nextLineY = currentLineY + lineHeight;
+
+        QCOMPARE(rendered.pixelColor(viewportGeometry.left() + 2, currentLineY),
+                 caretLineBackground);
+        const int leftPadding = static_cast<int>(editor.SendScintilla(
+            QsciScintillaBase::SCI_GETMARGINLEFT));
+        QCOMPARE(rendered.pixelColor(viewportGeometry.left() + leftPadding - 1,
+                                     currentLineY),
+                 caretLineBackground);
+        QCOMPARE(rendered.pixelColor(viewportGeometry.right() - 2, currentLineY),
+                 caretLineBackground);
+        QCOMPARE(rendered.pixelColor(viewportGeometry.left() + 2, nextLineY),
+                 documentBackground);
+        QCOMPARE(rendered.pixelColor(viewportGeometry.center().x(),
+                                     editor.contentsRect().top() + 2),
+                 documentBackground);
+
+        QFocusEvent focusOut(QEvent::FocusOut, Qt::OtherFocusReason);
+        QApplication::sendEvent(&editor, &focusOut);
+        rendered = renderEditor();
+        QCOMPARE(rendered.pixelColor(viewportGeometry.left() + 2, currentLineY),
+                 documentBackground);
+        QCOMPARE(rendered.pixelColor(viewportGeometry.left() + leftPadding - 1,
+                                     currentLineY),
+                 documentBackground);
+        QCOMPARE(rendered.pixelColor(viewportGeometry.center().x(), currentLineY),
+                 documentBackground);
+    }
+
+    void editorThemeSynchronizesTopPaddingBackground()
+    {
+        EditorManager manager;
+        CustomEditor *editor = manager.createEditor();
+        const long scintillaBackground = editor->SendScintilla(
+            QsciScintillaBase::SCI_STYLEGETBACK,
+            QsciScintillaBase::STYLE_DEFAULT);
+        const QColor background(scintillaBackground & 0xff,
+                                (scintillaBackground >> 8) & 0xff,
+                                (scintillaBackground >> 16) & 0xff);
+
+        QCOMPARE(editor->palette().color(QPalette::Base), background);
+    }
+
+    void focusChangeInvalidatesLeftPadding()
+    {
+        PaintTrackingEditor editor;
+        editor.resize(320, 240);
+        editor.setMargins(0);
+        editor.setCaretLineVisible(true);
+        editor.setText(QStringLiteral("current\nnext"));
+        editor.show();
+        QApplication::processEvents();
+
+        QFocusEvent focusIn(QEvent::FocusIn, Qt::OtherFocusReason);
+        QApplication::sendEvent(&editor, &focusIn);
+        QApplication::processEvents();
+        editor.paintRects.clear();
+
+        QFocusEvent focusOut(QEvent::FocusOut, Qt::OtherFocusReason);
+        QApplication::sendEvent(&editor, &focusOut);
+        QApplication::processEvents();
+
+        QVERIFY(!editor.paintRects.isEmpty());
+        int leftmostPaint = editor.width();
+        for (const QRect &rect : editor.paintRects)
+            leftmostPaint = std::min(leftmostPaint, rect.left());
+        QCOMPARE(leftmostPaint, 0);
     }
 
     void configuresFeaturesForCodeOnly()

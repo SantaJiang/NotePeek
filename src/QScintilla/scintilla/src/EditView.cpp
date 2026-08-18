@@ -2068,9 +2068,9 @@ void EditView::PaintText(Surface *surfaceWindow, const EditModel &model, PRectan
 
 		// Remove selection margin from drawing area so text will not be drawn
 		// on it in unbuffered mode.
+		PRectangle rcClipText = rcTextArea;
+		rcClipText.left -= leftTextOverlap;
 		if (!bufferedDraw && vsDraw.marginInside) {
-			PRectangle rcClipText = rcTextArea;
-			rcClipText.left -= leftTextOverlap;
 			surfaceWindow->SetClip(rcClipText);
 		}
 
@@ -2129,6 +2129,45 @@ void EditView::PaintText(Surface *surfaceWindow, const EditModel &model, PRectan
 					PRectangle rcLine = rcTextArea;
 					rcLine.top = static_cast<XYPOSITION>(ypos);
 					rcLine.bottom = static_cast<XYPOSITION>(ypos + vsDraw.lineHeight);
+					PRectangle rcLineWithPadding = rcLine;
+					if (vsDraw.marginInside) {
+						rcLineWithPadding.left -= vsDraw.leftMarginWidth;
+						rcLineWithPadding.right += vsDraw.rightMarginWidth;
+					}
+
+					// Scintilla's left and right margins inset the text rectangle.  Paint
+					// those strips separately so whole-line backgrounds still span the
+					// complete text area while glyphs retain their padding.
+					if (phase & drawBack) {
+						surface->SetClip(rcLineWithPadding);
+						const ColourOptional lineBackground = vsDraw.Background(
+							model.pdoc->GetMark(lineDoc), model.caret.active, ll->containsCaret);
+						const ColourDesired paddingBackground = lineBackground.isSet
+							? lineBackground : vsDraw.styles[STYLE_DEFAULT].back;
+						PRectangle rcLeftPadding = rcLineWithPadding;
+						rcLeftPadding.right = rcLine.left;
+						surface->FillRectangle(rcLeftPadding, paddingBackground);
+						PRectangle rcRightPadding = rcLineWithPadding;
+						rcRightPadding.left = rcLine.right;
+						surface->FillRectangle(rcRightPadding, paddingBackground);
+						surface->SetClip(rcClipText);
+					}
+					if ((phase & drawLineTranslucent) &&
+						(model.caret.active || vsDraw.alwaysShowCaretLineBackground) &&
+						vsDraw.showCaretLineBackground && ll->containsCaret &&
+						!vsDraw.caretLineFrame &&
+						vsDraw.caretLineAlpha != SC_ALPHA_NOALPHA) {
+						surface->SetClip(rcLineWithPadding);
+						PRectangle rcLeftPadding = rcLineWithPadding;
+						rcLeftPadding.right = rcLine.left;
+						SimpleAlphaRectangle(surface, rcLeftPadding,
+							vsDraw.caretLineBackground, vsDraw.caretLineAlpha);
+						PRectangle rcRightPadding = rcLineWithPadding;
+						rcRightPadding.left = rcLine.right;
+						SimpleAlphaRectangle(surface, rcRightPadding,
+							vsDraw.caretLineBackground, vsDraw.caretLineAlpha);
+						surface->SetClip(rcClipText);
+					}
 
 					const Range rangeLine(model.pdoc->LineStart(lineDoc),
 						model.pdoc->LineStart(lineDoc + 1));
@@ -2136,14 +2175,6 @@ void EditView::PaintText(Surface *surfaceWindow, const EditModel &model, PRectan
 					// Highlight the current braces if any
 					ll->SetBracesHighlight(rangeLine, model.braces, static_cast<char>(model.bracesMatchStyle),
 						static_cast<int>(model.highlightGuideColumn * vsDraw.spaceWidth), bracesIgnoreStyle);
-
-					if (leftTextOverlap && (bufferedDraw || ((phasesDraw < phasesMultiple) && (phase & drawBack)))) {
-						// Clear the left margin
-						PRectangle rcSpacer = rcLine;
-						rcSpacer.right = rcSpacer.left;
-						rcSpacer.left -= 1;
-						surface->FillRectangle(rcSpacer, vsDraw.styles[STYLE_DEFAULT].back);
-					}
 
 					DrawLine(surface, model, vsDraw, ll, lineDoc, visibleLine, xStart, rcLine, subLine, phase);
 #if defined(TIME_PAINTING)
@@ -2161,9 +2192,14 @@ void EditView::PaintText(Surface *surfaceWindow, const EditModel &model, PRectan
 					}
 
 					if (bufferedDraw) {
-						const Point from = Point::FromInts(vsDraw.textStart - leftTextOverlap, 0);
-						const PRectangle rcCopyArea = PRectangle::FromInts(vsDraw.textStart - leftTextOverlap, yposScreen,
-							static_cast<int>(rcClient.right - vsDraw.rightMarginWidth),
+						const int copyLeft = vsDraw.marginInside
+							? vsDraw.fixedColumnWidth - vsDraw.leftMarginWidth
+							: vsDraw.textStart - leftTextOverlap;
+						const int copyRight = static_cast<int>(rcClient.right) -
+							(vsDraw.marginInside ? 0 : vsDraw.rightMarginWidth);
+						const Point from = Point::FromInts(copyLeft, 0);
+						const PRectangle rcCopyArea = PRectangle::FromInts(copyLeft, yposScreen,
+							copyRight,
 							yposScreen + vsDraw.lineHeight);
 						surfaceWindow->Copy(rcCopyArea, from, *pixmapLine);
 					}

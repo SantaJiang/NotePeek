@@ -4,6 +4,7 @@
 #include "themecolors.h"
 #include <QFileInfo>
 #include <QFontDatabase>
+#include <QPalette>
 #include <QSet>
 #include <QTimer>
 #include <Qsci/qscilexer.h>
@@ -789,6 +790,10 @@ void EditorManager::applyBaseEditorColors(CustomEditor *editor)
     const long fore = toScintillaColor(foreground);
     const long back = toScintillaColor(background);
     const long marginFore = toScintillaColor(marginForeground);
+
+    QPalette palette = editor->palette();
+    palette.setColor(QPalette::Base, background);
+    editor->setPalette(palette);
 
     editor->SendScintilla(QsciScintillaBase::SCI_STYLESETFORE, 0, fore);
     editor->SendScintilla(QsciScintillaBase::SCI_STYLESETFORE, QsciScintillaBase::STYLE_DEFAULT, fore);

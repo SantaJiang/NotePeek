@@ -39,6 +39,10 @@ distributed under GNU GPL version 3.0 when they form part of QScintilla.
 
 - Centred line numbers in number margins used by NotePeek.
 - Prevented word wrapping from splitting Markdown list-marker prefixes.
+- Kept left and right text padding while extending caret-line backgrounds
+  through that padding, including translucent highlights, so the highlight
+  reaches both edges of the text area. Range invalidation includes the left
+  padding so focus and caret changes cannot leave stale highlight pixels.
 - Drew the caret line's number in the accent colour, following the caret line
   background.  `MarginView::PaintMargin` passes a foreground override to a new
   `DrawTextNoClipPhase` overload rather than recolouring a copied `Style`,
