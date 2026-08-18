@@ -1,5 +1,0 @@
-{
-  "id": "notepeek-quiet-paper", "name": "NotePeek Quiet Paper", "appearance": "light",
-  "editor": {"background":"#F7F6F3","foreground":"#333333","marginBackground":"#EFEEE9","marginForeground":"#88847C","caret":"#242424","caretLine":"#EEECE6","indentGuide":"#D8D5CC","foldMarker":"#77736B","matchedBraceForeground":"#4A66A0","matchedBraceBackground":"#E2E6F1"},
-  "tokens": {"default":"#333333","comment":"#7A7468","documentation":"#726C61","keyword":"#7B3F98","type":"#266D69","builtin":"#88651F","function":"#725E26","variable":"#315B85","property":"#7C4B35","string":"#A05252","escape":"#B33C30","number":"#397B48","operator":"#454545","preprocessor":"#80558C","regex":"#9A3F55","attribute":"#875074","tag":"#8A3F35","link":"#346DA6","added":"#397B48","removed":"#B0443B","changed":"#9A6A18","error":"#C52A2A"}
-}

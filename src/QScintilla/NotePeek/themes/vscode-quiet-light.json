@@ -1,0 +1,46 @@
+{
+  "id": "upstream-vscode-quiet-light",
+  "name": "Quiet Light",
+  "appearance": "light",
+  "source": {
+    "repository": "https://github.com/microsoft/vscode",
+    "commit": "7fee81510403f95dff38c5f4a528dbc4bd4d4298",
+    "license": "MIT"
+  },
+  "editor": {
+    "background": "#F5F5F5",
+    "foreground": "#333333",
+    "marginBackground": "#EDEDF5",
+    "marginForeground": "#777777",
+    "caret": "#333333",
+    "caretLine": "#F2F8FC",
+    "indentGuide": "#C9D0D9",
+    "foldMarker": "#777777",
+    "matchedBraceForeground": "#4B69C6",
+    "matchedBraceBackground": "#EDEDF5"
+  },
+  "tokens": {
+    "default": "#333333",
+    "comment": "#AAAAAA",
+    "documentation": "#777777",
+    "keyword": "#7A3E9D",
+    "type": "#4B69C6",
+    "builtin": "#9C5D27",
+    "function": "#705697",
+    "variable": "#333333",
+    "property": "#4B69C6",
+    "string": "#448C27",
+    "escape": "#9C5D27",
+    "number": "#9C5D27",
+    "operator": "#333333",
+    "preprocessor": "#7A3E9D",
+    "regex": "#AA3731",
+    "attribute": "#705697",
+    "tag": "#4B69C6",
+    "link": "#4B69C6",
+    "added": "#448C27",
+    "removed": "#AA3731",
+    "changed": "#749351",
+    "error": "#AA3731"
+  }
+}

@@ -1,0 +1,46 @@
+{
+  "id": "upstream-rose-pine",
+  "name": "Rosé Pine",
+  "appearance": "dark",
+  "source": {
+    "repository": "https://github.com/rose-pine/vscode",
+    "commit": "d8f5ebe8e096fa833e997c07eb7685ee1677a4ba",
+    "license": "MIT"
+  },
+  "editor": {
+    "background": "#191724",
+    "foreground": "#E0DEF4",
+    "marginBackground": "#1F1D2E",
+    "marginForeground": "#6E6A86",
+    "caret": "#E0DEF4",
+    "caretLine": "#26233A",
+    "indentGuide": "#6E6A86",
+    "foldMarker": "#6E6A86",
+    "matchedBraceForeground": "#9CCFD8",
+    "matchedBraceBackground": "#26233A"
+  },
+  "tokens": {
+    "default": "#E0DEF4",
+    "comment": "#908CAA",
+    "documentation": "#908CAA",
+    "keyword": "#C4A7E7",
+    "type": "#9CCFD8",
+    "builtin": "#F6C177",
+    "function": "#EBBCBA",
+    "variable": "#E0DEF4",
+    "property": "#9CCFD8",
+    "string": "#F6C177",
+    "escape": "#EA9A97",
+    "number": "#F6C177",
+    "operator": "#E0DEF4",
+    "preprocessor": "#EB6F92",
+    "regex": "#EBBCBA",
+    "attribute": "#F6C177",
+    "tag": "#EB6F92",
+    "link": "#31748F",
+    "added": "#9CCFD8",
+    "removed": "#EB6F92",
+    "changed": "#F6C177",
+    "error": "#EB6F92"
+  }
+}

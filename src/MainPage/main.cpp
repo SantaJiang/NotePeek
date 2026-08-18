@@ -1,5 +1,6 @@
 #include "mainwindow.h"
 #include "apppreferences.h"
+#include <NotePeek/syntaxtheme.h>
 #include <QApplication>
 #include <QTranslator>
 #include <QDebug>
@@ -85,6 +86,11 @@ int main(int argc, char *argv[])
     {
         qWarning() << "Failed to load Fira Code from resource";
     }
+    // Load built-in and external JSON themes before preferences are validated.
+    // External themes may live beside the executable or in the per-user theme
+    // directory used by the Preferences import action.
+    NotePeek::SyntaxThemeCatalog::reload();
+
     // Load persisted user preferences after the fonts are registered so font
     // validation sees the bundled families, and before the translator so the
     // language preference can override the system locale.

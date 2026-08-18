@@ -1,5 +1,0 @@
-{
-  "id": "notepeek-rose-dawn", "name": "NotePeek Rose Dawn", "appearance": "light",
-  "editor": {"background":"#FAF4F2","foreground":"#4B3F45","marginBackground":"#F1E7E5","marginForeground":"#927D84","caret":"#3D3237","caretLine":"#F3E9EC","indentGuide":"#DDCFD2","foldMarker":"#866F78","matchedBraceForeground":"#8C4F78","matchedBraceBackground":"#EADBE4"},
-  "tokens": {"default":"#4B3F45","comment":"#8C777D","documentation":"#806C72","keyword":"#8C4F78","type":"#397A78","builtin":"#9A6A35","function":"#7A557D","variable":"#4D638C","property":"#8B5362","string":"#A04F55","escape":"#C05050","number":"#65783F","operator":"#574950","preprocessor":"#8E5B8F","regex":"#B34F65","attribute":"#965C80","tag":"#9A4D67","link":"#397692","added":"#557F52","removed":"#B34F55","changed":"#9C7137","error":"#C83248"}
-}

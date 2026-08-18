@@ -6,6 +6,7 @@
 #include <QMainWindow>
 #include <QLineEdit>
 #include <QMessageBox>
+#include <QPushButton>
 #include <QToolButton>
 #include <QSignalSpy>
 #include <QScrollBar>
@@ -790,7 +791,7 @@ private slots:
     void loadsCompleteBuiltInSyntaxThemesFromJson()
     {
         const QVector<NotePeek::SyntaxTheme> themes = NotePeek::SyntaxThemeCatalog::builtInThemes();
-        QCOMPARE(themes.size(), 8);
+        QCOMPARE(themes.size(), 10);
         int darkCount = 0;
         int lightCount = 0;
         QSet<QString> ids;
@@ -800,15 +801,46 @@ private slots:
             QVERIFY(!ids.contains(theme.id));
             ids.insert(theme.id);
             theme.dark ? ++darkCount : ++lightCount;
+            QVERIFY(!theme.sourceRepository.isEmpty());
+            QVERIFY(!theme.sourceRevision.isEmpty());
+            QVERIFY(!theme.sourceLicense.isEmpty());
+            QVERIFY(!theme.name.contains(QStringLiteral("VS Code")));
+            QVERIFY(!theme.name.contains(QStringLiteral("Qt Creator")));
             QCOMPARE(theme.syntaxColors.size(), 22);
             QVERIFY(theme.editorColor(QStringLiteral("background")).isValid());
         }
-        QCOMPARE(darkCount, 4);
-        QCOMPARE(lightCount, 4);
+        QCOMPARE(darkCount, 5);
+        QCOMPARE(lightCount, 5);
+        const QStringList ayuIds = {
+            QStringLiteral("upstream-ayu-dark"),
+            QStringLiteral("upstream-ayu-light")
+        };
+        for (const QString &ayuId : ayuIds)
+            QVERIFY2(ids.contains(ayuId), qPrintable(ayuId));
         QCOMPARE(NotePeek::SyntaxThemeCatalog::theme(QStringLiteral("auto"), true).id,
-                 QStringLiteral("notepeek-dark-modern"));
+                 QStringLiteral("upstream-vscode-dark-2026"));
         QCOMPARE(NotePeek::SyntaxThemeCatalog::theme(QStringLiteral("auto"), false).id,
-                 QStringLiteral("notepeek-light-modern"));
+                 QStringLiteral("upstream-vscode-light-2026"));
+    }
+
+    void loadsSyntaxThemesFromADirectory()
+    {
+        QTemporaryDir directory;
+        QVERIFY(directory.isValid());
+        QFile builtIn(QStringLiteral(":/notepeek/themes/ayu-dark.json"));
+        QVERIFY(builtIn.open(QFile::ReadOnly));
+        writeFile(directory.filePath(QStringLiteral("custom.json")), builtIn.readAll());
+        writeFile(directory.filePath(QStringLiteral("invalid.json")),
+                  QByteArrayLiteral("{\"id\":\"invalid\"}"));
+        writeFile(directory.filePath(QStringLiteral("ignored.txt")),
+                  QByteArrayLiteral("not a theme"));
+
+        const QVector<NotePeek::SyntaxTheme> themes =
+            NotePeek::SyntaxThemeCatalog::loadFromDirectory(directory.path());
+        QCOMPARE(themes.size(), 1);
+        QCOMPARE(themes.first().id, QStringLiteral("upstream-ayu-dark"));
+        QCOMPARE(themes.first().filePath, directory.filePath(QStringLiteral("custom.json")));
+        QVERIFY(!themes.first().builtIn);
     }
 
     void rejectsIncompleteSyntaxThemeJson()
@@ -824,29 +856,42 @@ private slots:
     void appliesSelectedSyntaxThemeToAnEditor()
     {
         AppPreferences &preferences = AppPreferences::instance();
-        const QString previousTheme = preferences.syntaxThemeId();
-        preferences.setSyntaxThemeId(QStringLiteral("notepeek-midnight-blue"));
+        const QString previousDarkTheme = preferences.darkSyntaxThemeId();
+        const QString previousLightTheme = preferences.lightSyntaxThemeId();
+        const QString previousFixedTheme = preferences.fixedSyntaxThemeId();
+        const bool previousFollowsSystem = preferences.syntaxThemeFollowsSystem();
+        const bool systemDark = ThemeColors::isDarkMode();
+        preferences.setDarkSyntaxThemeId(QStringLiteral("upstream-rose-pine"));
+        preferences.setLightSyntaxThemeId(QStringLiteral("upstream-ayu-light"));
+        preferences.setSyntaxThemeFollowsSystem(true, true);
+        QCOMPARE(preferences.currentSyntaxThemeId(true),
+                 QStringLiteral("upstream-rose-pine"));
+        QCOMPARE(preferences.currentSyntaxThemeId(false),
+                 QStringLiteral("upstream-ayu-light"));
+        preferences.setSyntaxThemeFollowsSystem(false, true);
+        QCOMPARE(preferences.currentSyntaxThemeId(false),
+                 QStringLiteral("upstream-rose-pine"));
 
         EditorManager manager;
         CustomEditor *editor = manager.createEditor();
         manager.updateEditorSyntax(editor, QStringLiteral("sample.py"));
         auto *python = qobject_cast<QsciLexerPython *>(editor->lexer());
         QVERIFY(python);
-        const NotePeek::SyntaxTheme midnight = NotePeek::SyntaxThemeCatalog::theme(
-            QStringLiteral("notepeek-midnight-blue"), true);
+        const NotePeek::SyntaxTheme dark = NotePeek::SyntaxThemeCatalog::theme(
+            QStringLiteral("upstream-rose-pine"), true);
         QCOMPARE(python->color(QsciLexerPython::FunctionMethodName),
-                 midnight.syntaxColors.value(NotePeek::SyntaxRole::Function));
+                 dark.syntaxColors.value(NotePeek::SyntaxRole::Function));
         QCOMPARE(python->paper(QsciLexerPython::Default),
-                 midnight.editorColor(QStringLiteral("background")));
-        const long midnightMarginBackground = editor->SendScintilla(
+                 dark.editorColor(QStringLiteral("background")));
+        const long darkMarginBackground = editor->SendScintilla(
             QsciScintillaBase::SCI_STYLEGETBACK, QsciScintillaBase::STYLE_LINENUMBER);
-        QCOMPARE(midnightMarginBackground,
-                 scintillaColorValue(midnight.editorColor(QStringLiteral("background"))));
+        QCOMPARE(darkMarginBackground,
+                 scintillaColorValue(dark.editorColor(QStringLiteral("background"))));
 
-        preferences.setSyntaxThemeId(QStringLiteral("notepeek-light-modern"));
+        preferences.setSyntaxThemeFollowsSystem(false, false);
         manager.reapplyThemeToAllEditors();
         const NotePeek::SyntaxTheme light = NotePeek::SyntaxThemeCatalog::theme(
-            QStringLiteral("notepeek-light-modern"), false);
+            QStringLiteral("upstream-ayu-light"), false);
         QCOMPARE(python->color(QsciLexerPython::FunctionMethodName),
                  light.syntaxColors.value(NotePeek::SyntaxRole::Function));
         const long lightMarginBackground = editor->SendScintilla(
@@ -854,16 +899,54 @@ private slots:
         QCOMPARE(lightMarginBackground,
                  scintillaColorValue(light.editorColor(QStringLiteral("background"))));
 
-        preferences.setSyntaxThemeId(previousTheme);
+        preferences.setDarkSyntaxThemeId(previousDarkTheme);
+        preferences.setLightSyntaxThemeId(previousLightTheme);
+        if (previousFollowsSystem)
+            preferences.setSyntaxThemeFollowsSystem(true, systemDark);
+        else
+        {
+            preferences.setSyntaxThemeFollowsSystem(false, systemDark);
+            preferences.setFixedSyntaxThemeId(previousFixedTheme);
+        }
     }
 
     void exposesAllSyntaxThemesInPreferences()
     {
         PreferencesDialog dialog;
-        QComboBox *themeCombo = dialog.findChild<QComboBox *>(QStringLiteral("syntaxThemeCombo"));
+        QComboBox *darkCombo =
+            dialog.findChild<QComboBox *>(QStringLiteral("darkSyntaxThemeCombo"));
+        QComboBox *lightCombo =
+            dialog.findChild<QComboBox *>(QStringLiteral("lightSyntaxThemeCombo"));
+        QComboBox *themeCombo =
+            dialog.findChild<QComboBox *>(QStringLiteral("syntaxThemeCombo"));
+        QCheckBox *followsSystem = dialog.findChild<QCheckBox *>(
+            QStringLiteral("syntaxThemeFollowsSystemCheckBox"));
+        QWidget *themeRow = dialog.findChild<QWidget *>(QStringLiteral("syntaxThemeRow"));
+        QWidget *darkRow = dialog.findChild<QWidget *>(QStringLiteral("darkSyntaxThemeRow"));
+        QWidget *lightRow = dialog.findChild<QWidget *>(QStringLiteral("lightSyntaxThemeRow"));
         QVERIFY(themeCombo);
-        QCOMPARE(themeCombo->count(), 9); // automatic + eight built-ins
-        QCOMPARE(themeCombo->itemData(0).toString(), QStringLiteral("auto"));
+        QVERIFY(darkCombo);
+        QVERIFY(lightCombo);
+        QVERIFY(followsSystem);
+        QVERIFY(themeRow);
+        QVERIFY(darkRow);
+        QVERIFY(lightRow);
+        QVERIFY(themeCombo->count() >= 10);
+        QVERIFY(darkCombo->count() >= 5);
+        QVERIFY(lightCombo->count() >= 5);
+        QCOMPARE(darkCombo->findData(QStringLiteral("upstream-vscode-dark-2026")) >= 0, true);
+        QCOMPARE(lightCombo->findData(QStringLiteral("upstream-vscode-light-2026")) >= 0, true);
+        QVERIFY(dialog.findChild<QPushButton *>(QStringLiteral("importSyntaxThemeButton")));
+        QVERIFY(dialog.findChild<QPushButton *>(QStringLiteral("openSyntaxThemeFolderButton")));
+
+        followsSystem->setChecked(true);
+        QVERIFY(themeRow->isHidden());
+        QVERIFY(!darkRow->isHidden());
+        QVERIFY(!lightRow->isHidden());
+        followsSystem->setChecked(false);
+        QVERIFY(!themeRow->isHidden());
+        QVERIFY(darkRow->isHidden());
+        QVERIFY(lightRow->isHidden());
     }
 
     void statusBarVisibilityFollowsPreferences()

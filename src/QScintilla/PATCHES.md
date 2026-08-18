@@ -29,8 +29,11 @@ distributed under GNU GPL version 3.0 when they form part of QScintilla.
 ## Syntax themes
 
 - Added semantic lexer-role mapping and a validated JSON theme engine.
-- Added four dark and four light NotePeek syntax themes, plus automatic
-  system-appearance selection.
+- Added ten built-in syntax themes (five dark and five light), including sourced
+  adaptations of VS Code, Qt Creator, Rosé Pine, and Ayu. Themes are independent
+  JSON files, and validated external themes load dynamically from installation
+  and per-user directories. See `NotePeek/themes/SOURCES.md` for upstream
+  revisions, licenses, and the external-file rules.
 
 ## Rendering changes
 

@@ -1,0 +1,46 @@
+{
+  "id": "upstream-vscode-light-2026",
+  "name": "Light 2026",
+  "appearance": "light",
+  "source": {
+    "repository": "https://github.com/microsoft/vscode",
+    "commit": "7fee81510403f95dff38c5f4a528dbc4bd4d4298",
+    "license": "MIT"
+  },
+  "editor": {
+    "background": "#FFFFFF",
+    "foreground": "#202020",
+    "marginBackground": "#FAFAFD",
+    "marginForeground": "#606060",
+    "caret": "#202020",
+    "caretLine": "#F0F1F2",
+    "indentGuide": "#D8D8D8",
+    "foldMarker": "#606060",
+    "matchedBraceForeground": "#0069CC",
+    "matchedBraceBackground": "#E4E5E6"
+  },
+  "tokens": {
+    "default": "#202020",
+    "comment": "#606060",
+    "documentation": "#606060",
+    "keyword": "#CF222E",
+    "type": "#0550AE",
+    "builtin": "#953800",
+    "function": "#8250DF",
+    "variable": "#202020",
+    "property": "#0550AE",
+    "string": "#116329",
+    "escape": "#953800",
+    "number": "#0550AE",
+    "operator": "#202020",
+    "preprocessor": "#CF222E",
+    "regex": "#82071E",
+    "attribute": "#953800",
+    "tag": "#116329",
+    "link": "#0069CC",
+    "added": "#116329",
+    "removed": "#AD0707",
+    "changed": "#667309",
+    "error": "#CF222E"
+  }
+}

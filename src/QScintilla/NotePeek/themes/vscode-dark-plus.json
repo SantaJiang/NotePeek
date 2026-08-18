@@ -1,0 +1,46 @@
+{
+  "id": "upstream-vscode-dark-plus",
+  "name": "Dark+",
+  "appearance": "dark",
+  "source": {
+    "repository": "https://github.com/microsoft/vscode",
+    "commit": "7fee81510403f95dff38c5f4a528dbc4bd4d4298",
+    "license": "MIT"
+  },
+  "editor": {
+    "background": "#1E1E1E",
+    "foreground": "#D4D4D4",
+    "marginBackground": "#181818",
+    "marginForeground": "#C8C8C8",
+    "caret": "#FFFFFF",
+    "caretLine": "#2A2A2A",
+    "indentGuide": "#404040",
+    "foldMarker": "#C8C8C8",
+    "matchedBraceForeground": "#4EC9B0",
+    "matchedBraceBackground": "#3B3B3B"
+  },
+  "tokens": {
+    "default": "#D4D4D4",
+    "comment": "#6A9955",
+    "documentation": "#6A9955",
+    "keyword": "#C586C0",
+    "type": "#4EC9B0",
+    "builtin": "#D7BA7D",
+    "function": "#DCDCAA",
+    "variable": "#9CDCFE",
+    "property": "#9CDCFE",
+    "string": "#CE9178",
+    "escape": "#D7BA7D",
+    "number": "#B5CEA8",
+    "operator": "#D4D4D4",
+    "preprocessor": "#C586C0",
+    "regex": "#D16969",
+    "attribute": "#9CDCFE",
+    "tag": "#569CD6",
+    "link": "#4FC1FF",
+    "added": "#B5CEA8",
+    "removed": "#F48771",
+    "changed": "#DCDCAA",
+    "error": "#F44747"
+  }
+}

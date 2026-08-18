@@ -1,0 +1,46 @@
+{
+  "id": "upstream-ayu-light",
+  "name": "Ayu Light",
+  "appearance": "light",
+  "source": {
+    "repository": "https://github.com/ayu-theme/vscode-ayu",
+    "commit": "444ef92911cb75c3933c8003e3a7c79b6b6c914f",
+    "license": "MIT"
+  },
+  "editor": {
+    "background": "#FCFCFC",
+    "foreground": "#5C6166",
+    "marginBackground": "#F8F9FA",
+    "marginForeground": "#828E9F",
+    "caret": "#F29718",
+    "caretLine": "#FAFAFA",
+    "indentGuide": "#828E9F",
+    "foldMarker": "#828E9F",
+    "matchedBraceForeground": "#22A4E6",
+    "matchedBraceBackground": "#FAFAFA"
+  },
+  "tokens": {
+    "default": "#5C6166",
+    "comment": "#ADAEB1",
+    "documentation": "#ADAEB1",
+    "keyword": "#FA8532",
+    "type": "#22A4E6",
+    "builtin": "#A37ACC",
+    "function": "#EBA400",
+    "variable": "#5C6166",
+    "property": "#F07171",
+    "string": "#86B300",
+    "escape": "#4CBF99",
+    "number": "#A37ACC",
+    "operator": "#F2A191",
+    "preprocessor": "#FA8532",
+    "regex": "#4CBF99",
+    "attribute": "#EBA400",
+    "tag": "#55B4D4",
+    "link": "#22A4E6",
+    "added": "#6CBF43",
+    "removed": "#E65050",
+    "changed": "#F29718",
+    "error": "#E65050"
+  }
+}

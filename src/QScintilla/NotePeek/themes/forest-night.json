@@ -1,5 +1,0 @@
-{
-  "id": "notepeek-forest-night", "name": "NotePeek Forest Night", "appearance": "dark",
-  "editor": {"background":"#17211B","foreground":"#D7E2D8","marginBackground":"#111813","marginForeground":"#78917D","caret":"#F0FFF4","caretLine":"#202D24","indentGuide":"#33483A","foldMarker":"#8FB996","matchedBraceForeground":"#9FE5B0","matchedBraceBackground":"#2A3B2F"},
-  "tokens": {"default":"#D7E2D8","comment":"#76927B","documentation":"#88A78E","keyword":"#D6A8E8","type":"#7DD3A8","builtin":"#E7C875","function":"#A8D8A0","variable":"#B7D8C0","property":"#91C9AC","string":"#E5B78B","escape":"#F2D184","number":"#B9D98B","operator":"#D7E2D8","preprocessor":"#D6A8E8","regex":"#E79A8B","attribute":"#CDA6D9","tag":"#82C4A3","link":"#75C9C8","added":"#7EDC92","removed":"#E98282","changed":"#E2C96F","error":"#FF6B6B"}
-}

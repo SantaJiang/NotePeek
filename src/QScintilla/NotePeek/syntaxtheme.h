@@ -20,6 +20,11 @@ class QSCINTILLA_EXPORT SyntaxTheme
 public:
     QString id;
     QString name;
+    QString sourceRepository;
+    QString sourceRevision;
+    QString sourceLicense;
+    QString filePath;
+    bool builtIn = false;
     bool dark = false;
     QMap<QString, QColor> editorColors;
     SyntaxPalette syntaxColors;
@@ -33,7 +38,13 @@ class QSCINTILLA_EXPORT SyntaxThemeCatalog
 public:
     static SyntaxTheme fromJson(const QByteArray &json, QString *error = nullptr);
     static QVector<SyntaxTheme> builtInThemes();
+    static QVector<SyntaxTheme> themes();
+    static QVector<SyntaxTheme> loadFromDirectory(const QString &directoryPath);
     static QStringList builtInThemeIds();
+    static QStringList themeIds();
+    static QString installationThemeDirectory();
+    static QString userThemeDirectory();
+    static void reload();
     static SyntaxTheme theme(const QString &id, bool systemDark);
     static QString automaticThemeId(bool systemDark);
 };

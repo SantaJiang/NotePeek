@@ -4,9 +4,15 @@
 
 #include "NotePeek/syntaxtheme.h"
 
+#include <QCoreApplication>
+#include <QDebug>
+#include <QDir>
 #include <QFile>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QMutex>
+#include <QMutexLocker>
+#include <QStandardPaths>
 
 namespace {
 
@@ -51,16 +57,54 @@ QColor parseColor(const QJsonValue &value)
 const QStringList &resourcePaths()
 {
     static const QStringList paths = {
-        QStringLiteral(":/notepeek/themes/dark-modern.json"),
-        QStringLiteral(":/notepeek/themes/midnight-blue.json"),
-        QStringLiteral(":/notepeek/themes/graphite.json"),
-        QStringLiteral(":/notepeek/themes/forest-night.json"),
-        QStringLiteral(":/notepeek/themes/light-modern.json"),
-        QStringLiteral(":/notepeek/themes/quiet-paper.json"),
-        QStringLiteral(":/notepeek/themes/solar-light.json"),
-        QStringLiteral(":/notepeek/themes/rose-dawn.json")
+        QStringLiteral(":/notepeek/themes/vscode-dark-2026.json"),
+        QStringLiteral(":/notepeek/themes/vscode-dark-plus.json"),
+        QStringLiteral(":/notepeek/themes/rose-pine.json"),
+        QStringLiteral(":/notepeek/themes/ayu-dark.json"),
+        QStringLiteral(":/notepeek/themes/qtcreator-dark-2024.json"),
+        QStringLiteral(":/notepeek/themes/vscode-light-2026.json"),
+        QStringLiteral(":/notepeek/themes/vscode-light-plus.json"),
+        QStringLiteral(":/notepeek/themes/vscode-quiet-light.json"),
+        QStringLiteral(":/notepeek/themes/rose-pine-dawn.json"),
+        QStringLiteral(":/notepeek/themes/ayu-light.json"),
     };
     return paths;
+}
+
+QVector<NotePeek::SyntaxTheme> &loadedThemes()
+{
+    static QVector<NotePeek::SyntaxTheme> themes;
+    return themes;
+}
+
+bool &catalogLoaded()
+{
+    static bool loaded = false;
+    return loaded;
+}
+
+QMutex &catalogMutex()
+{
+    static QMutex mutex;
+    return mutex;
+}
+
+void mergeTheme(QVector<NotePeek::SyntaxTheme> *themes,
+                const NotePeek::SyntaxTheme &candidate)
+{
+    for (NotePeek::SyntaxTheme &theme : *themes)
+    {
+        if (theme.id == candidate.id)
+        {
+            if (theme.dark == candidate.dark)
+                theme = candidate;
+            else
+                qWarning() << "Ignoring syntax theme with conflicting appearance"
+                           << candidate.filePath;
+            return;
+        }
+    }
+    themes->append(candidate);
 }
 
 } // namespace
@@ -69,7 +113,8 @@ namespace NotePeek {
 
 bool SyntaxTheme::isValid() const
 {
-    if (id.isEmpty() || name.isEmpty())
+    if (id.isEmpty() || name.isEmpty() || sourceRepository.isEmpty()
+        || sourceRevision.isEmpty() || sourceLicense.isEmpty())
         return false;
     for (const QString &key : requiredEditorColors())
         if (!editorColors.value(key).isValid())
@@ -100,6 +145,10 @@ SyntaxTheme SyntaxThemeCatalog::fromJson(const QByteArray &json, QString *error)
     const QJsonObject root = document.object();
     theme.id = root.value(QStringLiteral("id")).toString().trimmed();
     theme.name = root.value(QStringLiteral("name")).toString().trimmed();
+    const QJsonObject source = root.value(QStringLiteral("source")).toObject();
+    theme.sourceRepository = source.value(QStringLiteral("repository")).toString().trimmed();
+    theme.sourceRevision = source.value(QStringLiteral("commit")).toString().trimmed();
+    theme.sourceLicense = source.value(QStringLiteral("license")).toString().trimmed();
     const QString appearance = root.value(QStringLiteral("appearance")).toString();
     if (appearance != QLatin1String("dark") && appearance != QLatin1String("light"))
     {
@@ -128,7 +177,7 @@ SyntaxTheme SyntaxThemeCatalog::fromJson(const QByteArray &json, QString *error)
     if (!theme.isValid())
     {
         if (error)
-            *error = QStringLiteral("theme is missing a required editor or token color");
+            *error = QStringLiteral("theme is missing provenance or a required editor or token color");
         return SyntaxTheme();
     }
     if (error)
@@ -138,10 +187,9 @@ SyntaxTheme SyntaxThemeCatalog::fromJson(const QByteArray &json, QString *error)
 
 QVector<SyntaxTheme> SyntaxThemeCatalog::builtInThemes()
 {
-    // Resources are immutable for the lifetime of the process. Parsing all
-    // eight JSON files for every viewport refresh adds UI-thread work without
-    // changing the result, so build the catalog once and share its Qt value
-    // data on subsequent calls.
+    // Resources are immutable for the lifetime of the process. Parse all ten
+    // JSON files once rather than repeating that work on viewport refreshes,
+    // then share the resulting Qt value data on subsequent calls.
     static const QVector<SyntaxTheme> themes = []() {
         QVector<SyntaxTheme> loadedThemes;
         for (const QString &path : resourcePaths())
@@ -152,11 +200,85 @@ QVector<SyntaxTheme> SyntaxThemeCatalog::builtInThemes()
             QString error;
             SyntaxTheme theme = fromJson(file.readAll(), &error);
             if (theme.isValid())
+            {
+                theme.filePath = path;
+                theme.builtIn = true;
                 loadedThemes.append(theme);
+            }
         }
         return loadedThemes;
     }();
     return themes;
+}
+
+QVector<SyntaxTheme> SyntaxThemeCatalog::loadFromDirectory(const QString &directoryPath)
+{
+    QVector<SyntaxTheme> loaded;
+    const QDir directory(directoryPath);
+    const QStringList files = directory.entryList({QStringLiteral("*.json")},
+                                                  QDir::Files | QDir::Readable,
+                                                  QDir::Name | QDir::IgnoreCase);
+    for (const QString &fileName : files)
+    {
+        const QString path = directory.filePath(fileName);
+        QFile file(path);
+        if (!file.open(QFile::ReadOnly))
+        {
+            qWarning() << "Could not read syntax theme" << path;
+            continue;
+        }
+        QString error;
+        SyntaxTheme theme = fromJson(file.readAll(), &error);
+        if (!theme.isValid())
+        {
+            qWarning() << "Ignoring invalid syntax theme" << path << error;
+            continue;
+        }
+        theme.filePath = path;
+        loaded.append(theme);
+    }
+    return loaded;
+}
+
+QString SyntaxThemeCatalog::installationThemeDirectory()
+{
+    return QDir(QCoreApplication::applicationDirPath()).filePath(QStringLiteral("themes"));
+}
+
+QString SyntaxThemeCatalog::userThemeDirectory()
+{
+    const QString dataDirectory =
+        QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation);
+    return QDir(dataDirectory).filePath(QStringLiteral("themes"));
+}
+
+void SyntaxThemeCatalog::reload()
+{
+    QVector<SyntaxTheme> refreshed = builtInThemes();
+    const QStringList directories = {
+        installationThemeDirectory(),
+        userThemeDirectory()
+    };
+    for (const QString &directory : directories)
+    {
+        for (const SyntaxTheme &theme : loadFromDirectory(directory))
+            mergeTheme(&refreshed, theme);
+    }
+    const QMutexLocker<QMutex> locker(&catalogMutex());
+    loadedThemes() = refreshed;
+    catalogLoaded() = true;
+}
+
+QVector<SyntaxTheme> SyntaxThemeCatalog::themes()
+{
+    {
+        const QMutexLocker<QMutex> locker(&catalogMutex());
+        if (catalogLoaded())
+            return loadedThemes();
+    }
+    reload();
+    const QMutexLocker<QMutex> locker(&catalogMutex());
+    return loadedThemes();
 }
 
 QStringList SyntaxThemeCatalog::builtInThemeIds()
@@ -167,21 +289,29 @@ QStringList SyntaxThemeCatalog::builtInThemeIds()
     return ids;
 }
 
+QStringList SyntaxThemeCatalog::themeIds()
+{
+    QStringList ids;
+    for (const SyntaxTheme &theme : themes())
+        ids.append(theme.id);
+    return ids;
+}
+
 QString SyntaxThemeCatalog::automaticThemeId(bool systemDark)
 {
-    return systemDark ? QStringLiteral("notepeek-dark-modern")
-                      : QStringLiteral("notepeek-light-modern");
+    return systemDark ? QStringLiteral("upstream-vscode-dark-2026")
+                      : QStringLiteral("upstream-vscode-light-2026");
 }
 
 SyntaxTheme SyntaxThemeCatalog::theme(const QString &id, bool systemDark)
 {
     const QString resolvedId = id.isEmpty() || id == QLatin1String("auto")
         ? automaticThemeId(systemDark) : id;
-    const QVector<SyntaxTheme> themes = builtInThemes();
-    for (const SyntaxTheme &theme : themes)
+    const QVector<SyntaxTheme> availableThemes = themes();
+    for (const SyntaxTheme &theme : availableThemes)
         if (theme.id == resolvedId)
             return theme;
-    for (const SyntaxTheme &theme : themes)
+    for (const SyntaxTheme &theme : availableThemes)
         if (theme.id == automaticThemeId(systemDark))
             return theme;
     return SyntaxTheme();

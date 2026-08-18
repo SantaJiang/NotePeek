@@ -19,8 +19,9 @@ namespace {
 
 NotePeek::SyntaxTheme currentSyntaxTheme()
 {
-    return NotePeek::SyntaxThemeCatalog::theme(AppPreferences::instance().syntaxThemeId(),
-                                               ThemeColors::isDarkMode());
+    const bool systemDark = ThemeColors::isDarkMode();
+    return NotePeek::SyntaxThemeCatalog::theme(
+        AppPreferences::instance().currentSyntaxThemeId(systemDark), systemDark);
 }
 
 LexerFactory::Language effectiveLanguage(CustomEditor *editor, const QString &filePath)

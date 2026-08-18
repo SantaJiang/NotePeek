@@ -40,6 +40,17 @@ int clampFontSize(int size)
     return size;
 }
 
+QString validatedThemeId(const QString &themeId, bool dark, const QString &fallback)
+{
+    const NotePeek::SyntaxTheme theme = NotePeek::SyntaxThemeCatalog::theme(themeId, dark);
+    return theme.id == themeId && theme.dark == dark ? themeId : fallback;
+}
+
+QString validatedFixedThemeId(const QString &themeId, const QString &fallback)
+{
+    return NotePeek::SyntaxThemeCatalog::themeIds().contains(themeId) ? themeId : fallback;
+}
+
 // Validate a persisted family: fall back to the default when the stored family
 // is empty or no longer installed on this machine.
 QString validatedFamily(const QString &family, const QString &fallback)
@@ -64,7 +75,10 @@ AppPreferences::AppPreferences()
     , m_textFontSize(defaultFontSize())
     , m_codeFontFamily(defaultCodeFontFamily())
     , m_codeFontSize(defaultFontSize())
-    , m_syntaxThemeId(QStringLiteral("auto"))
+    , m_darkSyntaxThemeId(QStringLiteral("upstream-vscode-dark-2026"))
+    , m_lightSyntaxThemeId(QStringLiteral("upstream-vscode-light-2026"))
+    , m_fixedSyntaxThemeId(QStringLiteral("upstream-vscode-dark-2026"))
+    , m_syntaxThemeFollowsSystem(true)
     , m_showFileTreeOnStartup(false)
     , m_showStatusBar(true)
     , m_markdownDefaultPreview(false)
@@ -168,7 +182,45 @@ void AppPreferences::load()
     m_codeFontFamily = codeFamily;
     m_codeFontSize = clampFontSize(
         settings.value(QStringLiteral("codeFontSize"), defaultFontSize()).toInt());
-    setSyntaxThemeId(settings.value(QStringLiteral("syntaxTheme"), QStringLiteral("auto")).toString());
+    const QString defaultDark = QStringLiteral("upstream-vscode-dark-2026");
+    const QString defaultLight = QStringLiteral("upstream-vscode-light-2026");
+    if (settings.contains(QStringLiteral("darkSyntaxTheme"))
+        || settings.contains(QStringLiteral("lightSyntaxTheme")))
+    {
+        setDarkSyntaxThemeId(settings.value(QStringLiteral("darkSyntaxTheme"), defaultDark).toString());
+        setLightSyntaxThemeId(settings.value(QStringLiteral("lightSyntaxTheme"), defaultLight).toString());
+        m_syntaxThemeFollowsSystem =
+            settings.value(QStringLiteral("syntaxThemeFollowsSystem"), true).toBool();
+        m_fixedSyntaxThemeId = validatedFixedThemeId(
+            settings.value(QStringLiteral("fixedSyntaxTheme"), m_darkSyntaxThemeId).toString(),
+            m_darkSyntaxThemeId);
+    }
+    else
+    {
+        // Migrate the original single selector. "auto" maps to the new paired
+        // defaults. An explicit theme remains fixed if it is still available.
+        const QString legacyTheme =
+            settings.value(QStringLiteral("syntaxTheme"), QStringLiteral("auto")).toString();
+        setDarkSyntaxThemeId(defaultDark);
+        setLightSyntaxThemeId(defaultLight);
+        if (legacyTheme != QLatin1String("auto")
+            && NotePeek::SyntaxThemeCatalog::themeIds().contains(legacyTheme))
+        {
+            const NotePeek::SyntaxTheme theme =
+                NotePeek::SyntaxThemeCatalog::theme(legacyTheme, true);
+            if (theme.dark)
+                setDarkSyntaxThemeId(legacyTheme);
+            else
+                setLightSyntaxThemeId(legacyTheme);
+            m_fixedSyntaxThemeId = legacyTheme;
+            m_syntaxThemeFollowsSystem = false;
+        }
+        else
+        {
+            m_fixedSyntaxThemeId = defaultDark;
+            m_syntaxThemeFollowsSystem = true;
+        }
+    }
 
     m_showFileTreeOnStartup =
         settings.value(QStringLiteral("showFileTreeOnStartup"), false).toBool();
@@ -207,7 +259,11 @@ void AppPreferences::save() const
     settings.setValue(QStringLiteral("textFontSize"), m_textFontSize);
     settings.setValue(QStringLiteral("codeFontFamily"), m_codeFontFamily);
     settings.setValue(QStringLiteral("codeFontSize"), m_codeFontSize);
-    settings.setValue(QStringLiteral("syntaxTheme"), m_syntaxThemeId);
+    settings.setValue(QStringLiteral("darkSyntaxTheme"), m_darkSyntaxThemeId);
+    settings.setValue(QStringLiteral("lightSyntaxTheme"), m_lightSyntaxThemeId);
+    settings.setValue(QStringLiteral("fixedSyntaxTheme"), m_fixedSyntaxThemeId);
+    settings.setValue(QStringLiteral("syntaxThemeFollowsSystem"), m_syntaxThemeFollowsSystem);
+    settings.remove(QStringLiteral("syntaxTheme"));
     settings.setValue(QStringLiteral("showFileTreeOnStartup"), m_showFileTreeOnStartup);
     settings.setValue(QStringLiteral("showStatusBar"), m_showStatusBar);
     settings.setValue(QStringLiteral("markdownDefaultPreview"), m_markdownDefaultPreview);
@@ -246,10 +302,33 @@ void AppPreferences::setCodeFont(const QString &family, int pointSize)
     m_codeFontSize = clampFontSize(pointSize);
 }
 
-void AppPreferences::setSyntaxThemeId(const QString &themeId)
+void AppPreferences::setDarkSyntaxThemeId(const QString &themeId)
 {
-    const QString normalized = themeId.isEmpty() ? QStringLiteral("auto") : themeId;
-    m_syntaxThemeId = normalized == QLatin1String("auto")
-        || NotePeek::SyntaxThemeCatalog::builtInThemeIds().contains(normalized)
-        ? normalized : QStringLiteral("auto");
+    m_darkSyntaxThemeId = validatedThemeId(themeId, true,
+        QStringLiteral("upstream-vscode-dark-2026"));
+}
+
+void AppPreferences::setLightSyntaxThemeId(const QString &themeId)
+{
+    m_lightSyntaxThemeId = validatedThemeId(themeId, false,
+        QStringLiteral("upstream-vscode-light-2026"));
+}
+
+void AppPreferences::setFixedSyntaxThemeId(const QString &themeId)
+{
+    m_fixedSyntaxThemeId = validatedFixedThemeId(themeId, m_darkSyntaxThemeId);
+}
+
+void AppPreferences::setSyntaxThemeFollowsSystem(bool follows, bool systemDark)
+{
+    if (!follows)
+        m_fixedSyntaxThemeId = systemDark ? m_darkSyntaxThemeId : m_lightSyntaxThemeId;
+    m_syntaxThemeFollowsSystem = follows;
+}
+
+QString AppPreferences::currentSyntaxThemeId(bool systemDark) const
+{
+    if (!m_syntaxThemeFollowsSystem)
+        return m_fixedSyntaxThemeId;
+    return systemDark ? m_darkSyntaxThemeId : m_lightSyntaxThemeId;
 }

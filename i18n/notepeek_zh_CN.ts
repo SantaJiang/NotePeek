@@ -118,7 +118,7 @@
         <location filename="../src/MainPage/editor/documentcontroller.cpp" line="690"/>
         <location filename="../src/MainPage/editor/documentcontroller.cpp" line="750"/>
         <location filename="../src/MainPage/editor/documentcontroller.cpp" line="760"/>
-        <location filename="../src/MainPage/editor/documentcontroller.cpp" line="1246"/>
+        <location filename="../src/MainPage/editor/documentcontroller.cpp" line="1255"/>
         <source>NotePeek</source>
         <translation>NotePeek</translation>
     </message>
@@ -137,7 +137,7 @@
     </message>
     <message>
         <location filename="../src/MainPage/editor/documentcontroller.cpp" line="570"/>
-        <location filename="../src/MainPage/editor/documentcontroller.cpp" line="1247"/>
+        <location filename="../src/MainPage/editor/documentcontroller.cpp" line="1256"/>
         <source>Cannot read file %1:
 %2.</source>
         <translation>无法读取文件 %1：
@@ -152,37 +152,37 @@
 %2。</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/editor/documentcontroller.cpp" line="1189"/>
+        <location filename="../src/MainPage/editor/documentcontroller.cpp" line="1198"/>
         <source>Reopen with Encoding</source>
         <translation>以指定编码重新打开</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/editor/documentcontroller.cpp" line="1190"/>
+        <location filename="../src/MainPage/editor/documentcontroller.cpp" line="1199"/>
         <source>Reopening the file will discard the unsaved changes. Continue?</source>
         <translation>重新打开文件将丢弃未保存的更改。是否继续？</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/editor/documentcontroller.cpp" line="1336"/>
+        <location filename="../src/MainPage/editor/documentcontroller.cpp" line="1345"/>
         <source>Convert Encoding</source>
         <translation>转换编码</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/editor/documentcontroller.cpp" line="1337"/>
+        <location filename="../src/MainPage/editor/documentcontroller.cpp" line="1346"/>
         <source>Some characters in this document cannot be represented in %1 and will be replaced. Continue?</source>
         <translation>本文档中的部分字符无法用 %1 表示，转换后将被替换。是否继续？</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/editor/documentcontroller.cpp" line="1636"/>
+        <location filename="../src/MainPage/editor/documentcontroller.cpp" line="1645"/>
         <source>The file was deleted outside NotePeek. Saving will recreate it.</source>
         <translation>文件已在 NotePeek 外部被删除。保存将重新创建该文件。</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/editor/documentcontroller.cpp" line="1637"/>
+        <location filename="../src/MainPage/editor/documentcontroller.cpp" line="1646"/>
         <source>The file changed outside NotePeek. Saving will overwrite those changes.</source>
         <translation>文件已在 NotePeek 外部发生更改。保存将覆盖这些更改。</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/editor/documentcontroller.cpp" line="1639"/>
+        <location filename="../src/MainPage/editor/documentcontroller.cpp" line="1648"/>
         <source>External File Conflict</source>
         <translation>外部文件冲突</translation>
     </message>
@@ -823,185 +823,272 @@
 <context>
     <name>PreferencesDialog</name>
     <message>
-        <location filename="../src/MainPage/preferencesdialog.cpp" line="253"/>
+        <location filename="../src/MainPage/preferencesdialog.cpp" line="315"/>
         <source>Show file tree on startup</source>
         <translation>启动时显示文件树</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/preferencesdialog.cpp" line="254"/>
+        <location filename="../src/MainPage/preferencesdialog.cpp" line="316"/>
         <source>Show bottom status bar</source>
         <translation>显示底部状态栏</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/preferencesdialog.cpp" line="262"/>
+        <location filename="../src/MainPage/preferencesdialog.cpp" line="324"/>
         <source>Add function, type, member and variable colors</source>
         <translation>添加函数、类型、成员和变量颜色</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/preferencesdialog.cpp" line="267"/>
+        <location filename="../src/MainPage/preferencesdialog.cpp" line="329"/>
         <source>Preferences</source>
         <translation>首选项</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/preferencesdialog.cpp" line="290"/>
+        <location filename="../src/MainPage/preferencesdialog.cpp" line="355"/>
         <source>Text font</source>
         <translation>文本字体</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/preferencesdialog.cpp" line="291"/>
+        <location filename="../src/MainPage/preferencesdialog.cpp" line="356"/>
         <source>Code font</source>
         <translation>代码字体</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/preferencesdialog.cpp" line="293"/>
-        <source>Automatic (system appearance)</source>
-        <translation>自动（跟随系统外观）</translation>
-    </message>
-    <message>
-        <location filename="../src/MainPage/preferencesdialog.cpp" line="298"/>
-        <source>Applies immediately to syntax editors.</source>
-        <translation>立即应用到语法编辑器。</translation>
-    </message>
-    <message>
-        <location filename="../src/MainPage/preferencesdialog.cpp" line="299"/>
+        <location filename="../src/MainPage/preferencesdialog.cpp" line="371"/>
         <source>Syntax theme</source>
-        <translation>语法主题</translation>
+        <translation>代码高亮主题</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/preferencesdialog.cpp" line="304"/>
+        <location filename="../src/MainPage/preferencesdialog.cpp" line="374"/>
+        <source>Dark syntax theme</source>
+        <translation>深色代码高亮主题</translation>
+    </message>
+    <message>
+        <location filename="../src/MainPage/preferencesdialog.cpp" line="377"/>
+        <source>Light syntax theme</source>
+        <translation>浅色代码高亮主题</translation>
+    </message>
+    <message>
+        <location filename="../src/MainPage/preferencesdialog.cpp" line="382"/>
+        <source>Appearance switching</source>
+        <translation>外观切换</translation>
+    </message>
+    <message>
+        <location filename="../src/MainPage/preferencesdialog.cpp" line="390"/>
+        <source>Theme files</source>
+        <translation>主题文件</translation>
+    </message>
+    <message>
+        <location filename="../src/MainPage/preferencesdialog.cpp" line="395"/>
         <source>System default</source>
         <translation>跟随系统</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/preferencesdialog.cpp" line="307"/>
+        <location filename="../src/MainPage/preferencesdialog.cpp" line="398"/>
         <source>Takes effect the next time NotePeek starts.</source>
         <translation>将在下次启动 NotePeek 时生效。</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/preferencesdialog.cpp" line="311"/>
+        <location filename="../src/MainPage/preferencesdialog.cpp" line="402"/>
         <source>Text (wrap lines, no line numbers)</source>
         <translation>文本(自动换行,不显示行号)</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/preferencesdialog.cpp" line="312"/>
+        <location filename="../src/MainPage/preferencesdialog.cpp" line="403"/>
         <source>Code (line numbers, no wrapping)</source>
         <translation>代码(显示行号,不自动换行)</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/preferencesdialog.cpp" line="313"/>
+        <location filename="../src/MainPage/preferencesdialog.cpp" line="404"/>
         <source>Applies to untitled documents that have not been saved yet.</source>
         <translation>适用于尚未保存的 untitled 文档。</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/preferencesdialog.cpp" line="318"/>
+        <location filename="../src/MainPage/preferencesdialog.cpp" line="409"/>
         <source>Insert (INS)</source>
         <translation>插入 (INS)</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/preferencesdialog.cpp" line="319"/>
+        <location filename="../src/MainPage/preferencesdialog.cpp" line="410"/>
         <source>Overwrite (OVR)</source>
         <translation>改写 (OVR)</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/preferencesdialog.cpp" line="320"/>
+        <location filename="../src/MainPage/preferencesdialog.cpp" line="411"/>
         <source>Controls whether typing inserts or replaces the character ahead of the caret.</source>
         <translation>控制输入时是插入字符还是覆盖光标后的字符。</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/preferencesdialog.cpp" line="322"/>
-        <location filename="../src/MainPage/preferencesdialog.cpp" line="351"/>
+        <location filename="../src/MainPage/preferencesdialog.cpp" line="413"/>
+        <location filename="../src/MainPage/preferencesdialog.cpp" line="442"/>
         <source>General</source>
         <translation>常规</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/preferencesdialog.cpp" line="324"/>
+        <location filename="../src/MainPage/preferencesdialog.cpp" line="415"/>
         <source>Language</source>
         <translation>语言</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/preferencesdialog.cpp" line="325"/>
+        <location filename="../src/MainPage/preferencesdialog.cpp" line="416"/>
         <source>Interface</source>
         <translation>界面</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/preferencesdialog.cpp" line="326"/>
+        <location filename="../src/MainPage/preferencesdialog.cpp" line="417"/>
         <source>Startup</source>
         <translation>启动</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/preferencesdialog.cpp" line="327"/>
+        <location filename="../src/MainPage/preferencesdialog.cpp" line="418"/>
         <source>New document</source>
         <translation>新建文档</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/preferencesdialog.cpp" line="328"/>
+        <location filename="../src/MainPage/preferencesdialog.cpp" line="419"/>
         <source>Typing</source>
         <translation>输入</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/preferencesdialog.cpp" line="329"/>
+        <location filename="../src/MainPage/preferencesdialog.cpp" line="420"/>
         <source>Markdown</source>
         <translation>Markdown</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/preferencesdialog.cpp" line="338"/>
+        <location filename="../src/MainPage/preferencesdialog.cpp" line="429"/>
         <source>Semantic highlighting</source>
         <translation>语义高亮</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/preferencesdialog.cpp" line="255"/>
+        <location filename="../src/MainPage/preferencesdialog.cpp" line="545"/>
+        <source>Import syntax theme</source>
+        <translation>导入语法主题</translation>
+    </message>
+    <message>
+        <location filename="../src/MainPage/preferencesdialog.cpp" line="545"/>
+        <source>JSON theme files (*.json)</source>
+        <translation>JSON 主题文件 (*.json)</translation>
+    </message>
+    <message>
+        <location filename="../src/MainPage/preferencesdialog.cpp" line="552"/>
+        <location filename="../src/MainPage/preferencesdialog.cpp" line="562"/>
+        <location filename="../src/MainPage/preferencesdialog.cpp" line="570"/>
+        <location filename="../src/MainPage/preferencesdialog.cpp" line="586"/>
+        <location filename="../src/MainPage/preferencesdialog.cpp" line="599"/>
+        <source>Import theme</source>
+        <translation>导入主题</translation>
+    </message>
+    <message>
+        <location filename="../src/MainPage/preferencesdialog.cpp" line="553"/>
+        <source>The selected theme file could not be read.</source>
+        <translation>无法读取所选主题文件。</translation>
+    </message>
+    <message>
+        <location filename="../src/MainPage/preferencesdialog.cpp" line="563"/>
+        <source>The selected file is not a valid theme:
+%1</source>
+        <translation>所选文件不是有效的主题：
+%1</translation>
+    </message>
+    <message>
+        <location filename="../src/MainPage/preferencesdialog.cpp" line="571"/>
+        <source>The theme folder could not be created.</source>
+        <translation>无法创建主题文件夹。</translation>
+    </message>
+    <message>
+        <location filename="../src/MainPage/preferencesdialog.cpp" line="587"/>
+        <source>The theme file could not be saved.</source>
+        <translation>无法保存主题文件。</translation>
+    </message>
+    <message>
+        <location filename="../src/MainPage/preferencesdialog.cpp" line="600"/>
+        <source>Theme “%1” was imported.</source>
+        <translation>主题“%1”已导入。</translation>
+    </message>
+    <message>
+        <location filename="../src/MainPage/preferencesdialog.cpp" line="610"/>
+        <source>The theme folder could not be opened.</source>
+        <translation>无法打开主题文件夹。</translation>
+    </message>
+    <message>
+        <location filename="../src/MainPage/preferencesdialog.cpp" line="317"/>
         <source>Open with side preview</source>
         <translation>打开时显示侧边预览</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/preferencesdialog.cpp" line="288"/>
-        <location filename="../src/MainPage/preferencesdialog.cpp" line="349"/>
+        <location filename="../src/MainPage/preferencesdialog.cpp" line="312"/>
+        <source>Follow system light and dark appearance</source>
+        <translation>高亮主题跟随系统深浅色外观</translation>
+    </message>
+    <message>
+        <location filename="../src/MainPage/preferencesdialog.cpp" line="313"/>
+        <source>Import theme...</source>
+        <translation>导入主题...</translation>
+    </message>
+    <message>
+        <location filename="../src/MainPage/preferencesdialog.cpp" line="314"/>
+        <location filename="../src/MainPage/preferencesdialog.cpp" line="609"/>
+        <source>Open theme folder</source>
+        <translation>打开主题文件夹</translation>
+    </message>
+    <message>
+        <location filename="../src/MainPage/preferencesdialog.cpp" line="353"/>
+        <location filename="../src/MainPage/preferencesdialog.cpp" line="440"/>
         <source>Editor</source>
         <translation>编辑器</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/preferencesdialog.cpp" line="332"/>
-        <location filename="../src/MainPage/preferencesdialog.cpp" line="353"/>
+        <location filename="../src/MainPage/preferencesdialog.cpp" line="365"/>
+        <source>Applies immediately to syntax editors after Apply.</source>
+        <translation>点击“应用”后立即应用到语法编辑器。</translation>
+    </message>
+    <message>
+        <location filename="../src/MainPage/preferencesdialog.cpp" line="370"/>
+        <source>When disabled, one fixed syntax theme is used for both appearances.</source>
+        <translation>关闭后，深色和浅色外观共用一个固定语法主题。</translation>
+    </message>
+    <message>
+        <location filename="../src/MainPage/preferencesdialog.cpp" line="423"/>
+        <location filename="../src/MainPage/preferencesdialog.cpp" line="444"/>
         <source>Code Editing</source>
         <translation>代码编辑</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/preferencesdialog.cpp" line="334"/>
+        <location filename="../src/MainPage/preferencesdialog.cpp" line="425"/>
         <source>Folding</source>
         <translation>代码折叠</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/preferencesdialog.cpp" line="258"/>
+        <location filename="../src/MainPage/preferencesdialog.cpp" line="320"/>
         <source>Show folding controls</source>
         <translation>显示折叠控件</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/preferencesdialog.cpp" line="335"/>
+        <location filename="../src/MainPage/preferencesdialog.cpp" line="426"/>
         <source>Brackets</source>
         <translation>括号</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/preferencesdialog.cpp" line="259"/>
+        <location filename="../src/MainPage/preferencesdialog.cpp" line="321"/>
         <source>Match and auto-close brackets</source>
         <translation>匹配并自动闭合括号</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/preferencesdialog.cpp" line="336"/>
+        <location filename="../src/MainPage/preferencesdialog.cpp" line="427"/>
         <source>Indentation</source>
         <translation>缩进</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/preferencesdialog.cpp" line="260"/>
+        <location filename="../src/MainPage/preferencesdialog.cpp" line="322"/>
         <source>Indent guides and smart Tab/Backspace</source>
         <translation>缩进参考线和智能 Tab/退格</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/preferencesdialog.cpp" line="337"/>
+        <location filename="../src/MainPage/preferencesdialog.cpp" line="428"/>
         <source>Completion</source>
         <translation>补全</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/preferencesdialog.cpp" line="261"/>
+        <location filename="../src/MainPage/preferencesdialog.cpp" line="323"/>
         <source>Suggest words from the current document</source>
         <translation>提示当前文档中的单词</translation>
     </message>
@@ -1075,7 +1162,7 @@
     </message>
     <message>
         <location filename="../src/MainPage/widgets/searchresultsdock.cpp" line="175"/>
-        <location filename="../src/MainPage/widgets/searchresultsdock.cpp" line="470"/>
+        <location filename="../src/MainPage/widgets/searchresultsdock.cpp" line="487"/>
         <source>Search</source>
         <translation>搜索</translation>
     </message>
@@ -1111,43 +1198,43 @@
         <translation>关闭搜索结果</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/widgets/searchresultsdock.cpp" line="351"/>
-        <location filename="../src/MainPage/widgets/searchresultsdock.cpp" line="430"/>
+        <location filename="../src/MainPage/widgets/searchresultsdock.cpp" line="368"/>
+        <location filename="../src/MainPage/widgets/searchresultsdock.cpp" line="447"/>
         <source>Search canceled.</source>
         <translation>搜索已取消。</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/widgets/searchresultsdock.cpp" line="363"/>
+        <location filename="../src/MainPage/widgets/searchresultsdock.cpp" line="380"/>
         <source>Open a directory first to search in files.</source>
         <translation>请先打开一个目录再进行文件搜索。</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/widgets/searchresultsdock.cpp" line="369"/>
+        <location filename="../src/MainPage/widgets/searchresultsdock.cpp" line="386"/>
         <source>Searching in %1...</source>
         <translation>正在 %1 中搜索...</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/widgets/searchresultsdock.cpp" line="405"/>
+        <location filename="../src/MainPage/widgets/searchresultsdock.cpp" line="422"/>
         <source>Line %1: %2</source>
         <translation>第 %1 行：%2</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/widgets/searchresultsdock.cpp" line="422"/>
+        <location filename="../src/MainPage/widgets/searchresultsdock.cpp" line="439"/>
         <source>%1 (%2)</source>
         <translation>%1 (%2)</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/widgets/searchresultsdock.cpp" line="434"/>
+        <location filename="../src/MainPage/widgets/searchresultsdock.cpp" line="451"/>
         <source>Showing the first %1 matches; refine the search to see the rest.</source>
         <translation>仅显示前 %1 处匹配；请缩小搜索范围以查看其余结果。</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/widgets/searchresultsdock.cpp" line="439"/>
+        <location filename="../src/MainPage/widgets/searchresultsdock.cpp" line="456"/>
         <source>%1 match(es) in %2 file(s).</source>
         <translation>在 %2 个文件中找到 %1 处匹配。</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/widgets/searchresultsdock.cpp" line="470"/>
+        <location filename="../src/MainPage/widgets/searchresultsdock.cpp" line="487"/>
         <source>Cancel</source>
         <translation>取消</translation>
     </message>

@@ -1,0 +1,46 @@
+{
+  "id": "upstream-qtcreator-dark-2024",
+  "name": "Dark 2024",
+  "appearance": "dark",
+  "source": {
+    "repository": "https://github.com/qt-creator/qt-creator",
+    "commit": "266254593f77ccb252fe145908d2d66bf14d52de",
+    "license": "GPL-3.0-only WITH Qt-GPL-exception-1.0"
+  },
+  "editor": {
+    "background": "#1F1F1F",
+    "foreground": "#D6CF9A",
+    "marginBackground": "#262626",
+    "marginForeground": "#AEAEAE",
+    "caret": "#1EC974",
+    "caretLine": "#373737",
+    "indentGuide": "#4C4D50",
+    "foldMarker": "#AEAEAE",
+    "matchedBraceForeground": "#BEC0C2",
+    "matchedBraceBackground": "#1D545C"
+  },
+  "tokens": {
+    "default": "#D6CF9A",
+    "comment": "#A8ABB0",
+    "documentation": "#65676A",
+    "keyword": "#45C6D6",
+    "type": "#FF8080",
+    "builtin": "#D69AA7",
+    "function": "#D6CF9A",
+    "variable": "#D6BB9A",
+    "property": "#9AA7D6",
+    "string": "#D69545",
+    "escape": "#D6C540",
+    "number": "#8A602C",
+    "operator": "#D6BB9A",
+    "preprocessor": "#FF6AAD",
+    "regex": "#D69545",
+    "attribute": "#45C6D6",
+    "tag": "#66A334",
+    "link": "#D6C540",
+    "added": "#45C6D6",
+    "removed": "#D65645",
+    "changed": "#D6C540",
+    "error": "#D65645"
+  }
+}

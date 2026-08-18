@@ -1,5 +1,0 @@
-{
-  "id": "notepeek-midnight-blue", "name": "NotePeek Midnight Blue", "appearance": "dark",
-  "editor": {"background":"#0F172A","foreground":"#CBD5E1","marginBackground":"#0B1220","marginForeground":"#64748B","caret":"#F8FAFC","caretLine":"#17213A","indentGuide":"#27364F","foldMarker":"#7DD3FC","matchedBraceForeground":"#67E8F9","matchedBraceBackground":"#243453"},
-  "tokens": {"default":"#CBD5E1","comment":"#6489A8","documentation":"#70A0B8","keyword":"#C4B5FD","type":"#67E8F9","builtin":"#FDE68A","function":"#F9A8D4","variable":"#BAE6FD","property":"#93C5FD","string":"#86EFAC","escape":"#FDE68A","number":"#FDBA74","operator":"#E2E8F0","preprocessor":"#E879F9","regex":"#FDA4AF","attribute":"#F0ABFC","tag":"#7DD3FC","link":"#38BDF8","added":"#4ADE80","removed":"#FB7185","changed":"#FACC15","error":"#FF5C7C"}
-}

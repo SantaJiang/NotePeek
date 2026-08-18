@@ -667,7 +667,7 @@ private slots:
         for (int style = 0; style <= QsciScintillaBase::STYLE_MAX; ++style)
             featureLexer.setFont(codeFont, style);
         const NotePeek::SyntaxTheme theme = NotePeek::SyntaxThemeCatalog::theme(
-            QStringLiteral("notepeek-dark-modern"), true);
+            QStringLiteral("upstream-vscode-dark-2026"), true);
         NotePeek::SyntaxStyler::applyTheme(&featureLexer, theme.syntaxColors,
                                            theme.editorColor(QStringLiteral("background")),
                                            theme.editorColor(QStringLiteral("foreground")));

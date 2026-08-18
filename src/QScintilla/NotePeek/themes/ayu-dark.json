@@ -1,0 +1,46 @@
+{
+  "id": "upstream-ayu-dark",
+  "name": "Ayu Dark",
+  "appearance": "dark",
+  "source": {
+    "repository": "https://github.com/ayu-theme/vscode-ayu",
+    "commit": "444ef92911cb75c3933c8003e3a7c79b6b6c914f",
+    "license": "MIT"
+  },
+  "editor": {
+    "background": "#10141C",
+    "foreground": "#BFBDB6",
+    "marginBackground": "#0D1017",
+    "marginForeground": "#5A6378",
+    "caret": "#E6B450",
+    "caretLine": "#161A24",
+    "indentGuide": "#5A6378",
+    "foldMarker": "#5A6378",
+    "matchedBraceForeground": "#59C2FF",
+    "matchedBraceBackground": "#1B1F29"
+  },
+  "tokens": {
+    "default": "#BFBDB6",
+    "comment": "#5A6673",
+    "documentation": "#5A6673",
+    "keyword": "#FF8F40",
+    "type": "#59C2FF",
+    "builtin": "#D2A6FF",
+    "function": "#FFB454",
+    "variable": "#BFBDB6",
+    "property": "#F07178",
+    "string": "#AAD94C",
+    "escape": "#95E6CB",
+    "number": "#D2A6FF",
+    "operator": "#F29668",
+    "preprocessor": "#FF8F40",
+    "regex": "#95E6CB",
+    "attribute": "#FFB454",
+    "tag": "#39BAE6",
+    "link": "#59C2FF",
+    "added": "#70BF56",
+    "removed": "#D95757",
+    "changed": "#E6B450",
+    "error": "#D95757"
+  }
+}

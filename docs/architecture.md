@@ -164,9 +164,13 @@ other LSP client to provide more precise tokens without changing the widget.
 carry revision/range metadata, cancellation and execution budgets so providers
 can be hosted asynchronously without coupling worker threads to QWidget state.
 
-`SyntaxThemeCatalog` validates JSON themes embedded in the library. Four dark
-and four light themes ship with the fork, and MainPage persists either a theme
-id or automatic system-appearance selection.
+`SyntaxThemeCatalog` validates JSON themes and merges ten embedded defaults with
+optional `*.json` files beside the executable and in the per-user theme folder.
+External definitions can override an earlier theme with the same id and
+appearance. MainPage persists
+whether syntax colors follow system appearance. The settings UI shows separate
+dark and light choices only while following is enabled; otherwise it shows one
+fixed theme selector used by both appearances.
 
 ### `themecolors.h`
 
