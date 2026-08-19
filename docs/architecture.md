@@ -167,10 +167,10 @@ can be hosted asynchronously without coupling worker threads to QWidget state.
 `SyntaxThemeCatalog` validates JSON themes and merges ten embedded defaults with
 optional `*.json` files beside the executable and in the per-user theme folder.
 External definitions can override an earlier theme with the same id and
-appearance. MainPage persists
-whether syntax colors follow system appearance. The settings UI shows separate
-dark and light choices only while following is enabled; otherwise it shows one
-fixed theme selector used by both appearances.
+appearance. MainPage persists separate dark and light syntax theme choices;
+the active one is always selected by the current system appearance, so syntax
+highlighting tracks the light/dark theme automatically. The settings UI shows
+both choices at all times.
 
 ### `themecolors.h`
 

@@ -306,10 +306,8 @@ PreferencesDialog::PreferencesDialog(QWidget *parent)
     , m_textFontSize(new QComboBox(this))
     , m_codeFontCombo(new QComboBox(this))
     , m_codeFontSize(new QComboBox(this))
-    , m_syntaxThemeCombo(new QComboBox(this))
     , m_darkSyntaxThemeCombo(new QComboBox(this))
     , m_lightSyntaxThemeCombo(new QComboBox(this))
-    , m_syntaxThemeFollowsSystem(new QCheckBox(tr("Follow system light and dark appearance"), this))
     , m_importSyntaxThemeButton(new QPushButton(tr("Import theme..."), this))
     , m_openSyntaxThemeFolderButton(new QPushButton(tr("Open theme folder"), this))
     , m_showFileTree(new QCheckBox(tr("Show file tree on startup"), this))
@@ -355,31 +353,22 @@ PreferencesDialog::PreferencesDialog(QWidget *parent)
     editorLayout->addLayout(makeSettingsRow(tr("Text font"), makeFontRow(m_textFontCombo, m_textFontSize, editorSection), editorSection));
     editorLayout->addLayout(makeSettingsRow(tr("Code font"), makeFontRow(m_codeFontCombo, m_codeFontSize, editorSection), editorSection));
 
-    m_syntaxThemeCombo->setObjectName(QStringLiteral("syntaxThemeCombo"));
     m_darkSyntaxThemeCombo->setObjectName(QStringLiteral("darkSyntaxThemeCombo"));
     m_lightSyntaxThemeCombo->setObjectName(QStringLiteral("lightSyntaxThemeCombo"));
-    m_syntaxThemeFollowsSystem->setObjectName(QStringLiteral("syntaxThemeFollowsSystemCheckBox"));
     m_importSyntaxThemeButton->setObjectName(QStringLiteral("importSyntaxThemeButton"));
     m_openSyntaxThemeFolderButton->setObjectName(QStringLiteral("openSyntaxThemeFolderButton"));
     populateSyntaxThemeCombos();
     const QString themeToolTip = tr("Applies immediately to syntax editors after Apply.");
-    m_syntaxThemeCombo->setToolTip(themeToolTip);
     m_darkSyntaxThemeCombo->setToolTip(themeToolTip);
     m_lightSyntaxThemeCombo->setToolTip(themeToolTip);
-    m_syntaxThemeFollowsSystem->setToolTip(
-        tr("When disabled, one fixed syntax theme is used for both appearances."));
-    m_syntaxThemeRow = makeSettingsRowWidget(tr("Syntax theme"), m_syntaxThemeCombo, editorSection);
-    m_syntaxThemeRow->setObjectName(QStringLiteral("syntaxThemeRow"));
     m_darkSyntaxThemeRow = makeSettingsRowWidget(
         tr("Dark syntax theme"), m_darkSyntaxThemeCombo, editorSection);
     m_darkSyntaxThemeRow->setObjectName(QStringLiteral("darkSyntaxThemeRow"));
     m_lightSyntaxThemeRow = makeSettingsRowWidget(
         tr("Light syntax theme"), m_lightSyntaxThemeCombo, editorSection);
     m_lightSyntaxThemeRow->setObjectName(QStringLiteral("lightSyntaxThemeRow"));
-    editorLayout->addWidget(m_syntaxThemeRow);
     editorLayout->addWidget(m_darkSyntaxThemeRow);
     editorLayout->addWidget(m_lightSyntaxThemeRow);
-    editorLayout->addLayout(makeSettingsRow(tr("Appearance switching"), m_syntaxThemeFollowsSystem, editorSection));
 
     auto *themeActions = new QWidget(editorSection);
     auto *themeActionsLayout = new QHBoxLayout(themeActions);
@@ -494,49 +483,25 @@ PreferencesDialog::PreferencesDialog(QWidget *parent)
             this, &PreferencesDialog::importSyntaxTheme);
     connect(m_openSyntaxThemeFolderButton, &QPushButton::clicked,
             this, &PreferencesDialog::openSyntaxThemeFolder);
-    connect(m_syntaxThemeFollowsSystem, &QCheckBox::toggled, this, [this](bool follows) {
-        if (!follows)
-        {
-            const QComboBox *activeCombo = ThemeColors::isDarkMode()
-                ? m_darkSyntaxThemeCombo : m_lightSyntaxThemeCombo;
-            const int index = m_syntaxThemeCombo->findData(activeCombo->currentData());
-            if (index >= 0)
-                m_syntaxThemeCombo->setCurrentIndex(index);
-        }
-        updateSyntaxThemeControls(follows);
-    });
 }
 
 void PreferencesDialog::populateSyntaxThemeCombos()
 {
-    const QString selectedTheme = m_syntaxThemeCombo->currentData().toString();
     const QString selectedDark = m_darkSyntaxThemeCombo->currentData().toString();
     const QString selectedLight = m_lightSyntaxThemeCombo->currentData().toString();
-    m_syntaxThemeCombo->clear();
     m_darkSyntaxThemeCombo->clear();
     m_lightSyntaxThemeCombo->clear();
     for (const NotePeek::SyntaxTheme &theme : NotePeek::SyntaxThemeCatalog::themes())
     {
-        m_syntaxThemeCombo->addItem(theme.name, theme.id);
         QComboBox *combo = theme.dark ? m_darkSyntaxThemeCombo : m_lightSyntaxThemeCombo;
         combo->addItem(theme.name, theme.id);
     }
-    const int themeIndex = m_syntaxThemeCombo->findData(selectedTheme);
     const int darkIndex = m_darkSyntaxThemeCombo->findData(selectedDark);
     const int lightIndex = m_lightSyntaxThemeCombo->findData(selectedLight);
-    if (themeIndex >= 0)
-        m_syntaxThemeCombo->setCurrentIndex(themeIndex);
     if (darkIndex >= 0)
         m_darkSyntaxThemeCombo->setCurrentIndex(darkIndex);
     if (lightIndex >= 0)
         m_lightSyntaxThemeCombo->setCurrentIndex(lightIndex);
-}
-
-void PreferencesDialog::updateSyntaxThemeControls(bool followsSystem)
-{
-    m_syntaxThemeRow->setVisible(!followsSystem);
-    m_darkSyntaxThemeRow->setVisible(followsSystem);
-    m_lightSyntaxThemeRow->setVisible(followsSystem);
 }
 
 void PreferencesDialog::importSyntaxTheme()
@@ -590,9 +555,7 @@ void PreferencesDialog::importSyntaxTheme()
 
     NotePeek::SyntaxThemeCatalog::reload();
     populateSyntaxThemeCombos();
-    QComboBox *combo = m_syntaxThemeFollowsSystem->isChecked()
-        ? (theme.dark ? m_darkSyntaxThemeCombo : m_lightSyntaxThemeCombo)
-        : m_syntaxThemeCombo;
+    QComboBox *combo = theme.dark ? m_darkSyntaxThemeCombo : m_lightSyntaxThemeCombo;
     const int importedIndex = combo->findData(theme.id);
     if (importedIndex >= 0)
         combo->setCurrentIndex(importedIndex);
@@ -623,14 +586,6 @@ void PreferencesDialog::loadFromPreferences()
     m_darkSyntaxThemeCombo->setCurrentIndex(darkThemeIndex >= 0 ? darkThemeIndex : 0);
     const int lightThemeIndex = m_lightSyntaxThemeCombo->findData(prefs.lightSyntaxThemeId());
     m_lightSyntaxThemeCombo->setCurrentIndex(lightThemeIndex >= 0 ? lightThemeIndex : 0);
-    const int fixedThemeIndex = m_syntaxThemeCombo->findData(
-        prefs.currentSyntaxThemeId(ThemeColors::isDarkMode()));
-    m_syntaxThemeCombo->setCurrentIndex(fixedThemeIndex >= 0 ? fixedThemeIndex : 0);
-    {
-        const QSignalBlocker blocker(m_syntaxThemeFollowsSystem);
-        m_syntaxThemeFollowsSystem->setChecked(prefs.syntaxThemeFollowsSystem());
-    }
-    updateSyntaxThemeControls(prefs.syntaxThemeFollowsSystem());
     m_showFileTree->setChecked(prefs.showFileTreeOnStartup());
     m_showStatusBar->setChecked(prefs.showStatusBar());
     m_markdownSidePreview->setChecked(prefs.markdownDefaultPreview());
@@ -656,10 +611,6 @@ void PreferencesDialog::commit()
     prefs.setCodeFont(comboCurrentFont(m_codeFontCombo).family(), currentFontSize(m_codeFontSize));
     prefs.setDarkSyntaxThemeId(m_darkSyntaxThemeCombo->currentData().toString());
     prefs.setLightSyntaxThemeId(m_lightSyntaxThemeCombo->currentData().toString());
-    prefs.setSyntaxThemeFollowsSystem(m_syntaxThemeFollowsSystem->isChecked(),
-                                      ThemeColors::isDarkMode());
-    if (!m_syntaxThemeFollowsSystem->isChecked())
-        prefs.setFixedSyntaxThemeId(m_syntaxThemeCombo->currentData().toString());
     prefs.setShowFileTreeOnStartup(m_showFileTree->isChecked());
     prefs.setShowStatusBar(m_showStatusBar->isChecked());
     prefs.setMarkdownDefaultPreview(m_markdownSidePreview->isChecked());

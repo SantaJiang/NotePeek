@@ -29,17 +29,13 @@ public:
     void setCodeFont(const QString &family, int pointSize);
 
     // Syntax colour themes exported by NotePeekScintilla. Dark and light
-    // choices are stored independently. When following is disabled, the
-    // theme that was active at that moment remains fixed across appearance
-    // changes.
+    // choices are stored independently and the active one is always selected
+    // by the current system appearance, so syntax highlighting tracks the
+    // light/dark theme automatically.
     QString darkSyntaxThemeId() const { return m_darkSyntaxThemeId; }
     QString lightSyntaxThemeId() const { return m_lightSyntaxThemeId; }
-    QString fixedSyntaxThemeId() const { return m_fixedSyntaxThemeId; }
-    bool syntaxThemeFollowsSystem() const { return m_syntaxThemeFollowsSystem; }
     void setDarkSyntaxThemeId(const QString &themeId);
     void setLightSyntaxThemeId(const QString &themeId);
-    void setFixedSyntaxThemeId(const QString &themeId);
-    void setSyntaxThemeFollowsSystem(bool follows, bool systemDark);
     QString currentSyntaxThemeId(bool systemDark) const;
 
     // Show the left file-tree dock when the application starts.  This only
@@ -109,8 +105,6 @@ private:
     int m_codeFontSize;
     QString m_darkSyntaxThemeId;
     QString m_lightSyntaxThemeId;
-    QString m_fixedSyntaxThemeId;
-    bool m_syntaxThemeFollowsSystem;
     bool m_showFileTreeOnStartup;
     bool m_showStatusBar;
     bool m_markdownDefaultPreview;

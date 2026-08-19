@@ -46,11 +46,6 @@ QString validatedThemeId(const QString &themeId, bool dark, const QString &fallb
     return theme.id == themeId && theme.dark == dark ? themeId : fallback;
 }
 
-QString validatedFixedThemeId(const QString &themeId, const QString &fallback)
-{
-    return NotePeek::SyntaxThemeCatalog::themeIds().contains(themeId) ? themeId : fallback;
-}
-
 // Validate a persisted family: fall back to the default when the stored family
 // is empty or no longer installed on this machine.
 QString validatedFamily(const QString &family, const QString &fallback)
@@ -77,8 +72,6 @@ AppPreferences::AppPreferences()
     , m_codeFontSize(defaultFontSize())
     , m_darkSyntaxThemeId(QStringLiteral("upstream-vscode-dark-2026"))
     , m_lightSyntaxThemeId(QStringLiteral("upstream-vscode-light-2026"))
-    , m_fixedSyntaxThemeId(QStringLiteral("upstream-vscode-dark-2026"))
-    , m_syntaxThemeFollowsSystem(true)
     , m_showFileTreeOnStartup(false)
     , m_showStatusBar(true)
     , m_markdownDefaultPreview(false)
@@ -189,16 +182,13 @@ void AppPreferences::load()
     {
         setDarkSyntaxThemeId(settings.value(QStringLiteral("darkSyntaxTheme"), defaultDark).toString());
         setLightSyntaxThemeId(settings.value(QStringLiteral("lightSyntaxTheme"), defaultLight).toString());
-        m_syntaxThemeFollowsSystem =
-            settings.value(QStringLiteral("syntaxThemeFollowsSystem"), true).toBool();
-        m_fixedSyntaxThemeId = validatedFixedThemeId(
-            settings.value(QStringLiteral("fixedSyntaxTheme"), m_darkSyntaxThemeId).toString(),
-            m_darkSyntaxThemeId);
     }
     else
     {
         // Migrate the original single selector. "auto" maps to the new paired
-        // defaults. An explicit theme remains fixed if it is still available.
+        // defaults. An explicit legacy theme is folded into the matching
+        // dark/light slot based on its own appearance, since syntax
+        // highlighting now always tracks the system theme.
         const QString legacyTheme =
             settings.value(QStringLiteral("syntaxTheme"), QStringLiteral("auto")).toString();
         setDarkSyntaxThemeId(defaultDark);
@@ -212,15 +202,33 @@ void AppPreferences::load()
                 setDarkSyntaxThemeId(legacyTheme);
             else
                 setLightSyntaxThemeId(legacyTheme);
-            m_fixedSyntaxThemeId = legacyTheme;
-            m_syntaxThemeFollowsSystem = false;
-        }
-        else
-        {
-            m_fixedSyntaxThemeId = defaultDark;
-            m_syntaxThemeFollowsSystem = true;
         }
     }
+    // Drop the obsolete fixed-theme / follows-system keys: the active theme
+    // is now always chosen from the dark/light pair by system appearance.
+    // When a user had explicitly pinned a fixed theme (follows=false),
+    // preserve it by folding it into the matching dark/light slot based on
+    // its own appearance; otherwise the pair loaded above is authoritative.
+    if (settings.contains(QStringLiteral("syntaxThemeFollowsSystem"))
+        && !settings.value(QStringLiteral("syntaxThemeFollowsSystem"), true).toBool()
+        && settings.contains(QStringLiteral("fixedSyntaxTheme")))
+    {
+        const QString fixedTheme = settings.value(QStringLiteral("fixedSyntaxTheme")).toString();
+        if (!fixedTheme.isEmpty()
+            && NotePeek::SyntaxThemeCatalog::themeIds().contains(fixedTheme))
+        {
+            const NotePeek::SyntaxTheme theme =
+                NotePeek::SyntaxThemeCatalog::theme(fixedTheme, true);
+            if (theme.dark)
+                setDarkSyntaxThemeId(fixedTheme);
+            else
+                setLightSyntaxThemeId(fixedTheme);
+        }
+    }
+    if (settings.contains(QStringLiteral("fixedSyntaxTheme")))
+        settings.remove(QStringLiteral("fixedSyntaxTheme"));
+    if (settings.contains(QStringLiteral("syntaxThemeFollowsSystem")))
+        settings.remove(QStringLiteral("syntaxThemeFollowsSystem"));
 
     m_showFileTreeOnStartup =
         settings.value(QStringLiteral("showFileTreeOnStartup"), false).toBool();
@@ -261,9 +269,9 @@ void AppPreferences::save() const
     settings.setValue(QStringLiteral("codeFontSize"), m_codeFontSize);
     settings.setValue(QStringLiteral("darkSyntaxTheme"), m_darkSyntaxThemeId);
     settings.setValue(QStringLiteral("lightSyntaxTheme"), m_lightSyntaxThemeId);
-    settings.setValue(QStringLiteral("fixedSyntaxTheme"), m_fixedSyntaxThemeId);
-    settings.setValue(QStringLiteral("syntaxThemeFollowsSystem"), m_syntaxThemeFollowsSystem);
     settings.remove(QStringLiteral("syntaxTheme"));
+    settings.remove(QStringLiteral("fixedSyntaxTheme"));
+    settings.remove(QStringLiteral("syntaxThemeFollowsSystem"));
     settings.setValue(QStringLiteral("showFileTreeOnStartup"), m_showFileTreeOnStartup);
     settings.setValue(QStringLiteral("showStatusBar"), m_showStatusBar);
     settings.setValue(QStringLiteral("markdownDefaultPreview"), m_markdownDefaultPreview);
@@ -314,21 +322,7 @@ void AppPreferences::setLightSyntaxThemeId(const QString &themeId)
         QStringLiteral("upstream-vscode-light-2026"));
 }
 
-void AppPreferences::setFixedSyntaxThemeId(const QString &themeId)
-{
-    m_fixedSyntaxThemeId = validatedFixedThemeId(themeId, m_darkSyntaxThemeId);
-}
-
-void AppPreferences::setSyntaxThemeFollowsSystem(bool follows, bool systemDark)
-{
-    if (!follows)
-        m_fixedSyntaxThemeId = systemDark ? m_darkSyntaxThemeId : m_lightSyntaxThemeId;
-    m_syntaxThemeFollowsSystem = follows;
-}
-
 QString AppPreferences::currentSyntaxThemeId(bool systemDark) const
 {
-    if (!m_syntaxThemeFollowsSystem)
-        return m_fixedSyntaxThemeId;
     return systemDark ? m_darkSyntaxThemeId : m_lightSyntaxThemeId;
 }

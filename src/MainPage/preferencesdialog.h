@@ -35,7 +35,6 @@ private:
     void loadFromPreferences();
     void commit();
     void populateSyntaxThemeCombos();
-    void updateSyntaxThemeControls(bool followsSystem);
     void importSyntaxTheme();
     void openSyntaxThemeFolder();
 
@@ -43,13 +42,10 @@ private:
     QComboBox *m_textFontSize;
     QComboBox *m_codeFontCombo;
     QComboBox *m_codeFontSize;
-    QComboBox *m_syntaxThemeCombo;
     QComboBox *m_darkSyntaxThemeCombo;
     QComboBox *m_lightSyntaxThemeCombo;
-    QCheckBox *m_syntaxThemeFollowsSystem;
     QPushButton *m_importSyntaxThemeButton;
     QPushButton *m_openSyntaxThemeFolderButton;
-    QWidget *m_syntaxThemeRow = nullptr;
     QWidget *m_darkSyntaxThemeRow = nullptr;
     QWidget *m_lightSyntaxThemeRow = nullptr;
     QCheckBox *m_showFileTree;
