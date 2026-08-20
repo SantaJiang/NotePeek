@@ -49,22 +49,10 @@ class StatusLabel : public ClickableLabel
     Q_OBJECT
 
 public:
-    explicit StatusLabel(int size = 200, QWidget *parent = 0) : ClickableLabel(parent), preferredSize(size) {
+    explicit StatusLabel(QWidget *parent = nullptr) : ClickableLabel(parent) {
         // Since these get set a lot and plain text is always used go ahead and set the format
         setTextFormat(Qt::PlainText);
     }
-
-protected:
-    QSize sizeHint() const override {
-        QSize size = ClickableLabel::sizeHint();
-        size.setWidth(preferredSize);
-        return size;
-    }
-
-    QSize minimumSizeHint() const override { return QSize(); }
-
-private:
-    int preferredSize;
 };
 
 class QLabel;
@@ -76,6 +64,7 @@ public:
     explicit QsciEditorInfoStatusBar(QMainWindow *window);
     void refresh(QsciScintilla *editor);
     void connectToEditor(QsciScintilla *editor);
+    void reapplyTheme();
 
 signals:
     void customContextMenuRequestedForEOLLabel(const QPoint &pos);
@@ -89,7 +78,6 @@ private slots:
     void editorModificationChanged(bool modified);
 
 private:
-    void updateDocumentSize(QsciScintilla *editor);
     void updateSelectionInfo(QsciScintilla *editor);
     void updateLanguage(QsciScintilla *editor);
     void updateEol(QsciScintilla *editor);
@@ -97,7 +85,6 @@ private:
     void applyChromeTheme();
 
     QLabel *docType;
-    QLabel *docSize;
     QLabel *docPos;
     QLabel *eolFormat;
     QLabel *unicodeType;

@@ -479,6 +479,8 @@ void MainWindow::reapplyChromeTheme()
     const QScopedValueRollback<bool> guard(m_reapplyingChromeTheme, true);
     applyEditorSplitterStyle(ui->editorSplitter);
     applyMainWindowSeparatorStyle(this);
+    ui->statusbar->reapplyTheme();
+    ui->widget_findreplace->reapplyTheme();
     m_fileExplorerDock->reapplyTheme();
     m_searchResultsDock->reapplyTheme();
     m_editorCoordinator->reapplyThemeToEditorPanes();
@@ -648,7 +650,7 @@ void MainWindow::applyPreferences()
     // to files opened afterwards, as before.
     m_editorCoordinator->applyFontPreferencesToEditors();
     m_editorCoordinator->applyCodeFeaturePreferencesToEditors();
-    m_editorCoordinator->reapplyThemeToEditorPanes();
+    reapplyChromeTheme();
     m_editorCoordinator->refreshVisibleMarkdownPreviews();
     ui->statusbar->setVisible(AppPreferences::instance().showStatusBar());
     if (CustomEditor *editor = activeController()->currentEditor())

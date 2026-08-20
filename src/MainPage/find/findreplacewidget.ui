@@ -315,8 +315,14 @@
       <widget class="QToolButton" name="buttonWrapAround">
        <property name="minimumSize">
         <size>
-         <width>26</width>
-         <height>26</height>
+         <width>22</width>
+         <height>22</height>
+        </size>
+       </property>
+       <property name="maximumSize">
+        <size>
+         <width>22</width>
+         <height>22</height>
         </size>
        </property>
        <property name="checkable">
@@ -331,8 +337,14 @@
       <widget class="QToolButton" name="buttonMatchCase">
        <property name="minimumSize">
         <size>
-         <width>26</width>
-         <height>26</height>
+         <width>22</width>
+         <height>22</height>
+        </size>
+       </property>
+       <property name="maximumSize">
+        <size>
+         <width>22</width>
+         <height>22</height>
         </size>
        </property>
        <property name="checkable">
@@ -347,8 +359,14 @@
       <widget class="QToolButton" name="buttonMatchWholeWord">
        <property name="minimumSize">
         <size>
-         <width>26</width>
-         <height>26</height>
+         <width>22</width>
+         <height>22</height>
+        </size>
+       </property>
+       <property name="maximumSize">
+        <size>
+         <width>22</width>
+         <height>22</height>
         </size>
        </property>
        <property name="checkable">
@@ -363,8 +381,14 @@
       <widget class="QToolButton" name="buttonBackwardsDirection">
        <property name="minimumSize">
         <size>
-         <width>26</width>
-         <height>26</height>
+         <width>22</width>
+         <height>22</height>
+        </size>
+       </property>
+       <property name="maximumSize">
+        <size>
+         <width>22</width>
+         <height>22</height>
         </size>
        </property>
        <property name="checkable">

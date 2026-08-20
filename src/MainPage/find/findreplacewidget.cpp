@@ -1,13 +1,27 @@
 #include "find/findreplacewidget.h"
 #include "ui_findreplacewidget.h"
+#include "apppreferences.h"
 #include "find/findreplacemanager.h"
 #include "themecolors.h"
 #include "widgets/iconfont.h"
+#include <NotePeek/syntaxtheme.h>
 #include <QEvent>
 #include <QKeyEvent>
 #include <QLineEdit>
 #include <QToolButton>
 #include <QTimer>
+
+namespace {
+
+QColor currentSyntaxThemeBackground()
+{
+    const bool systemDark = ThemeColors::isDarkMode();
+    const NotePeek::SyntaxTheme theme = NotePeek::SyntaxThemeCatalog::theme(
+        AppPreferences::instance().currentSyntaxThemeId(systemDark), systemDark);
+    return theme.editorColor(QStringLiteral("background"), ThemeColors::Editor::background());
+}
+
+} // namespace
 
 FindReplaceWidget::FindReplaceWidget(QWidget *parent)
     : QWidget(parent)
@@ -117,12 +131,17 @@ void FindReplaceWidget::applyChromeTheme()
           hoverBg().name(QColor::HexRgb),
           pressedBg().name(QColor::HexRgb),
           background().name(QColor::HexRgb),
-          ThemeColors::FileTree::background().name(QColor::HexRgb));
+          currentSyntaxThemeBackground().name(QColor::HexRgb));
 
     if (styleSheet() != style)
     {
         setStyleSheet(style);
     }
+}
+
+void FindReplaceWidget::reapplyTheme()
+{
+    applyChromeTheme();
 }
 
 void FindReplaceWidget::changeEvent(QEvent *event)

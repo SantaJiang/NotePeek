@@ -1,5 +1,8 @@
 #include "widgets/searchresultsdock.h"
+#include "apppreferences.h"
 #include "widgets/iconfont.h"
+
+#include <NotePeek/syntaxtheme.h>
 
 #include <QApplication>
 #include <QDir>
@@ -26,6 +29,14 @@
 #include "themecolors.h"
 
 namespace {
+
+QColor currentSyntaxThemeBackground()
+{
+    const bool systemDark = ThemeColors::isDarkMode();
+    const NotePeek::SyntaxTheme theme = NotePeek::SyntaxThemeCatalog::theme(
+        AppPreferences::instance().currentSyntaxThemeId(systemDark), systemDark);
+    return theme.editorColor(QStringLiteral("background"), ThemeColors::Editor::background());
+}
 
 enum ItemDataRole
 {
@@ -174,7 +185,6 @@ SearchResultsDock::SearchResultsDock(QWidget *parent)
     m_searchButton->setObjectName(QStringLiteral("searchResultsSearchButton"));
     m_searchButton->setToolButtonStyle(Qt::ToolButtonTextOnly);
 
-    m_patternEdit->setPlaceholderText(tr("Search in files..."));
     m_patternEdit->setObjectName(QStringLiteral("searchResultsPatternEdit"));
     m_patternEdit->setClearButtonEnabled(true);
 
@@ -310,10 +320,10 @@ void SearchResultsDock::reapplyTheme()
         m_searchButton->setStyleSheet(searchButtonStyle);
     }
 
-    const QString fileTreeBg = ThemeColors::FileTree::background().name(QColor::HexRgb);
+    const QString editorBg = currentSyntaxThemeBackground().name(QColor::HexRgb);
     const QString inputStyle = QStringLiteral(
         "QLineEdit { background-color: %1; }"
-    ).arg(fileTreeBg);
+    ).arg(editorBg);
     if (m_dock->widget()->styleSheet() != inputStyle)
     {
         m_dock->widget()->setStyleSheet(inputStyle);
@@ -321,7 +331,7 @@ void SearchResultsDock::reapplyTheme()
 
     const QString treeStyle = QStringLiteral(
         "QTreeWidget { background-color: %1; }"
-    ).arg(fileTreeBg);
+    ).arg(editorBg);
     if (m_resultsTree->styleSheet() != treeStyle)
     {
         m_resultsTree->setStyleSheet(treeStyle);

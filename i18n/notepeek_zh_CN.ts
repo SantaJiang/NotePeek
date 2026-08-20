@@ -388,22 +388,22 @@
         <translation>查找：</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/find/findreplacewidget.ui" line="326"/>
+        <location filename="../src/MainPage/find/findreplacewidget.ui" line="332"/>
         <source>↻</source>
         <translation>↻</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/find/findreplacewidget.ui" line="342"/>
+        <location filename="../src/MainPage/find/findreplacewidget.ui" line="354"/>
         <source>Aa</source>
         <translation>Aa</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/find/findreplacewidget.ui" line="358"/>
+        <location filename="../src/MainPage/find/findreplacewidget.ui" line="376"/>
         <source>W</source>
         <translation>W</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/find/findreplacewidget.ui" line="374"/>
+        <location filename="../src/MainPage/find/findreplacewidget.ui" line="398"/>
         <source>←</source>
         <translation>←</translation>
     </message>
@@ -413,62 +413,62 @@
         <translation>替换为：</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/find/findreplacewidget.cpp" line="29"/>
-        <location filename="../src/MainPage/find/findreplacewidget.cpp" line="30"/>
+        <location filename="../src/MainPage/find/findreplacewidget.cpp" line="43"/>
+        <location filename="../src/MainPage/find/findreplacewidget.cpp" line="44"/>
         <source>Close find and replace</source>
         <translation>关闭查找和替换</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/find/findreplacewidget.cpp" line="31"/>
+        <location filename="../src/MainPage/find/findreplacewidget.cpp" line="45"/>
         <source>Find next</source>
         <translation>查找下一个</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/find/findreplacewidget.cpp" line="32"/>
+        <location filename="../src/MainPage/find/findreplacewidget.cpp" line="46"/>
         <source>Replace current match</source>
         <translation>替换当前匹配项</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/find/findreplacewidget.cpp" line="33"/>
+        <location filename="../src/MainPage/find/findreplacewidget.cpp" line="47"/>
         <source>Replace all matches</source>
         <translation>替换所有匹配项</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/find/findreplacewidget.cpp" line="34"/>
+        <location filename="../src/MainPage/find/findreplacewidget.cpp" line="48"/>
         <source>Advanced search</source>
         <translation>高级搜索</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/find/findreplacewidget.cpp" line="35"/>
+        <location filename="../src/MainPage/find/findreplacewidget.cpp" line="49"/>
         <source>Search text</source>
         <translation>搜索文本</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/find/findreplacewidget.cpp" line="36"/>
+        <location filename="../src/MainPage/find/findreplacewidget.cpp" line="50"/>
         <source>Replacement text</source>
         <translation>替换文本</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/find/findreplacewidget.cpp" line="45"/>
-        <location filename="../src/MainPage/find/findreplacewidget.cpp" line="46"/>
+        <location filename="../src/MainPage/find/findreplacewidget.cpp" line="59"/>
+        <location filename="../src/MainPage/find/findreplacewidget.cpp" line="60"/>
         <source>Wrap around</source>
         <translation>循环搜索</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/find/findreplacewidget.cpp" line="47"/>
-        <location filename="../src/MainPage/find/findreplacewidget.cpp" line="48"/>
+        <location filename="../src/MainPage/find/findreplacewidget.cpp" line="61"/>
+        <location filename="../src/MainPage/find/findreplacewidget.cpp" line="62"/>
         <source>Match case</source>
         <translation>区分大小写</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/find/findreplacewidget.cpp" line="49"/>
-        <location filename="../src/MainPage/find/findreplacewidget.cpp" line="50"/>
+        <location filename="../src/MainPage/find/findreplacewidget.cpp" line="63"/>
+        <location filename="../src/MainPage/find/findreplacewidget.cpp" line="64"/>
         <source>Whole words only</source>
         <translation>全词匹配</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/find/findreplacewidget.cpp" line="51"/>
-        <location filename="../src/MainPage/find/findreplacewidget.cpp" line="52"/>
+        <location filename="../src/MainPage/find/findreplacewidget.cpp" line="65"/>
+        <location filename="../src/MainPage/find/findreplacewidget.cpp" line="66"/>
         <source>Search backwards</source>
         <translation>反向搜索</translation>
     </message>
@@ -477,7 +477,7 @@
     <name>MainWindow</name>
     <message>
         <location filename="../src/MainPage/mainwindow.ui" line="14"/>
-        <location filename="../src/MainPage/mainwindow.cpp" line="999"/>
+        <location filename="../src/MainPage/mainwindow.cpp" line="1001"/>
         <source>NotePeek</source>
         <translation></translation>
     </message>
@@ -523,7 +523,7 @@
     </message>
     <message>
         <location filename="../src/MainPage/mainwindow.ui" line="145"/>
-        <location filename="../src/MainPage/mainwindow.cpp" line="560"/>
+        <location filename="../src/MainPage/mainwindow.cpp" line="562"/>
         <source>Open File</source>
         <translation>打开文件</translation>
     </message>
@@ -619,7 +619,7 @@
     </message>
     <message>
         <location filename="../src/MainPage/mainwindow.ui" line="279"/>
-        <location filename="../src/MainPage/mainwindow.cpp" line="820"/>
+        <location filename="../src/MainPage/mainwindow.cpp" line="822"/>
         <source>Format Code</source>
         <translation>格式化代码</translation>
     </message>
@@ -759,12 +759,12 @@
         <translation>转换编码并保存</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/mainwindow.cpp" line="572"/>
+        <location filename="../src/MainPage/mainwindow.cpp" line="574"/>
         <source>Open Directory...</source>
         <translation>打开文件夹...</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/mainwindow.cpp" line="821"/>
+        <location filename="../src/MainPage/mainwindow.cpp" line="823"/>
         <source>Could not format %1.
 
 %2</source>
@@ -773,42 +773,42 @@
 %2</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/mainwindow.cpp" line="931"/>
+        <location filename="../src/MainPage/mainwindow.cpp" line="933"/>
         <source>Export Markdown to PDF</source>
         <translation>将 Markdown 导出为 PDF</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/mainwindow.cpp" line="933"/>
+        <location filename="../src/MainPage/mainwindow.cpp" line="935"/>
         <source>PDF Files (*.pdf)</source>
         <translation>PDF 文件 (*.pdf)</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/mainwindow.cpp" line="947"/>
+        <location filename="../src/MainPage/mainwindow.cpp" line="949"/>
         <source>Export Failed</source>
         <translation>导出失败</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/mainwindow.cpp" line="948"/>
+        <location filename="../src/MainPage/mainwindow.cpp" line="950"/>
         <source>Could not export Markdown to PDF.</source>
         <translation>无法将 Markdown 导出为 PDF。</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/mainwindow.cpp" line="1007"/>
+        <location filename="../src/MainPage/mainwindow.cpp" line="1009"/>
         <source>%1 - %2</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="../src/MainPage/mainwindow.cpp" line="1043"/>
+        <location filename="../src/MainPage/mainwindow.cpp" line="1045"/>
         <source>Format this file with %1</source>
         <translation>使用 %1 格式化此文件</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/mainwindow.cpp" line="1044"/>
+        <location filename="../src/MainPage/mainwindow.cpp" line="1046"/>
         <source>No code formatter is available for this file.</source>
         <translation>此文件没有可用的代码格式化程序。</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/mainwindow.cpp" line="1002"/>
+        <location filename="../src/MainPage/mainwindow.cpp" line="1004"/>
         <source>%1 - %2[*]</source>
         <translation></translation>
     </message>
@@ -818,7 +818,7 @@
         <translation>未安装 Emoji 字体</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/mainwindow.cpp" line="619"/>
+        <location filename="../src/MainPage/mainwindow.cpp" line="621"/>
         <source>For Yueyue</source>
         <translation>致玥玥</translation>
     </message>
@@ -1100,58 +1100,48 @@
 <context>
     <name>QsciEditorInfoStatusBar</name>
     <message>
-        <location filename="../src/MainPage/widgets/qscieditorinfostatusbar.cpp" line="171"/>
-        <source>Length: %1    Lines: %2</source>
-        <translation>长度: %1    行数: %2</translation>
+        <location filename="../src/MainPage/widgets/qscieditorinfostatusbar.cpp" line="177"/>
+        <source>Line %1, Column %2</source>
+        <translation>行%1，列%2</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/widgets/qscieditorinfostatusbar.cpp" line="197"/>
-        <source>Sel: %1 | %2</source>
-        <translation>选择: %1 | %2</translation>
+        <location filename="../src/MainPage/widgets/qscieditorinfostatusbar.cpp" line="187"/>
+        <source>Line %1, Column %2 (Selected %3)</source>
+        <translation>行%1，列%2(已选择%3)</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/widgets/qscieditorinfostatusbar.cpp" line="201"/>
-        <source>Sel: 0 | 0</source>
-        <translation>选择: 0 | 0</translation>
-    </message>
-    <message>
-        <location filename="../src/MainPage/widgets/qscieditorinfostatusbar.cpp" line="206"/>
-        <source>Ln: %1    Col: %2    </source>
-        <translation>行: %1    列: %2    </translation>
-    </message>
-    <message>
-        <location filename="../src/MainPage/widgets/qscieditorinfostatusbar.cpp" line="219"/>
+        <location filename="../src/MainPage/widgets/qscieditorinfostatusbar.cpp" line="202"/>
         <source>Plain Text</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="../src/MainPage/widgets/qscieditorinfostatusbar.cpp" line="228"/>
+        <location filename="../src/MainPage/widgets/qscieditorinfostatusbar.cpp" line="211"/>
         <source>Mixed line endings</source>
         <translation>混合换行符</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/widgets/qscieditorinfostatusbar.cpp" line="235"/>
+        <location filename="../src/MainPage/widgets/qscieditorinfostatusbar.cpp" line="218"/>
         <source>Windows (CR LF)</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="../src/MainPage/widgets/qscieditorinfostatusbar.cpp" line="238"/>
+        <location filename="../src/MainPage/widgets/qscieditorinfostatusbar.cpp" line="221"/>
         <source>Unix (LF)</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="../src/MainPage/widgets/qscieditorinfostatusbar.cpp" line="241"/>
+        <location filename="../src/MainPage/widgets/qscieditorinfostatusbar.cpp" line="224"/>
         <source>Macintosh (CR)</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="../src/MainPage/widgets/qscieditorinfostatusbar.cpp" line="244"/>
-        <location filename="../src/MainPage/widgets/qscieditorinfostatusbar.cpp" line="258"/>
+        <location filename="../src/MainPage/widgets/qscieditorinfostatusbar.cpp" line="227"/>
+        <location filename="../src/MainPage/widgets/qscieditorinfostatusbar.cpp" line="241"/>
         <source>Unknown</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="../src/MainPage/widgets/qscieditorinfostatusbar.cpp" line="258"/>
+        <location filename="../src/MainPage/widgets/qscieditorinfostatusbar.cpp" line="241"/>
         <source>UTF-8</source>
         <translation></translation>
     </message>
@@ -1159,76 +1149,71 @@
 <context>
     <name>SearchResultsDock</name>
     <message>
-        <location filename="../src/MainPage/widgets/searchresultsdock.cpp" line="163"/>
-        <location filename="../src/MainPage/widgets/searchresultsdock.cpp" line="227"/>
+        <location filename="../src/MainPage/widgets/searchresultsdock.cpp" line="174"/>
+        <location filename="../src/MainPage/widgets/searchresultsdock.cpp" line="237"/>
         <source>Search Results</source>
         <translation>搜索结果</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/widgets/searchresultsdock.cpp" line="173"/>
-        <location filename="../src/MainPage/widgets/searchresultsdock.cpp" line="474"/>
+        <location filename="../src/MainPage/widgets/searchresultsdock.cpp" line="184"/>
+        <location filename="../src/MainPage/widgets/searchresultsdock.cpp" line="484"/>
         <source>Search</source>
         <translation>搜索</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/widgets/searchresultsdock.cpp" line="177"/>
-        <source>Search in files...</source>
-        <translation>在文件中搜索...</translation>
-    </message>
-    <message>
-        <location filename="../src/MainPage/widgets/searchresultsdock.cpp" line="183"/>
+        <location filename="../src/MainPage/widgets/searchresultsdock.cpp" line="193"/>
         <source>Match case</source>
         <translation>区分大小写</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/widgets/searchresultsdock.cpp" line="188"/>
+        <location filename="../src/MainPage/widgets/searchresultsdock.cpp" line="198"/>
         <source>Whole words only</source>
         <translation>全字匹配</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/widgets/searchresultsdock.cpp" line="232"/>
-        <location filename="../src/MainPage/widgets/searchresultsdock.cpp" line="233"/>
+        <location filename="../src/MainPage/widgets/searchresultsdock.cpp" line="242"/>
+        <location filename="../src/MainPage/widgets/searchresultsdock.cpp" line="243"/>
         <source>Close search results</source>
         <translation>关闭搜索结果</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/widgets/searchresultsdock.cpp" line="357"/>
-        <location filename="../src/MainPage/widgets/searchresultsdock.cpp" line="434"/>
+        <location filename="../src/MainPage/widgets/searchresultsdock.cpp" line="367"/>
+        <location filename="../src/MainPage/widgets/searchresultsdock.cpp" line="444"/>
         <source>Search canceled.</source>
         <translation>搜索已取消。</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/widgets/searchresultsdock.cpp" line="369"/>
+        <location filename="../src/MainPage/widgets/searchresultsdock.cpp" line="379"/>
         <source>Open a directory first to search in files.</source>
         <translation>请先打开一个目录再进行文件搜索。</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/widgets/searchresultsdock.cpp" line="375"/>
+        <location filename="../src/MainPage/widgets/searchresultsdock.cpp" line="385"/>
         <source>Searching in %1...</source>
         <translation>正在 %1 中搜索...</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/widgets/searchresultsdock.cpp" line="409"/>
+        <location filename="../src/MainPage/widgets/searchresultsdock.cpp" line="419"/>
         <source>Line %1: %2</source>
         <translation>第 %1 行：%2</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/widgets/searchresultsdock.cpp" line="426"/>
+        <location filename="../src/MainPage/widgets/searchresultsdock.cpp" line="436"/>
         <source>%1 (%2)</source>
         <translation>%1 (%2)</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/widgets/searchresultsdock.cpp" line="438"/>
+        <location filename="../src/MainPage/widgets/searchresultsdock.cpp" line="448"/>
         <source>Showing the first %1 matches; refine the search to see the rest.</source>
         <translation>仅显示前 %1 处匹配；请缩小搜索范围以查看其余结果。</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/widgets/searchresultsdock.cpp" line="443"/>
+        <location filename="../src/MainPage/widgets/searchresultsdock.cpp" line="453"/>
         <source>%1 match(es) in %2 file(s).</source>
         <translation>在 %2 个文件中找到 %1 处匹配。</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/widgets/searchresultsdock.cpp" line="474"/>
+        <location filename="../src/MainPage/widgets/searchresultsdock.cpp" line="484"/>
         <source>Cancel</source>
         <translation>取消</translation>
     </message>

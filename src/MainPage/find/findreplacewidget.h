@@ -26,6 +26,7 @@ public:
     void refreshHighlights();
     void findNext();
     void setFocus();
+    void reapplyTheme();
 
 public slots:
     void find();

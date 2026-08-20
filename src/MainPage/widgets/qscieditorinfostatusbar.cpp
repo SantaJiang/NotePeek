@@ -28,8 +28,7 @@
 
 namespace {
 
-// Kept equal on both ends so the row is not visually heavier on one side.
-constexpr int kEdgePadding = 12;
+constexpr int kItemSpacing = 15;
 
 } // namespace
 
@@ -38,23 +37,28 @@ QsciEditorInfoStatusBar::QsciEditorInfoStatusBar(QMainWindow *window)
 {
     setAttribute(Qt::WA_StyledBackground, true);
 
-    auto *leftPadding = new QWidget(this);
-    leftPadding->setFixedWidth(kEdgePadding);
-    addWidget(leftPadding, 0);
-
-    docType = new StatusLabel(120);
-    addWidget(docType, 1);
-
-    docPos = new StatusLabel(270);
-    docPos->setContentsMargins(6, 0, 6, 0);
+    docPos = new StatusLabel(this);
+    docPos->setObjectName(QStringLiteral("statusDocumentPosition"));
     addPermanentWidget(docPos, 0);
 
-    docSize = new StatusLabel(215);
-    docSize->setContentsMargins(6, 0, 6, 0);
-    addPermanentWidget(docSize, 0);
+    auto addItemSpacing = [this](const QString &objectName) {
+        auto *spacing = new QWidget(this);
+        spacing->setObjectName(objectName);
+        spacing->setFixedWidth(kItemSpacing);
+        addPermanentWidget(spacing, 0);
+    };
 
-    eolFormat = new StatusLabel(165);
-    eolFormat->setContentsMargins(6, 0, 6, 0);
+    addItemSpacing(QStringLiteral("statusSpacingAfterPosition"));
+
+    // Size naturally so the compact group only occupies the space it needs.
+    unicodeType = new StatusLabel(this);
+    unicodeType->setObjectName(QStringLiteral("statusEncoding"));
+    addPermanentWidget(unicodeType, 0);
+
+    addItemSpacing(QStringLiteral("statusSpacingAfterEncoding"));
+
+    eolFormat = new StatusLabel(this);
+    eolFormat->setObjectName(QStringLiteral("statusLineEnding"));
     addPermanentWidget(eolFormat, 0);
     eolFormat->setContextMenuPolicy(Qt::CustomContextMenu);
     connect(eolFormat, &StatusLabel::customContextMenuRequested, this, [=](const QPoint &pos)
@@ -62,16 +66,11 @@ QsciEditorInfoStatusBar::QsciEditorInfoStatusBar(QMainWindow *window)
         emit customContextMenuRequestedForEOLLabel(eolFormat->mapToGlobal(pos));
     });
 
-    // Wide enough for the longest label offered ("ISO-8859-1").
-    unicodeType = new StatusLabel(90);
-    unicodeType->setContentsMargins(6, 0, 6, 0);
-    addPermanentWidget(unicodeType, 0);
+    addItemSpacing(QStringLiteral("statusSpacingAfterLineEnding"));
 
-    // Balances leftPadding: the labels' own 6px margin alone would leave the
-    // last entry looking pinned to the window edge.
-    auto *rightPadding = new QWidget(this);
-    rightPadding->setFixedWidth(kEdgePadding - 6);
-    addPermanentWidget(rightPadding, 0);
+    docType = new StatusLabel(this);
+    docType->setObjectName(QStringLiteral("statusDocumentType"));
+    addPermanentWidget(docType, 0);
 
     applyChromeTheme();
 }
@@ -80,7 +79,6 @@ void QsciEditorInfoStatusBar::refresh(QsciScintilla *editor)
 {
     if (!editor) return;
 
-    updateDocumentSize(editor);
     updateSelectionInfo(editor);
     updateLanguage(editor);
     updateEol(editor);
@@ -122,7 +120,6 @@ void QsciEditorInfoStatusBar::editorTextChanged()
 {
     if (currentEditor)
     {
-        updateDocumentSize(currentEditor);
         updateSelectionInfo(currentEditor);
     }
 }
@@ -140,11 +137,14 @@ void QsciEditorInfoStatusBar::applyChromeTheme()
     const QString styleSheet = QStringLiteral(
         "QStatusBar {"
         "  background-color: %1;"
+        "  color: %3;"
         "  border-top: 1px solid %2;"
         "}"
+        "QStatusBar QLabel { color: %3; }"
         "QStatusBar::item { border: none; }"
     ).arg(background().name(QColor::HexRgb),
-          border().name(QColor::HexRgb));
+          border().name(QColor::HexRgb),
+          text().name(QColor::HexRgb));
 
     // setStyleSheet() repolishes the widget and can synchronously emit another
     // PaletteChange. Avoid reapplying an identical sheet during theme changes.
@@ -152,6 +152,11 @@ void QsciEditorInfoStatusBar::applyChromeTheme()
     {
         setStyleSheet(styleSheet);
     }
+}
+
+void QsciEditorInfoStatusBar::reapplyTheme()
+{
+    applyChromeTheme();
 }
 
 void QsciEditorInfoStatusBar::changeEvent(QEvent *event)
@@ -166,45 +171,26 @@ void QsciEditorInfoStatusBar::changeEvent(QEvent *event)
     }
 }
 
-void QsciEditorInfoStatusBar::updateDocumentSize(QsciScintilla *editor)
-{
-    QString sizeText = tr("Length: %1    Lines: %2")
-                       .arg(editor->SendScintilla(QsciScintillaBase::SCI_GETLENGTH))
-                       .arg(editor->lines());
-    docSize->setText(sizeText);
-}
-
 void QsciEditorInfoStatusBar::updateSelectionInfo(QsciScintilla *editor)
 {
-    QString selectionText;
-    int lineFrom, indexFrom, lineTo, indexTo;
-
-    editor->getSelection(&lineFrom, &indexFrom, &lineTo, &indexTo);
-
-    if (editor->hasSelectedText())
-    {
-        const int start = editor->positionFromLineIndex(lineFrom, indexFrom);
-        const int end = editor->positionFromLineIndex(lineTo, indexTo);
-        const int chars = qMax(0, end - start);
-        int lines = 1;
-
-        // Count lines in selection
-        if (lineTo > lineFrom)
-        {
-            lines = lineTo - lineFrom + 1;
-        }
-
-        selectionText = tr("Sel: %1 | %2").arg(chars).arg(lines);
-    }
-    else
-    {
-        selectionText = tr("Sel: 0 | 0");
-    }
-
     int line, index;
     editor->getCursorPosition(&line, &index);
-    QString positionText = tr("Ln: %1    Col: %2    ").arg(line + 1).arg(index + 1);
-    docPos->setText(positionText + selectionText);
+    if (!editor->hasSelectedText())
+    {
+        docPos->setText(tr("Line %1, Column %2").arg(line + 1).arg(index + 1));
+        return;
+    }
+
+    int lineFrom, indexFrom, lineTo, indexTo;
+    editor->getSelection(&lineFrom, &indexFrom, &lineTo, &indexTo);
+    const int start = editor->positionFromLineIndex(lineFrom, indexFrom);
+    const int end = editor->positionFromLineIndex(lineTo, indexTo);
+    const int selectedCharacters = static_cast<int>(editor->SendScintilla(
+        QsciScintillaBase::SCI_COUNTCHARACTERS, qMin(start, end), qMax(start, end)));
+    docPos->setText(tr("Line %1, Column %2 (Selected %3)")
+                        .arg(line + 1)
+                        .arg(index + 1)
+                        .arg(selectedCharacters));
 }
 
 void QsciEditorInfoStatusBar::updateLanguage(QsciScintilla *editor)

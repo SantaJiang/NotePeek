@@ -5,11 +5,13 @@
 #include <QDockWidget>
 #include <QMainWindow>
 #include <QLineEdit>
+#include <QLabel>
 #include <QMessageBox>
 #include <QPushButton>
 #include <QToolButton>
 #include <QSignalSpy>
 #include <QScrollBar>
+#include <QStringList>
 #include <QTimer>
 #include <QTemporaryDir>
 #include <QTreeWidget>
@@ -198,6 +200,68 @@ private slots:
         FindReplaceWidget findReplace;
         QVERIFY(findReplace.styleSheet().contains(
             ThemeColors::EditorTopBar::background().name(QColor::HexRgb)));
+        const bool systemDark = ThemeColors::isDarkMode();
+        const NotePeek::SyntaxTheme syntaxTheme = NotePeek::SyntaxThemeCatalog::theme(
+            AppPreferences::instance().currentSyntaxThemeId(systemDark), systemDark);
+        const QString syntaxBackground = syntaxTheme.editorColor(
+            QStringLiteral("background"), ThemeColors::Editor::background())
+                                             .name(QColor::HexRgb);
+        QVERIFY(findReplace.styleSheet().contains(syntaxBackground));
+    }
+
+    void statusBarUsesCompactRightAlignedDocumentInfo()
+    {
+        MainWindow window;
+        window.resize(900, 600);
+        window.show();
+        QApplication::processEvents();
+
+        auto *statusBar = window.findChild<QsciEditorInfoStatusBar *>();
+        auto *editor = window.findChild<CustomEditor *>();
+        auto *position = statusBar
+            ? statusBar->findChild<QLabel *>(QStringLiteral("statusDocumentPosition"))
+            : nullptr;
+        auto *encoding = statusBar
+            ? statusBar->findChild<QLabel *>(QStringLiteral("statusEncoding"))
+            : nullptr;
+        auto *lineEnding = statusBar
+            ? statusBar->findChild<QLabel *>(QStringLiteral("statusLineEnding"))
+            : nullptr;
+        auto *documentType = statusBar
+            ? statusBar->findChild<QLabel *>(QStringLiteral("statusDocumentType"))
+            : nullptr;
+        const QStringList spacingObjectNames = {
+            QStringLiteral("statusSpacingAfterPosition"),
+            QStringLiteral("statusSpacingAfterEncoding"),
+            QStringLiteral("statusSpacingAfterLineEnding")
+        };
+        QVERIFY(statusBar);
+        QVERIFY(editor);
+        QVERIFY(position);
+        QVERIFY(encoding);
+        QVERIFY(lineEnding);
+        QVERIFY(documentType);
+
+        editor->setText(QStringLiteral("alpha\nbeta"));
+        editor->setCursorPosition(1, 2);
+        statusBar->refresh(editor);
+        QCOMPARE(position->text(), QStringLiteral("Line 2, Column 3"));
+
+        editor->setSelection(0, 1, 0, 4);
+        statusBar->refresh(editor);
+        QCOMPARE(position->text(), QStringLiteral("Line 1, Column 5 (Selected 3)"));
+
+        QVERIFY(position->geometry().left() < encoding->geometry().left());
+        QVERIFY(encoding->geometry().left() < lineEnding->geometry().left());
+        QVERIFY(lineEnding->geometry().left() < documentType->geometry().left());
+        for (const QString &objectName : spacingObjectNames)
+        {
+            auto *spacing = statusBar->findChild<QWidget *>(objectName);
+            QVERIFY(spacing);
+            QCOMPARE(spacing->width(), 15);
+        }
+        QVERIFY(statusBar->styleSheet().contains(
+            ThemeColors::EditorTopBar::text().name(QColor::HexRgb)));
     }
 
     void usesUntranslatedNameForUntitledDocuments()
@@ -456,15 +520,26 @@ private slots:
         auto *caseButton = dockWidget->findChild<QToolButton *>(QStringLiteral("searchResultsCaseButton"));
         auto *wholeWordButton = dockWidget->findChild<QToolButton *>(QStringLiteral("searchResultsWholeWordButton"));
         auto *searchButton = dockWidget->findChild<QToolButton *>(QStringLiteral("searchResultsSearchButton"));
+        auto *resultsTree = dockWidget->findChild<QTreeWidget *>();
         QVERIFY(titleBar);
         QVERIFY(closeButton);
         QVERIFY(patternEdit);
+        QVERIFY(patternEdit->placeholderText().isEmpty());
         QVERIFY(!excludeEdit);
         QVERIFY(caseButton);
         QVERIFY(wholeWordButton);
         QVERIFY(searchButton);
+        QVERIFY(resultsTree);
         QVERIFY(!titleBar->styleSheet().isEmpty());
         QVERIFY(!searchButton->styleSheet().isEmpty());
+        const bool systemDark = ThemeColors::isDarkMode();
+        const NotePeek::SyntaxTheme syntaxTheme = NotePeek::SyntaxThemeCatalog::theme(
+            AppPreferences::instance().currentSyntaxThemeId(systemDark), systemDark);
+        const QString syntaxBackground = syntaxTheme.editorColor(
+            QStringLiteral("background"), ThemeColors::Editor::background())
+                                             .name(QColor::HexRgb);
+        QVERIFY(dockWidget->widget()->styleSheet().contains(syntaxBackground));
+        QVERIFY(resultsTree->styleSheet().contains(syntaxBackground));
         QCOMPARE(caseButton->height(), patternEdit->sizeHint().height());
         QCOMPARE(wholeWordButton->height(), patternEdit->sizeHint().height());
 
@@ -485,6 +560,14 @@ private slots:
         QCOMPARE(findWholeWordButton->text(), QStringLiteral("W"));
         QVERIFY(backwardsButton->isCheckable());
         QCOMPARE(backwardsButton->text(), QStringLiteral("←"));
+        const QList<QToolButton *> compactFindOptions = {
+            wrapButton, findCaseButton, findWholeWordButton, backwardsButton
+        };
+        for (QToolButton *button : compactFindOptions)
+        {
+            QCOMPARE(button->minimumSize(), QSize(22, 22));
+            QCOMPARE(button->maximumSize(), QSize(22, 22));
+        }
 
         auto *advancedButton = findReplace->findChild<QToolButton *>(QStringLiteral("buttonAdvanced"));
         QVERIFY(advancedButton);
