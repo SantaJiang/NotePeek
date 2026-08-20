@@ -1,7 +1,6 @@
 #include "editor/customeditor.h"
 #include <QFrame>
 #include <QMimeData>
-#include <QPalette>
 
 namespace {
 constexpr int EditorContentPadding = 5;
@@ -12,13 +11,7 @@ CustomEditor::CustomEditor(QWidget *parent)
 {
     setAcceptDrops(true);
     setFrameShape(QFrame::NoFrame);
-    // The top content padding is outside Scintilla's viewport, so let the
-    // scroll area paint it with the same palette role as the viewport.
-    setBackgroundRole(QPalette::Base);
-    setAutoFillBackground(true);
     SendScintilla(QsciScintillaBase::SCI_SETMARGINLEFT, 0UL, EditorContentPadding);
-    // Padding the viewport keeps line height unchanged, unlike extra ascent.
-    setViewportMargins(0, EditorContentPadding, 0, 0);
 }
 
 void CustomEditor::setFilePath(const QString &path)

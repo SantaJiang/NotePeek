@@ -5,18 +5,15 @@
 #include <QFileInfo>
 #include <QSet>
 
-ProjectPathFilter::ProjectPathFilter(const QString &rootDirectory,
-                                     const QStringList &extraExcludeGlobs)
+ProjectPathFilter::ProjectPathFilter(const QString &rootDirectory)
     : m_rootDirectory(QDir::cleanPath(QFileInfo(rootDirectory).absoluteFilePath()))
 {
     QFile ignoreFile(QDir(m_rootDirectory).filePath(QStringLiteral(".gitignore")));
     if (ignoreFile.open(QFile::ReadOnly | QFile::Text))
     {
         while (!ignoreFile.atEnd())
-            appendRule(QString::fromUtf8(ignoreFile.readLine()).trimmed(), true);
+            appendRule(QString::fromUtf8(ignoreFile.readLine()).trimmed());
     }
-    for (const QString &pattern : extraExcludeGlobs)
-        appendRule(pattern.trimmed(), false);
 }
 
 bool ProjectPathFilter::isStandardIgnoredDirectoryName(const QString &name)
@@ -53,14 +50,14 @@ bool ProjectPathFilter::ignores(const QString &absolutePath, bool directory) con
     return ignored;
 }
 
-void ProjectPathFilter::appendRule(const QString &rawPattern, bool allowNegation)
+void ProjectPathFilter::appendRule(const QString &rawPattern)
 {
     QString pattern = QDir::fromNativeSeparators(rawPattern);
     if (pattern.isEmpty() || pattern.startsWith(QLatin1Char('#')))
         return;
 
     Rule rule;
-    if (allowNegation && pattern.startsWith(QLatin1Char('!')))
+    if (pattern.startsWith(QLatin1Char('!')))
     {
         rule.negated = true;
         pattern.remove(0, 1);

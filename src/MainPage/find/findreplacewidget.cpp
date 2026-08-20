@@ -42,14 +42,23 @@ FindReplaceWidget::FindReplaceWidget(QWidget *parent)
     connect(ui->comboFind->lineEdit(), &QLineEdit::textChanged, this, &FindReplaceWidget::onFindTextChanged);
     connect(ui->comboReplace->lineEdit(), &QLineEdit::textChanged, this, &FindReplaceWidget::onReplaceTextChanged);
 
-    connect(ui->checkBoxMatchCase, &QCheckBox::toggled, this, &FindReplaceWidget::onCaseSensitiveToggled);
-    connect(ui->checkBoxMatchWholeWord, &QCheckBox::toggled, this, &FindReplaceWidget::onWholeWordToggled);
-    connect(ui->checkBoxWrapAround, &QCheckBox::toggled, this, &FindReplaceWidget::onWrapAroundToggled);
-    connect(ui->checkBoxBackwardsDirection, &QCheckBox::toggled, this, &FindReplaceWidget::onBackwardsToggled);
+    ui->buttonWrapAround->setToolTip(tr("Wrap around"));
+    ui->buttonWrapAround->setAccessibleName(tr("Wrap around"));
+    ui->buttonMatchCase->setToolTip(tr("Match case"));
+    ui->buttonMatchCase->setAccessibleName(tr("Match case"));
+    ui->buttonMatchWholeWord->setToolTip(tr("Whole words only"));
+    ui->buttonMatchWholeWord->setAccessibleName(tr("Whole words only"));
+    ui->buttonBackwardsDirection->setToolTip(tr("Search backwards"));
+    ui->buttonBackwardsDirection->setAccessibleName(tr("Search backwards"));
+
+    connect(ui->buttonMatchCase, &QToolButton::toggled, this, &FindReplaceWidget::onCaseSensitiveToggled);
+    connect(ui->buttonMatchWholeWord, &QToolButton::toggled, this, &FindReplaceWidget::onWholeWordToggled);
+    connect(ui->buttonWrapAround, &QToolButton::toggled, this, &FindReplaceWidget::onWrapAroundToggled);
+    connect(ui->buttonBackwardsDirection, &QToolButton::toggled, this, &FindReplaceWidget::onBackwardsToggled);
 
     ui->comboFind->setCompleter(nullptr);
     ui->comboReplace->setCompleter(nullptr);
-    ui->checkBoxWrapAround->setChecked(true);
+    ui->buttonWrapAround->setChecked(true);
 }
 
 FindReplaceWidget::~FindReplaceWidget()
@@ -100,8 +109,7 @@ void FindReplaceWidget::applyChromeTheme()
         "}"
         "QLineEdit,"
         "QComboBox,"
-        "QComboBox QLineEdit,"
-        "QCheckBox::indicator {"
+        "QComboBox QLineEdit {"
         "  background-color: %6;"
         "}"
     ).arg(border().name(QColor::HexRgb),

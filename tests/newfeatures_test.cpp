@@ -298,7 +298,7 @@ private slots:
         QCOMPARE(alphaMatches, 2);
     }
 
-    void searchRespectsGitIgnoreAndExplicitExcludes()
+    void searchRespectsGitIgnore()
     {
         QTemporaryDir root;
         QVERIFY(root.isValid());
@@ -318,18 +318,18 @@ private slots:
 
         FileSearcher searcher;
         QSignalSpy finished(&searcher, &FileSearcher::searchFinished);
-        searcher.start(root.path(), QStringLiteral("needle"), true, false,
-                       {QStringLiteral("*.log")});
+        searcher.start(root.path(), QStringLiteral("needle"), true, false);
         QTRY_COMPARE(finished.count(), 1);
 
         const auto outcome = finished.takeFirst().first().value<FileSearchOutcome>();
-        QCOMPARE(outcome.summary.matchCount, 2);
+        QCOMPARE(outcome.summary.matchCount, 3);
         QStringList matchedFiles;
         for (const FileSearchMatch &match : outcome.matches)
             matchedFiles.append(QFileInfo(match.filePath).fileName());
         matchedFiles.sort();
         QCOMPARE(matchedFiles,
-                 QStringList({QStringLiteral("keep-generated.txt"),
+                 QStringList({QStringLiteral("explicit.log"),
+                              QStringLiteral("keep-generated.txt"),
                               QStringLiteral("keep.txt")}));
     }
 
@@ -452,12 +452,14 @@ private slots:
         auto *titleBar = dockWidget->findChild<QWidget *>(QStringLiteral("searchResultsTitleBar"));
         auto *closeButton = dockWidget->findChild<QToolButton *>(QStringLiteral("searchResultsCloseButton"));
         auto *patternEdit = dockWidget->findChild<QLineEdit *>(QStringLiteral("searchResultsPatternEdit"));
+        auto *excludeEdit = dockWidget->findChild<QLineEdit *>(QStringLiteral("searchResultsExcludeEdit"));
         auto *caseButton = dockWidget->findChild<QToolButton *>(QStringLiteral("searchResultsCaseButton"));
         auto *wholeWordButton = dockWidget->findChild<QToolButton *>(QStringLiteral("searchResultsWholeWordButton"));
         auto *searchButton = dockWidget->findChild<QToolButton *>(QStringLiteral("searchResultsSearchButton"));
         QVERIFY(titleBar);
         QVERIFY(closeButton);
         QVERIFY(patternEdit);
+        QVERIFY(!excludeEdit);
         QVERIFY(caseButton);
         QVERIFY(wholeWordButton);
         QVERIFY(searchButton);
@@ -465,6 +467,24 @@ private slots:
         QVERIFY(!searchButton->styleSheet().isEmpty());
         QCOMPARE(caseButton->height(), patternEdit->sizeHint().height());
         QCOMPARE(wholeWordButton->height(), patternEdit->sizeHint().height());
+
+        auto *wrapButton = findReplace->findChild<QToolButton *>(QStringLiteral("buttonWrapAround"));
+        auto *findCaseButton = findReplace->findChild<QToolButton *>(QStringLiteral("buttonMatchCase"));
+        auto *findWholeWordButton = findReplace->findChild<QToolButton *>(QStringLiteral("buttonMatchWholeWord"));
+        auto *backwardsButton = findReplace->findChild<QToolButton *>(QStringLiteral("buttonBackwardsDirection"));
+        QVERIFY(wrapButton);
+        QVERIFY(findCaseButton);
+        QVERIFY(findWholeWordButton);
+        QVERIFY(backwardsButton);
+        QVERIFY(wrapButton->isCheckable());
+        QVERIFY(wrapButton->isChecked());
+        QVERIFY(findCaseButton->isCheckable());
+        QVERIFY(findWholeWordButton->isCheckable());
+        QCOMPARE(wrapButton->text(), QStringLiteral("↻"));
+        QCOMPARE(findCaseButton->text(), QStringLiteral("Aa"));
+        QCOMPARE(findWholeWordButton->text(), QStringLiteral("W"));
+        QVERIFY(backwardsButton->isCheckable());
+        QCOMPARE(backwardsButton->text(), QStringLiteral("←"));
 
         auto *advancedButton = findReplace->findChild<QToolButton *>(QStringLiteral("buttonAdvanced"));
         QVERIFY(advancedButton);

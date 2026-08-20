@@ -4,15 +4,13 @@
 #include <QList>
 #include <QRegularExpression>
 #include <QString>
-#include <QStringList>
 
 // Shared project-tree exclusion policy. Built-in heavy directories are always
-// ignored; root .gitignore rules and caller-provided globs are applied in order.
+// ignored, and root .gitignore rules are applied in order.
 class ProjectPathFilter
 {
 public:
-    explicit ProjectPathFilter(const QString &rootDirectory = QString(),
-                               const QStringList &extraExcludeGlobs = {});
+    explicit ProjectPathFilter(const QString &rootDirectory = QString());
 
     bool ignores(const QString &absolutePath, bool directory) const;
     static bool isStandardIgnoredDirectoryName(const QString &name);
@@ -25,7 +23,7 @@ private:
         bool directoryOnly = false;
     };
 
-    void appendRule(const QString &pattern, bool allowNegation);
+    void appendRule(const QString &pattern);
     QString m_rootDirectory;
     QList<Rule> m_rules;
 };

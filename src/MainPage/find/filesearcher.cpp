@@ -9,6 +9,7 @@
 #include <QFile>
 #include <QFileInfo>
 #include <QFutureWatcher>
+#include <QStringList>
 #include <QStringDecoder>
 #include <QtConcurrent>
 
@@ -200,7 +201,6 @@ FileSearchOutcome runSearch(const QString &rootDirectory,
                             const QString &pattern,
                             bool caseSensitive,
                             bool wholeWord,
-                            const QStringList &excludeGlobs,
                             std::shared_ptr<std::atomic_bool> cancelRequested)
 {
     FileSearchOutcome outcome;
@@ -208,7 +208,7 @@ FileSearchOutcome runSearch(const QString &rootDirectory,
     const Qt::CaseSensitivity caseSensitivity = caseSensitive ? Qt::CaseSensitive
                                                               : Qt::CaseInsensitive;
 
-    const ProjectPathFilter pathFilter(rootDirectory, excludeGlobs);
+    const ProjectPathFilter pathFilter(rootDirectory);
     QStringList pendingDirectories{QDir(rootDirectory).absolutePath()};
     while (!pendingDirectories.isEmpty())
     {
@@ -271,8 +271,7 @@ FileSearcher::FileSearcher(QObject *parent)
 void FileSearcher::start(const QString &rootDirectory,
                          const QString &pattern,
                          bool caseSensitive,
-                         bool wholeWord,
-                         const QStringList &excludeGlobs)
+                         bool wholeWord)
 {
     cancel();
 
@@ -299,8 +298,8 @@ void FileSearcher::start(const QString &rootDirectory,
         m_running = false;
         emit searchFinished(outcome);
     });
-    watcher->setFuture(QtConcurrent::run(BackgroundWorkScheduler::interactivePool(), [rootDirectory, pattern, caseSensitive, wholeWord, excludeGlobs, cancelRequested]() {
-        return runSearch(rootDirectory, pattern, caseSensitive, wholeWord, excludeGlobs, cancelRequested);
+    watcher->setFuture(QtConcurrent::run(BackgroundWorkScheduler::interactivePool(), [rootDirectory, pattern, caseSensitive, wholeWord, cancelRequested]() {
+        return runSearch(rootDirectory, pattern, caseSensitive, wholeWord, cancelRequested);
     }));
 }
 

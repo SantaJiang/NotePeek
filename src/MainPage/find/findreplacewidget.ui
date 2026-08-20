@@ -312,30 +312,66 @@
       <number>6</number>
      </property>
      <item>
-      <widget class="QCheckBox" name="checkBoxWrapAround">
+      <widget class="QToolButton" name="buttonWrapAround">
+       <property name="minimumSize">
+        <size>
+         <width>26</width>
+         <height>26</height>
+        </size>
+       </property>
+       <property name="checkable">
+        <bool>true</bool>
+       </property>
        <property name="text">
-        <string>Wra&amp;p Around</string>
+        <string>↻</string>
        </property>
       </widget>
      </item>
      <item>
-      <widget class="QCheckBox" name="checkBoxMatchCase">
+      <widget class="QToolButton" name="buttonMatchCase">
+       <property name="minimumSize">
+        <size>
+         <width>26</width>
+         <height>26</height>
+        </size>
+       </property>
+       <property name="checkable">
+        <bool>true</bool>
+       </property>
        <property name="text">
-        <string>Match &amp;case</string>
+        <string>Aa</string>
        </property>
       </widget>
      </item>
      <item>
-      <widget class="QCheckBox" name="checkBoxMatchWholeWord">
+      <widget class="QToolButton" name="buttonMatchWholeWord">
+       <property name="minimumSize">
+        <size>
+         <width>26</width>
+         <height>26</height>
+        </size>
+       </property>
+       <property name="checkable">
+        <bool>true</bool>
+       </property>
        <property name="text">
-        <string>Match &amp;whole word only</string>
+        <string>W</string>
        </property>
       </widget>
      </item>
      <item>
-      <widget class="QCheckBox" name="checkBoxBackwardsDirection">
+      <widget class="QToolButton" name="buttonBackwardsDirection">
+       <property name="minimumSize">
+        <size>
+         <width>26</width>
+         <height>26</height>
+        </size>
+       </property>
+       <property name="checkable">
+        <bool>true</bool>
+       </property>
        <property name="text">
-        <string>Backward direction</string>
+        <string>←</string>
        </property>
       </widget>
      </item>

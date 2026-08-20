@@ -39,6 +39,15 @@ protected:
         CustomEditor::paintEvent(event);
     }
 };
+
+class ViewportMarginEditor final : public CustomEditor
+{
+public:
+    QMargins configuredViewportMargins() const
+    {
+        return viewportMargins();
+    }
+};
 }
 
 class EditorFeaturesTest : public QObject
@@ -130,18 +139,16 @@ private slots:
         QCOMPARE(editor.selectedText(), QStringLiteral("值abc"));
     }
 
-    void editorTopPaddingMatchesHorizontalPadding()
+    void editorHasNoTopPadding()
     {
-        CustomEditor editor;
+        ViewportMarginEditor editor;
         editor.resize(320, 240);
 
         const int horizontalPadding = static_cast<int>(editor.SendScintilla(
             QsciScintillaBase::SCI_GETMARGINLEFT));
-        const int topPadding = editor.viewport()->geometry().top()
-                               - editor.contentsRect().top();
 
-        QCOMPARE(topPadding, horizontalPadding);
-        QCOMPARE(topPadding, 5);
+        QCOMPARE(horizontalPadding, 5);
+        QCOMPARE(editor.configuredViewportMargins().top(), 0);
     }
 
     void editorPaddingUsesDocumentAndCaretLineBackgrounds()
@@ -193,8 +200,8 @@ private slots:
         QCOMPARE(rendered.pixelColor(viewportGeometry.left() + 2, nextLineY),
                  documentBackground);
         QCOMPARE(rendered.pixelColor(viewportGeometry.center().x(),
-                                     editor.contentsRect().top() + 2),
-                 documentBackground);
+                                     viewportGeometry.top() + 2),
+                 caretLineBackground);
 
         QFocusEvent focusOut(QEvent::FocusOut, Qt::OtherFocusReason);
         QApplication::sendEvent(&editor, &focusOut);
@@ -208,7 +215,7 @@ private slots:
                  documentBackground);
     }
 
-    void editorThemeSynchronizesTopPaddingBackground()
+    void editorThemeSynchronizesViewportBackground()
     {
         EditorManager manager;
         CustomEditor *editor = manager.createEditor();

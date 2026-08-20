@@ -388,29 +388,29 @@
         <translation>查找：</translation>
     </message>
     <message>
+        <location filename="../src/MainPage/find/findreplacewidget.ui" line="326"/>
+        <source>↻</source>
+        <translation>↻</translation>
+    </message>
+    <message>
+        <location filename="../src/MainPage/find/findreplacewidget.ui" line="342"/>
+        <source>Aa</source>
+        <translation>Aa</translation>
+    </message>
+    <message>
+        <location filename="../src/MainPage/find/findreplacewidget.ui" line="358"/>
+        <source>W</source>
+        <translation>W</translation>
+    </message>
+    <message>
+        <location filename="../src/MainPage/find/findreplacewidget.ui" line="374"/>
+        <source>←</source>
+        <translation>←</translation>
+    </message>
+    <message>
         <location filename="../src/MainPage/find/findreplacewidget.ui" line="225"/>
         <source>Replace:</source>
         <translation>替换为：</translation>
-    </message>
-    <message>
-        <location filename="../src/MainPage/find/findreplacewidget.ui" line="338"/>
-        <source>Backward direction</source>
-        <translation>反向搜索</translation>
-    </message>
-    <message>
-        <location filename="../src/MainPage/find/findreplacewidget.ui" line="331"/>
-        <source>Match &amp;whole word only</source>
-        <translation>全词匹配</translation>
-    </message>
-    <message>
-        <location filename="../src/MainPage/find/findreplacewidget.ui" line="324"/>
-        <source>Match &amp;case</source>
-        <translation>匹配大小写</translation>
-    </message>
-    <message>
-        <location filename="../src/MainPage/find/findreplacewidget.ui" line="317"/>
-        <source>Wra&amp;p Around</source>
-        <translation>循环搜索</translation>
     </message>
     <message>
         <location filename="../src/MainPage/find/findreplacewidget.cpp" line="29"/>
@@ -447,6 +447,30 @@
         <location filename="../src/MainPage/find/findreplacewidget.cpp" line="36"/>
         <source>Replacement text</source>
         <translation>替换文本</translation>
+    </message>
+    <message>
+        <location filename="../src/MainPage/find/findreplacewidget.cpp" line="45"/>
+        <location filename="../src/MainPage/find/findreplacewidget.cpp" line="46"/>
+        <source>Wrap around</source>
+        <translation>循环搜索</translation>
+    </message>
+    <message>
+        <location filename="../src/MainPage/find/findreplacewidget.cpp" line="47"/>
+        <location filename="../src/MainPage/find/findreplacewidget.cpp" line="48"/>
+        <source>Match case</source>
+        <translation>区分大小写</translation>
+    </message>
+    <message>
+        <location filename="../src/MainPage/find/findreplacewidget.cpp" line="49"/>
+        <location filename="../src/MainPage/find/findreplacewidget.cpp" line="50"/>
+        <source>Whole words only</source>
+        <translation>全词匹配</translation>
+    </message>
+    <message>
+        <location filename="../src/MainPage/find/findreplacewidget.cpp" line="51"/>
+        <location filename="../src/MainPage/find/findreplacewidget.cpp" line="52"/>
+        <source>Search backwards</source>
+        <translation>反向搜索</translation>
     </message>
 </context>
 <context>
@@ -1135,86 +1159,76 @@
 <context>
     <name>SearchResultsDock</name>
     <message>
-        <location filename="../src/MainPage/widgets/searchresultsdock.cpp" line="164"/>
-        <location filename="../src/MainPage/widgets/searchresultsdock.cpp" line="236"/>
+        <location filename="../src/MainPage/widgets/searchresultsdock.cpp" line="163"/>
+        <location filename="../src/MainPage/widgets/searchresultsdock.cpp" line="227"/>
         <source>Search Results</source>
         <translation>搜索结果</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/widgets/searchresultsdock.cpp" line="175"/>
-        <location filename="../src/MainPage/widgets/searchresultsdock.cpp" line="487"/>
+        <location filename="../src/MainPage/widgets/searchresultsdock.cpp" line="173"/>
+        <location filename="../src/MainPage/widgets/searchresultsdock.cpp" line="474"/>
         <source>Search</source>
         <translation>搜索</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/widgets/searchresultsdock.cpp" line="179"/>
+        <location filename="../src/MainPage/widgets/searchresultsdock.cpp" line="177"/>
         <source>Search in files...</source>
         <translation>在文件中搜索...</translation>
     </message>
     <message>
         <location filename="../src/MainPage/widgets/searchresultsdock.cpp" line="183"/>
-        <source>Exclude globs (comma-separated)</source>
-        <translation>排除通配符（以逗号分隔）</translation>
-    </message>
-    <message>
-        <location filename="../src/MainPage/widgets/searchresultsdock.cpp" line="187"/>
-        <source>File exclusion patterns</source>
-        <translation>文件排除模式</translation>
-    </message>
-    <message>
-        <location filename="../src/MainPage/widgets/searchresultsdock.cpp" line="191"/>
         <source>Match case</source>
         <translation>区分大小写</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/widgets/searchresultsdock.cpp" line="196"/>
+        <location filename="../src/MainPage/widgets/searchresultsdock.cpp" line="188"/>
         <source>Whole words only</source>
         <translation>全字匹配</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/widgets/searchresultsdock.cpp" line="241"/>
-        <location filename="../src/MainPage/widgets/searchresultsdock.cpp" line="242"/>
+        <location filename="../src/MainPage/widgets/searchresultsdock.cpp" line="232"/>
+        <location filename="../src/MainPage/widgets/searchresultsdock.cpp" line="233"/>
         <source>Close search results</source>
         <translation>关闭搜索结果</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/widgets/searchresultsdock.cpp" line="368"/>
-        <location filename="../src/MainPage/widgets/searchresultsdock.cpp" line="447"/>
+        <location filename="../src/MainPage/widgets/searchresultsdock.cpp" line="357"/>
+        <location filename="../src/MainPage/widgets/searchresultsdock.cpp" line="434"/>
         <source>Search canceled.</source>
         <translation>搜索已取消。</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/widgets/searchresultsdock.cpp" line="380"/>
+        <location filename="../src/MainPage/widgets/searchresultsdock.cpp" line="369"/>
         <source>Open a directory first to search in files.</source>
         <translation>请先打开一个目录再进行文件搜索。</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/widgets/searchresultsdock.cpp" line="386"/>
+        <location filename="../src/MainPage/widgets/searchresultsdock.cpp" line="375"/>
         <source>Searching in %1...</source>
         <translation>正在 %1 中搜索...</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/widgets/searchresultsdock.cpp" line="422"/>
+        <location filename="../src/MainPage/widgets/searchresultsdock.cpp" line="409"/>
         <source>Line %1: %2</source>
         <translation>第 %1 行：%2</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/widgets/searchresultsdock.cpp" line="439"/>
+        <location filename="../src/MainPage/widgets/searchresultsdock.cpp" line="426"/>
         <source>%1 (%2)</source>
         <translation>%1 (%2)</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/widgets/searchresultsdock.cpp" line="451"/>
+        <location filename="../src/MainPage/widgets/searchresultsdock.cpp" line="438"/>
         <source>Showing the first %1 matches; refine the search to see the rest.</source>
         <translation>仅显示前 %1 处匹配；请缩小搜索范围以查看其余结果。</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/widgets/searchresultsdock.cpp" line="456"/>
+        <location filename="../src/MainPage/widgets/searchresultsdock.cpp" line="443"/>
         <source>%1 match(es) in %2 file(s).</source>
         <translation>在 %2 个文件中找到 %1 处匹配。</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/widgets/searchresultsdock.cpp" line="487"/>
+        <location filename="../src/MainPage/widgets/searchresultsdock.cpp" line="474"/>
         <source>Cancel</source>
         <translation>取消</translation>
     </message>
