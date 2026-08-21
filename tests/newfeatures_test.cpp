@@ -6,11 +6,13 @@
 #include <QMainWindow>
 #include <QLineEdit>
 #include <QLabel>
+#include <QListWidget>
 #include <QMessageBox>
 #include <QPushButton>
 #include <QToolButton>
 #include <QSignalSpy>
 #include <QScrollBar>
+#include <QStackedWidget>
 #include <QStringList>
 #include <QTimer>
 #include <QTemporaryDir>
@@ -1037,6 +1039,127 @@ private slots:
         QCOMPARE(lightCombo->findData(QStringLiteral("upstream-vscode-light-2026")) >= 0, true);
         QVERIFY(dialog.findChild<QPushButton *>(QStringLiteral("importSyntaxThemeButton")));
         QVERIFY(dialog.findChild<QPushButton *>(QStringLiteral("openSyntaxThemeFolderButton")));
+    }
+
+    void preferencesSidebarSearchAndThemeRefreshStayLive()
+    {
+        PreferencesDialog dialog;
+        dialog.show();
+        QCoreApplication::processEvents();
+        auto *search =
+            dialog.findChild<QLineEdit *>(QStringLiteral("settingsSearch"));
+        auto *sections =
+            dialog.findChild<QListWidget *>(QStringLiteral("sectionList"));
+        QVERIFY(search);
+        QVERIFY(sections);
+        QCOMPARE(sections->count(), 3);
+        QVERIFY(dialog.width() <= 700);
+        QVERIFY(dialog.height() <= 320);
+        QCOMPARE(search->width(), sections->viewport()->width());
+
+        QLabel *sectionTitle = nullptr;
+        QLabel *textFontLabel = nullptr;
+        QLabel *codeFontLabel = nullptr;
+        const QList<QLabel *> labels = dialog.findChildren<QLabel *>();
+        for (QLabel *label : labels)
+        {
+            if (label->objectName() == QLatin1String("sectionTitle")
+                && label->text() == QLatin1String("Editor"))
+                sectionTitle = label;
+            else if (label->text() == QLatin1String("Text font"))
+                textFontLabel = label;
+            else if (label->text() == QLatin1String("Code font"))
+                codeFontLabel = label;
+        }
+        QVERIFY(sectionTitle);
+        QVERIFY(textFontLabel);
+        QVERIFY(codeFontLabel);
+        QVERIFY(sectionTitle->font().bold());
+        // Bold CJK glyphs carry about 4 px of visible left side bearing. The
+        // title widget is deliberately offset so its painted edge, rather
+        // than merely its widget geometry, aligns with the regular labels.
+        QCOMPARE(sectionTitle->mapTo(&dialog, QPoint()).x() + 4,
+                 textFontLabel->mapTo(&dialog, QPoint()).x());
+        QVERIFY(codeFontLabel->mapTo(&dialog, QPoint()).y()
+                - textFontLabel->mapTo(&dialog, QPoint()).y() <= 36);
+
+        auto *darkCombo = dialog.findChild<QComboBox *>(
+            QStringLiteral("darkSyntaxThemeCombo"));
+        QVERIFY(darkCombo);
+        QVERIFY(!dialog.findChild<QPushButton *>(QStringLiteral("applyButton")));
+        QVERIFY(!dialog.findChild<QPushButton *>(QStringLiteral("cancelButton")));
+        QVERIFY(!dialog.findChild<QPushButton *>(QStringLiteral("okButton")));
+
+        AppPreferences &preferences = AppPreferences::instance();
+        auto *statusBarCheckBox = dialog.findChild<QCheckBox *>(
+            QStringLiteral("showStatusBarCheckBox"));
+        QVERIFY(statusBarCheckBox);
+        QSignalSpy appliedSpy(&dialog, &PreferencesDialog::applied);
+
+        const bool previousStatusBar = preferences.showStatusBar();
+        statusBarCheckBox->setChecked(!previousStatusBar);
+        QCOMPARE(preferences.showStatusBar(), !previousStatusBar);
+        QCOMPARE(appliedSpy.count(), 1);
+        statusBarCheckBox->setChecked(previousStatusBar);
+        QCOMPARE(preferences.showStatusBar(), previousStatusBar);
+        QCOMPARE(appliedSpy.count(), 2);
+
+        const QString previousDarkTheme = preferences.darkSyntaxThemeId();
+        const int alternativeTheme = (darkCombo->currentIndex() + 1) % darkCombo->count();
+        darkCombo->setCurrentIndex(alternativeTheme);
+        QCOMPARE(preferences.darkSyntaxThemeId(), darkCombo->currentData().toString());
+        QCOMPARE(appliedSpy.count(), 3);
+        darkCombo->setCurrentIndex(darkCombo->findData(previousDarkTheme));
+        QCOMPARE(preferences.darkSyntaxThemeId(), previousDarkTheme);
+        QCOMPARE(appliedSpy.count(), 4);
+
+        search->setText(QStringLiteral("Markdown"));
+        QVERIFY(sections->item(0)->isHidden());
+        QVERIFY(!sections->item(1)->isHidden());
+        QVERIFY(sections->item(2)->isHidden());
+        QCOMPARE(sections->currentItem(), sections->item(1));
+
+        search->setText(QStringLiteral("Brackets"));
+        QVERIFY(sections->item(0)->isHidden());
+        QVERIFY(sections->item(1)->isHidden());
+        QVERIFY(!sections->item(2)->isHidden());
+        QCOMPARE(sections->currentItem(), sections->item(2));
+
+        search->setText(QStringLiteral("No such setting"));
+        QVERIFY(dialog.findChild<QStackedWidget *>()->isHidden());
+
+        search->clear();
+        for (int row = 0; row < sections->count(); ++row)
+            QVERIFY(!sections->item(row)->isHidden());
+        QVERIFY(!dialog.findChild<QStackedWidget *>()->isHidden());
+
+        // Style and palette changes can arrive while the modal dialog is
+        // open. Clearing the sheet emits StyleChange; the queued refresh must
+        // rebuild the appearance without requiring the dialog to be reopened.
+        dialog.setStyleSheet(QString());
+        QTRY_VERIFY(!dialog.styleSheet().isEmpty());
+
+#if QT_VERSION >= QT_VERSION_CHECK(6, 8, 0)
+        QStyleHints *styleHints = QGuiApplication::styleHints();
+        const Qt::ColorScheme originalScheme = styleHints->colorScheme();
+        const Qt::ColorScheme requestedScheme =
+            originalScheme == Qt::ColorScheme::Dark
+            ? Qt::ColorScheme::Light
+            : Qt::ColorScheme::Dark;
+        const QColor originalBackground = dialog.palette().color(QPalette::Window);
+
+        styleHints->setColorScheme(requestedScheme);
+        QCoreApplication::processEvents();
+        if (styleHints->colorScheme() == requestedScheme)
+        {
+            QTRY_COMPARE(dialog.palette().color(QPalette::Window),
+                         ThemeColors::Preferences::windowBg());
+            QVERIFY(dialog.palette().color(QPalette::Window) != originalBackground);
+        }
+
+        styleHints->setColorScheme(originalScheme);
+        QCoreApplication::processEvents();
+#endif
     }
 
     void statusBarVisibilityFollowsPreferences()

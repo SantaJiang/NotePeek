@@ -5,16 +5,16 @@
 
 class QCheckBox;
 class QComboBox;
+class QEvent;
 class QFontComboBox;
+class QLineEdit;
 class QListWidget;
 class QListWidgetItem;
 class QPushButton;
 class QStackedWidget;
 
-// The application settings window (File ▸ Preferences).  Editing is
-// non-destructive: changes are only committed to AppPreferences when the user
-// presses Apply or OK, at which point applied() is emitted so the main window
-// can refresh open editors live.  Cancel discards everything.
+// The application settings window (File ▸ Preferences). Changes are persisted
+// immediately and applied to the main window while the dialog remains open.
 //
 // The dialog uses a two-pane layout: a left sidebar lists the available
 // setting sections and the right pane shows the corresponding controls.  Only
@@ -26,17 +26,24 @@ class PreferencesDialog : public QDialog
 public:
     explicit PreferencesDialog(QWidget *parent = nullptr);
 
+protected:
+    void changeEvent(QEvent *event) override;
+
 signals:
-    // Emitted after preferences have been written and saved (Apply or OK), so
-    // the rest of the application can re-apply them without a restart.
+    // Emitted after each user change has been written and saved, so the rest
+    // of the application can re-apply it without a restart.
     void applied();
 
 private:
     void loadFromPreferences();
     void commit();
+    void connectLiveUpdates();
     void populateSyntaxThemeCombos();
     void importSyntaxTheme();
     void openSyntaxThemeFolder();
+    void filterSections(const QString &query);
+    void scheduleThemeRefresh();
+    void reapplyTheme();
 
     QFontComboBox *m_textFontCombo;
     QComboBox *m_textFontSize;
@@ -59,8 +66,10 @@ private:
     QCheckBox *m_documentCompletion;
     QCheckBox *m_semanticHighlighting;
     QComboBox *m_languageCombo;
+    QLineEdit *m_searchEdit;
     QListWidget *m_sectionList;
     QStackedWidget *m_sectionStack;
+    bool m_themeRefreshPending = false;
 };
 
 #endif // PREFERENCESDIALOG_H

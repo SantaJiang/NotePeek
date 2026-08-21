@@ -5,11 +5,12 @@
 #include <NotePeek/syntaxtheme.h>
 
 #include <QAbstractItemView>
+#include <QAbstractButton>
 #include <QCheckBox>
 #include <QComboBox>
 #include <QDesktopServices>
-#include <QDialogButtonBox>
 #include <QDir>
+#include <QEvent>
 #include <QFile>
 #include <QFileDialog>
 #include <QFileInfo>
@@ -17,6 +18,7 @@
 #include <QFontComboBox>
 #include <QFontDatabase>
 #include <QFrame>
+#include <QGuiApplication>
 #include <QHBoxLayout>
 #include <QIntValidator>
 #include <QLabel>
@@ -28,8 +30,11 @@
 #include <QPushButton>
 #include <QRegularExpression>
 #include <QSaveFile>
+#include <QScrollArea>
 #include <QSignalBlocker>
 #include <QStackedWidget>
+#include <QStyleHints>
+#include <QTimer>
 #include <QUrl>
 #include <QVariant>
 #include <QVBoxLayout>
@@ -38,9 +43,16 @@ namespace {
 
 constexpr int kMinFontSize = 6;
 constexpr int kMaxFontSize = 288;
-constexpr int kDialogWidth = 720;
-constexpr int kSidebarWidth = 180;
+constexpr int kDialogWidth = 700;
+constexpr int kDialogHeight = 320;
+constexpr int kSidebarWidth = 190;
 constexpr int kLabelWidth = 150;
+constexpr int kContentMargin = 20;
+constexpr int kRowSpacing = 12;
+// The bold CJK section-title glyphs have a visible left side bearing on the
+// bundled/platform fonts. Shift the title widget left while keeping every row
+// on the original form grid so their painted text edges align optically.
+constexpr int kTitleOpticalOffset = 4;
 constexpr int kCommonFontSizes[] = {9, 10, 11, 12, 13, 14, 18, 24, 36, 48, 64, 72, 96, 144, 288};
 
 void polishDialogPalette(QWidget *widget)
@@ -64,14 +76,17 @@ QLabel *makeSectionTitle(const QString &text, QWidget *parent)
 {
     auto *label = new QLabel(text, parent);
     label->setObjectName(QStringLiteral("sectionTitle"));
+    QFont font = label->font();
+    font.setBold(true);
+    label->setFont(font);
     return label;
 }
 
 QHBoxLayout *makeSettingsRow(const QString &labelText, QWidget *control, QWidget *parent)
 {
     auto *row = new QHBoxLayout;
-    row->setContentsMargins(0, 0, 0, 0);
-    row->setSpacing(16);
+    row->setContentsMargins(kTitleOpticalOffset, 0, 0, 0);
+    row->setSpacing(kRowSpacing);
 
     auto *label = new QLabel(labelText, parent);
     label->setObjectName(QStringLiteral("rowLabel"));
@@ -99,17 +114,30 @@ QFrame *makeSection(const QString &title, QWidget *parent)
     section->setAttribute(Qt::WA_StyledBackground, true);
 
     auto *layout = new QVBoxLayout(section);
-    layout->setContentsMargins(16, 14, 16, 16);
-    layout->setSpacing(12);
+    layout->setContentsMargins(kContentMargin - kTitleOpticalOffset,
+                               16, kContentMargin, 16);
+    layout->setSpacing(8);
     layout->addWidget(makeSectionTitle(title, section));
 
     return section;
+}
+
+QScrollArea *makeScrollablePage(QWidget *content, QWidget *parent)
+{
+    auto *scrollArea = new QScrollArea(parent);
+    scrollArea->setObjectName(QStringLiteral("settingsScrollArea"));
+    scrollArea->setFrameShape(QFrame::NoFrame);
+    scrollArea->setWidgetResizable(true);
+    scrollArea->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    scrollArea->setWidget(content);
+    return scrollArea;
 }
 
 void configureFontCombo(QComboBox *combo)
 {
     combo->setEditable(false);
     combo->setInsertPolicy(QComboBox::NoInsert);
+    combo->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Fixed);
 }
 
 // Populate the code-font picker with every installed monospace family.
@@ -215,33 +243,56 @@ QString preferencesStyleSheet()
         "}"
         "QLabel#sectionTitle {"
         "  color: %5;"
-        "  font-weight: 600;"
+        "  font-weight: bold;"
+        "  font-size: 14px;"
+        "  padding-bottom: 2px;"
         "}"
         "QLabel#rowLabel {"
         "  color: %6;"
         "}"
         "QFrame#settingsSection {"
-        "  background-color: transparent;"
+        "  background-color: %1;"
         "  border: none;"
+        "}"
+        "QWidget#sidebar {"
+        "  background-color: %2;"
+        "  border-right: 1px solid %4;"
+        "}"
+        "QLineEdit#settingsSearch {"
+        "  background-color: %3;"
+        "  color: %5;"
+        "  border: 1px solid %4;"
+        "  border-radius: 5px;"
+        "  padding: 5px 8px;"
+        "}"
+        "QLineEdit#settingsSearch:focus {"
+        "  border-color: %9;"
+        "}"
+        "QScrollArea#settingsScrollArea {"
+        "  background-color: %1;"
+        "  border: none;"
+        "}"
+        "QScrollArea#settingsScrollArea > QWidget > QWidget {"
+        "  background-color: %1;"
         "}"
         "QListWidget#sectionList {"
         "  background-color: %2;"
         "  color: %5;"
-        "  border: 1px solid %4;"
-        "  border-radius: 6px;"
+        "  border: none;"
         "  outline: 0;"
-        "  padding: 4px;"
+        "  padding: 0;"
         "}"
         "QListWidget#sectionList::item {"
-        "  padding: 8px 12px;"
-        "  border-radius: 4px;"
+        "  padding: 8px 10px;"
+        "  margin: 1px 0;"
+        "  border-radius: 6px;"
         "}"
         "QListWidget#sectionList::item:hover {"
         "  background-color: %7;"
         "}"
         "QListWidget#sectionList::item:selected {"
-        "  background-color: %9;"
-        "  color: %10;"
+        "  background-color: %7;"
+        "  color: %5;"
         "}"
         "QCheckBox {"
         "  color: %5;"
@@ -321,14 +372,14 @@ PreferencesDialog::PreferencesDialog(QWidget *parent)
     , m_documentCompletion(new QCheckBox(tr("Suggest words from the current document"), this))
     , m_semanticHighlighting(new QCheckBox(tr("Add function, type, member and variable colors"), this))
     , m_languageCombo(new QComboBox(this))
+    , m_searchEdit(new QLineEdit(this))
     , m_sectionList(new QListWidget(this))
     , m_sectionStack(new QStackedWidget(this))
 {
     setWindowTitle(tr("Preferences"));
     setModal(true);
     m_showStatusBar->setObjectName(QStringLiteral("showStatusBarCheckBox"));
-    polishDialogPalette(this);
-    setStyleSheet(preferencesStyleSheet());
+    reapplyTheme();
 
     // The text font picker shows every family; the code font picker is
     // restricted to monospaced families, including ones whose fixed-pitch
@@ -340,10 +391,12 @@ PreferencesDialog::PreferencesDialog(QWidget *parent)
     configureFontSizeCombo(m_textFontSize);
     configureFontSizeCombo(m_codeFontSize);
 
-    // Sidebar navigation list.  Each entry maps, by row index, to a page in
-    // the stacked widget on the right.
+    // Sidebar navigation. Search filters whole sections using the visible
+    // category and setting labels, without changing any pending values.
+    m_searchEdit->setObjectName(QStringLiteral("settingsSearch"));
+    m_searchEdit->setPlaceholderText(tr("Search settings..."));
+    m_searchEdit->setClearButtonEnabled(true);
     m_sectionList->setObjectName(QStringLiteral("sectionList"));
-    m_sectionList->setFixedWidth(kSidebarWidth);
     m_sectionList->setUniformItemSizes(true);
     m_sectionList->setFocusPolicy(Qt::StrongFocus);
     m_sectionList->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
@@ -358,7 +411,7 @@ PreferencesDialog::PreferencesDialog(QWidget *parent)
     m_importSyntaxThemeButton->setObjectName(QStringLiteral("importSyntaxThemeButton"));
     m_openSyntaxThemeFolderButton->setObjectName(QStringLiteral("openSyntaxThemeFolderButton"));
     populateSyntaxThemeCombos();
-    const QString themeToolTip = tr("Applies immediately to syntax editors after Apply.");
+    const QString themeToolTip = tr("Applies immediately to syntax editors.");
     m_darkSyntaxThemeCombo->setToolTip(themeToolTip);
     m_lightSyntaxThemeCombo->setToolTip(themeToolTip);
     m_darkSyntaxThemeRow = makeSettingsRowWidget(
@@ -422,9 +475,12 @@ PreferencesDialog::PreferencesDialog(QWidget *parent)
     // matching sidebar entry.  The page index returned by addWidget is stored
     // on the list item (Qt::UserRole) so each entry stays bound to its page
     // regardless of the order in which pages and entries are added.
-    const int editorIndex = m_sectionStack->addWidget(editorSection);
-    const int generalIndex = m_sectionStack->addWidget(generalSection);
-    const int codeIndex = m_sectionStack->addWidget(codeSection);
+    const int editorIndex = m_sectionStack->addWidget(
+        makeScrollablePage(editorSection, m_sectionStack));
+    const int generalIndex = m_sectionStack->addWidget(
+        makeScrollablePage(generalSection, m_sectionStack));
+    const int codeIndex = m_sectionStack->addWidget(
+        makeScrollablePage(codeSection, m_sectionStack));
 
     auto *editorItem = new QListWidgetItem(tr("Editor"), m_sectionList);
     editorItem->setData(Qt::UserRole, editorIndex);
@@ -436,59 +492,134 @@ PreferencesDialog::PreferencesDialog(QWidget *parent)
     connect(m_sectionList, &QListWidget::currentRowChanged, this, [this](int row) {
         if (row < 0)
             return;
-        const QVariant data = m_sectionList->item(row)->data(Qt::UserRole);
+        QListWidgetItem *item = m_sectionList->item(row);
+        if (item == nullptr || item->isHidden())
+            return;
+        const QVariant data = item->data(Qt::UserRole);
         m_sectionStack->setCurrentIndex(data.toInt());
     });
+    connect(m_searchEdit, &QLineEdit::textChanged,
+            this, &PreferencesDialog::filterSections);
     // Show the first page deterministically; setCurrentRow then highlights the
     // matching sidebar entry (and the handler above keeps them in sync for
     // every subsequent user-driven change).
     m_sectionStack->setCurrentIndex(0);
     m_sectionList->setCurrentRow(0);
 
-    auto *buttons = new QDialogButtonBox(QDialogButtonBox::Ok
-                                             | QDialogButtonBox::Apply
-                                             | QDialogButtonBox::Cancel,
-                                         this);
+    auto *sidebar = new QWidget(this);
+    sidebar->setObjectName(QStringLiteral("sidebar"));
+    sidebar->setFixedWidth(kSidebarWidth);
+    auto *sidebarLayout = new QVBoxLayout(sidebar);
+    sidebarLayout->setContentsMargins(12, 16, 12, 12);
+    sidebarLayout->setSpacing(12);
+    sidebarLayout->addWidget(m_searchEdit);
+    sidebarLayout->addWidget(m_sectionList, 1);
 
-    // Two-pane body: left sidebar + right stacked content.  The buttons sit
-    // beneath the whole body as before.
+    auto *rightPane = new QWidget(this);
+    auto *rightLayout = new QVBoxLayout(rightPane);
+    rightLayout->setContentsMargins(0, 0, 0, 0);
+    rightLayout->setSpacing(0);
+    rightLayout->addWidget(m_sectionStack, 1);
+
     auto *bodyLayout = new QHBoxLayout;
     bodyLayout->setContentsMargins(0, 0, 0, 0);
-    bodyLayout->setSpacing(14);
-    bodyLayout->addWidget(m_sectionList);
-    bodyLayout->addWidget(m_sectionStack, 1);
+    bodyLayout->setSpacing(0);
+    bodyLayout->addWidget(sidebar);
+    bodyLayout->addWidget(rightPane, 1);
 
     auto *layout = new QVBoxLayout(this);
-    layout->setContentsMargins(20, 20, 20, 18);
-    layout->setSpacing(14);
+    layout->setContentsMargins(0, 0, 0, 0);
+    layout->setSpacing(0);
     layout->addLayout(bodyLayout);
-    layout->addStretch();
-    layout->addWidget(buttons);
 
     // Keep the compact default while allowing larger fonts and translations
     // to request more space.
     setMinimumWidth(kDialogWidth);
-    resize(kDialogWidth, sizeHint().height());
+    resize(kDialogWidth, kDialogHeight);
 
     loadFromPreferences();
-
-    connect(buttons, &QDialogButtonBox::accepted, this, [this]() {
-        commit();
-        accept();
-    });
-    connect(buttons, &QDialogButtonBox::rejected, this, &QDialog::reject);
-    connect(buttons->button(QDialogButtonBox::Apply), &QPushButton::clicked,
-            this, &PreferencesDialog::commit);
+    connectLiveUpdates();
     connect(m_importSyntaxThemeButton, &QPushButton::clicked,
             this, &PreferencesDialog::importSyntaxTheme);
     connect(m_openSyntaxThemeFolderButton, &QPushButton::clicked,
             this, &PreferencesDialog::openSyntaxThemeFolder);
+
+#if QT_VERSION >= QT_VERSION_CHECK(6, 5, 0)
+    connect(QGuiApplication::styleHints(), &QStyleHints::colorSchemeChanged,
+            this, [this]() {
+                scheduleThemeRefresh();
+            });
+#endif
+}
+
+void PreferencesDialog::changeEvent(QEvent *event)
+{
+    QDialog::changeEvent(event);
+    if (event->type() == QEvent::PaletteChange
+        || event->type() == QEvent::StyleChange)
+    {
+        scheduleThemeRefresh();
+    }
+}
+
+void PreferencesDialog::filterSections(const QString &query)
+{
+    const QString needle = query.trimmed();
+    QListWidgetItem *firstMatch = nullptr;
+    for (int row = 0; row < m_sectionList->count(); ++row)
+    {
+        QListWidgetItem *item = m_sectionList->item(row);
+        if (item == nullptr)
+            continue;
+        QString searchableText = item->text();
+        QWidget *page = m_sectionStack->widget(item->data(Qt::UserRole).toInt());
+        if (page != nullptr)
+        {
+            const QList<QLabel *> labels = page->findChildren<QLabel *>();
+            for (const QLabel *label : labels)
+                searchableText += QLatin1Char(' ') + label->text();
+            const QList<QAbstractButton *> controls =
+                page->findChildren<QAbstractButton *>();
+            for (const QAbstractButton *control : controls)
+                searchableText += QLatin1Char(' ') + control->text();
+        }
+        const bool matches = needle.isEmpty()
+            || searchableText.contains(needle, Qt::CaseInsensitive);
+        item->setHidden(!matches);
+        if (matches && firstMatch == nullptr)
+            firstMatch = item;
+    }
+
+    QListWidgetItem *current = m_sectionList->currentItem();
+    if (firstMatch != nullptr && (current == nullptr || current->isHidden()))
+        m_sectionList->setCurrentItem(firstMatch);
+    m_sectionStack->setVisible(firstMatch != nullptr);
+}
+
+void PreferencesDialog::scheduleThemeRefresh()
+{
+    if (m_themeRefreshPending)
+        return;
+
+    m_themeRefreshPending = true;
+    QTimer::singleShot(0, this, [this]() {
+        reapplyTheme();
+        m_themeRefreshPending = false;
+    });
+}
+
+void PreferencesDialog::reapplyTheme()
+{
+    polishDialogPalette(this);
+    setStyleSheet(preferencesStyleSheet());
 }
 
 void PreferencesDialog::populateSyntaxThemeCombos()
 {
     const QString selectedDark = m_darkSyntaxThemeCombo->currentData().toString();
     const QString selectedLight = m_lightSyntaxThemeCombo->currentData().toString();
+    const QSignalBlocker blockDark(m_darkSyntaxThemeCombo);
+    const QSignalBlocker blockLight(m_lightSyntaxThemeCombo);
     m_darkSyntaxThemeCombo->clear();
     m_lightSyntaxThemeCombo->clear();
     for (const NotePeek::SyntaxTheme &theme : NotePeek::SyntaxThemeCatalog::themes())
@@ -502,6 +633,57 @@ void PreferencesDialog::populateSyntaxThemeCombos()
         m_darkSyntaxThemeCombo->setCurrentIndex(darkIndex);
     if (lightIndex >= 0)
         m_lightSyntaxThemeCombo->setCurrentIndex(lightIndex);
+}
+
+void PreferencesDialog::connectLiveUpdates()
+{
+    const auto applyChange = [this]() {
+        commit();
+    };
+
+    connect(m_textFontCombo, &QFontComboBox::currentFontChanged,
+            this, [applyChange](const QFont &) { applyChange(); });
+    connect(m_textFontSize, &QComboBox::activated,
+            this, [applyChange](int) { applyChange(); });
+    connect(m_textFontSize->lineEdit(), &QLineEdit::editingFinished,
+            this, applyChange);
+    connect(m_codeFontCombo, &QComboBox::currentIndexChanged,
+            this, [applyChange](int) { applyChange(); });
+    connect(m_codeFontSize, &QComboBox::activated,
+            this, [applyChange](int) { applyChange(); });
+    connect(m_codeFontSize->lineEdit(), &QLineEdit::editingFinished,
+            this, applyChange);
+    connect(m_darkSyntaxThemeCombo, &QComboBox::currentIndexChanged,
+            this, [applyChange](int) { applyChange(); });
+    connect(m_lightSyntaxThemeCombo, &QComboBox::currentIndexChanged,
+            this, [applyChange](int) { applyChange(); });
+
+    const QList<QCheckBox *> checkBoxes = {
+        m_showFileTree,
+        m_showStatusBar,
+        m_markdownSidePreview,
+        m_codeFolding,
+        m_bracketAssistance,
+        m_smartIndentation,
+        m_documentCompletion,
+        m_semanticHighlighting,
+    };
+    for (QCheckBox *checkBox : checkBoxes)
+    {
+        connect(checkBox, &QCheckBox::toggled,
+                this, [applyChange](bool) { applyChange(); });
+    }
+
+    const QList<QComboBox *> combos = {
+        m_untitledModeCombo,
+        m_overtypeMode,
+        m_languageCombo,
+    };
+    for (QComboBox *combo : combos)
+    {
+        connect(combo, &QComboBox::currentIndexChanged,
+                this, [applyChange](int) { applyChange(); });
+    }
 }
 
 void PreferencesDialog::importSyntaxTheme()
@@ -624,10 +806,6 @@ void PreferencesDialog::commit()
     prefs.setLanguage(m_languageCombo->currentData().toString());
 
     prefs.save();
-
-    // Reflect any validation/normalisation the model applied (e.g. an
-    // unavailable family snapping back to a default).
-    loadFromPreferences();
 
     emit applied();
 }
