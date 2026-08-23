@@ -24,9 +24,10 @@ public:
     void enqueue(DocumentPersistenceService *receiver, const DocumentSaveRequest &request);
     void waitForPath(const QString &filePath);
 
-    quint64 beginDocumentSave(void *documentKey);
+    quint64 beginDocumentSave(void *documentKey, const QString &filePath);
     bool isLatestDocumentSave(void *documentKey, quint64 generation) const;
     bool hasOutstandingDocumentSave(void *documentKey) const;
+    QString latestDocumentSavePath(void *documentKey) const;
     void finishDocumentSave(void *documentKey, quint64 generation);
 
 private:
@@ -42,6 +43,7 @@ private:
     QSet<QString> m_activePaths;
     QHash<QString, QList<QPointer<QEventLoop>>> m_waiters;
     QHash<void *, quint64> m_latestDocumentGenerations;
+    QHash<void *, QString> m_latestDocumentPaths;
     quint64 m_nextGeneration = 1;
 };
 

@@ -59,10 +59,12 @@ void DocumentSaveCoordinator::waitForPath(const QString &filePath)
     loop.exec(QEventLoop::ExcludeUserInputEvents);
 }
 
-quint64 DocumentSaveCoordinator::beginDocumentSave(void *documentKey)
+quint64 DocumentSaveCoordinator::beginDocumentSave(void *documentKey,
+                                                    const QString &filePath)
 {
     const quint64 generation = m_nextGeneration++;
     m_latestDocumentGenerations.insert(documentKey, generation);
+    m_latestDocumentPaths.insert(documentKey, filePath);
     return generation;
 }
 
@@ -76,10 +78,18 @@ bool DocumentSaveCoordinator::hasOutstandingDocumentSave(void *documentKey) cons
     return documentKey && m_latestDocumentGenerations.contains(documentKey);
 }
 
+QString DocumentSaveCoordinator::latestDocumentSavePath(void *documentKey) const
+{
+    return documentKey ? m_latestDocumentPaths.value(documentKey) : QString();
+}
+
 void DocumentSaveCoordinator::finishDocumentSave(void *documentKey, quint64 generation)
 {
     if (isLatestDocumentSave(documentKey, generation))
+    {
         m_latestDocumentGenerations.remove(documentKey);
+        m_latestDocumentPaths.remove(documentKey);
+    }
 }
 
 void DocumentSaveCoordinator::startNext(const QString &path)

@@ -229,8 +229,10 @@ void ExternalFileWatcher::startBaselineHash(const QString &filePath,
         const QByteArray hash = watcher->result();
         watcher->deleteLater();
         m_baselineHashesInFlight.remove(filePath);
+        const bool hasPendingBaseline = m_pendingBaselineStates.contains(filePath);
         auto it = m_fileStates.find(filePath);
-        if (it != m_fileStates.end()
+        if (!hasPendingBaseline
+            && it != m_fileStates.end()
             && it->exists == expectedState.exists
             && it->size == expectedState.size
             && it->lastModified == expectedState.lastModified)
@@ -238,25 +240,24 @@ void ExternalFileWatcher::startBaselineHash(const QString &filePath,
             it->contentHash = hash;
         }
 
-        if (!m_pendingBaselineStates.contains(filePath))
+        if (!hasPendingBaseline)
         {
             return;
         }
 
         const WatchedFileState pendingState = m_pendingBaselineStates.take(filePath);
-        const bool sameSnapshot = pendingState.exists == expectedState.exists
-                                  && pendingState.size == expectedState.size
-                                  && pendingState.lastModified == expectedState.lastModified;
-        if (!sameSnapshot || hash.isEmpty())
+        // A new recordFileState() call means the caller established a newer
+        // authoritative snapshot. Metadata can remain identical across a
+        // same-size rewrite on coarse-timestamp or network file systems, so
+        // the older hash must never be reused solely because size and mtime
+        // compare equal.
+        const auto current = m_fileStates.constFind(filePath);
+        if (current != m_fileStates.cend()
+            && current->exists == pendingState.exists
+            && current->size == pendingState.size
+            && current->lastModified == pendingState.lastModified)
         {
-            const auto current = m_fileStates.constFind(filePath);
-            if (current != m_fileStates.cend()
-                && current->exists == pendingState.exists
-                && current->size == pendingState.size
-                && current->lastModified == pendingState.lastModified)
-            {
-                startBaselineHash(filePath, pendingState);
-            }
+            startBaselineHash(filePath, pendingState);
         }
     });
     watcher->setFuture(QtConcurrent::run(BackgroundWorkScheduler::ioPool(), [filePath]() { return fileContentHash(filePath); }));
@@ -286,8 +287,20 @@ void ExternalFileWatcher::checkFileStateAsync(const QString &filePath)
         return;
     }
 
-    if (!newState.exists || oldState.contentHash.isEmpty() || newState.size > PerformanceConstants::LargeFileSize)
+    if (!newState.exists || newState.size > PerformanceConstants::LargeFileSize)
         return;
+    if (oldState.contentHash.isEmpty())
+    {
+        // A same-metadata change can arrive while the initial baseline hash is
+        // still running. Remember to check again after that hash completes;
+        // otherwise this event is dropped permanently.
+        if (m_baselineHashesInFlight.contains(normalizedPath))
+        {
+            m_pendingChangeChecks.insert(normalizedPath);
+            m_changeCheckTimer->start(PerformanceConstants::WatcherDirectoryDebounceMs);
+        }
+        return;
+    }
     if (m_hashChecksInFlight.contains(normalizedPath))
     {
         m_hashRecheckRequested.insert(normalizedPath);

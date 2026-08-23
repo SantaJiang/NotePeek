@@ -174,8 +174,6 @@ void DocumentController::openFile(const QString &filePath, bool activate)
         return;
     }
 
-    const int previousIndex = m_pane->currentIndex();
-
     // If the file is already open, just activate it.
     CustomEditor *existingEditor = m_editorManager->getEditorByFilePath(filePath);
     if (existingEditor)
@@ -201,11 +199,16 @@ void DocumentController::openFile(const QString &filePath, bool activate)
     const QFileInfo fileInfo(filePath);
     DocumentPage *page = createPage(editor, filePath);
     const int tabIndex = m_pane->addPage(page, fileInfo.fileName(), filePath);
-    m_pane->setCurrentIndex(tabIndex);
+    // Adding a background tab must not steal focus from the document the user
+    // is reading. QTabWidget selects the first page automatically when the
+    // pane was empty, so an explicit selection is only needed for an active
+    // open in a non-empty pane.
+    if (activate)
+        m_pane->setCurrentIndex(tabIndex);
     connectEditorSignals(editor);
 
     const quint64 requestId = m_nextAsyncRequestId++;
-    m_pendingLoads.insert(requestId, { editor, page, filePath, previousIndex, activate });
+    m_pendingLoads.insert(requestId, { editor, page, filePath, activate });
     m_persistence->loadFileAsync({ requestId, filePath });
 }
 
@@ -240,7 +243,7 @@ bool DocumentController::saveEditor(CustomEditor *editor)
     if (!editor || m_drainingSaves || isEditorLoading(editor))
         return false;
 
-    QString filePath = editor->filePath();
+    QString filePath = effectiveSavePath(editor);
     if (filePath.isEmpty())
     {
         m_pane->focusEditor(editor);
@@ -290,7 +293,7 @@ bool DocumentController::maybeSave(CustomEditor *editor)
 
     if (result == QDialog::Accepted)
     {
-        const QString filePath = editor->filePath();
+        const QString filePath = effectiveSavePath(editor);
         if (filePath.isEmpty())
         {
             const QString fileName = m_persistence->promptSaveFileName(m_pane);
@@ -313,7 +316,7 @@ bool DocumentController::saveEditorForClose(CustomEditor *editor)
         return false;
     }
 
-    QString filePath = editor->filePath();
+    QString filePath = effectiveSavePath(editor);
     if (filePath.isEmpty())
     {
         filePath = m_persistence->promptSaveFileName(m_pane->parentWidget());
@@ -381,7 +384,8 @@ void DocumentController::dispatchAsyncSave(CustomEditor *editor,
     {
         documentKey = editor;
     }
-    const quint64 documentGeneration = m_saveCoordinator->beginDocumentSave(documentKey);
+    const quint64 documentGeneration = m_saveCoordinator->beginDocumentSave(documentKey,
+                                                                              filePath);
     PendingSave pending;
     pending.editor = editor;
     pending.oldFilePath = oldFilePath;
@@ -412,6 +416,18 @@ void DocumentController::setSavingTitle(CustomEditor *editor, const QString &fil
         }
         m_pane->setPageTitle(index, title + tr(" (saving)"));
     }
+}
+
+QString DocumentController::effectiveSavePath(CustomEditor *editor) const
+{
+    if (!editor)
+        return QString();
+
+    void *documentKey = editor->SendScintillaPtrResult(QsciScintillaBase::SCI_GETDOCPOINTER);
+    if (!documentKey)
+        documentKey = editor;
+    const QString pendingPath = m_saveCoordinator->latestDocumentSavePath(documentKey);
+    return pendingPath.isEmpty() ? editor->filePath() : pendingPath;
 }
 
 void DocumentController::insertContentInChunks(CustomEditor *editor,
@@ -586,7 +602,6 @@ void DocumentController::onFileLoaded(const DocumentLoadResult &result)
     const LexerFactory::Language detectedLanguage =
         static_cast<LexerFactory::Language>(result.detectedLanguage);
     const bool activate = pending.activate;
-    const int previousIndex = pending.previousIndex;
     const bool recommendEmojiFont = isMarkdownPath(filePath)
                                     && EmojiFontSupport::shouldRecommendInstallation(
                                         result.content,
@@ -594,7 +609,7 @@ void DocumentController::onFileLoaded(const DocumentLoadResult &result)
     if (largeFile)
         m_editorManager->promoteToLargeFileMode(editor);
     insertContentInChunks(editor, result.content,
-                          [this, editorGuard, pageGuard, format, filePath, largeFile, detectedLanguage, activate, previousIndex, recommendEmojiFont]() {
+                          [this, editorGuard, pageGuard, format, filePath, largeFile, detectedLanguage, activate, recommendEmojiFont]() {
         if (!editorGuard)
             return;
 
@@ -619,10 +634,6 @@ void DocumentController::onFileLoaded(const DocumentLoadResult &result)
         if (activate)
         {
             m_pane->focusEditor(editor);
-        }
-        else if (previousIndex >= 0 && previousIndex < m_pane->count())
-        {
-            m_pane->setCurrentIndex(previousIndex);
         }
 
         m_editorsLoading.remove(editor);
@@ -730,7 +741,8 @@ bool DocumentController::saveFileSynchronously(CustomEditor *editor, const QStri
     {
         documentKey = editor;
     }
-    quint64 documentGeneration = m_saveCoordinator->beginDocumentSave(documentKey);
+    quint64 documentGeneration = m_saveCoordinator->beginDocumentSave(documentKey,
+                                                                        newFilePath);
 
     // A synchronous save is the final authority for this document. Drain older
     // requests for the editor (including Save As to another path), then drain
@@ -739,7 +751,8 @@ bool DocumentController::saveFileSynchronously(CustomEditor *editor, const QStri
     m_persistence->waitForPendingSavePath(newFilePath);
     if (!m_saveCoordinator->isLatestDocumentSave(documentKey, documentGeneration))
     {
-        documentGeneration = m_saveCoordinator->beginDocumentSave(documentKey);
+        documentGeneration = m_saveCoordinator->beginDocumentSave(documentKey,
+                                                                    newFilePath);
     }
 
     QString errorMessage;
@@ -1355,7 +1368,7 @@ bool DocumentController::convertEncodingAndSave(DocumentEncoding encoding)
 
     editor->beginEncodingConversion(encoding);
 
-    QString filePath = editor->filePath();
+    QString filePath = effectiveSavePath(editor);
     if (filePath.isEmpty())
     {
         filePath = m_persistence->promptSaveFileName(m_pane);
@@ -1400,7 +1413,12 @@ void DocumentController::markExternalConflict(const QString &filePath, bool dele
 void DocumentController::onCurrentPageChanged(int index)
 {
     if (index == -1)
+    {
+        emit currentEditorChanged(nullptr);
+        emit modificationChanged(false);
+        emit copyAvailable(false);
         return;
+    }
 
     DocumentPage *page = m_pane->pageAt(index);
     CustomEditor *editor = page ? page->editor() : nullptr;

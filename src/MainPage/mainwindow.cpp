@@ -431,6 +431,11 @@ void MainWindow::applyActiveController(DocumentController *controller)
             syncFileExplorerToFile(filePath, false);
         }
     }
+    else
+    {
+        setWindowTitle(tr("NotePeek"));
+        setWindowModified(false);
+    }
 }
 
 void MainWindow::closeEvent(QCloseEvent *event)

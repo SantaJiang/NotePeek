@@ -169,11 +169,17 @@ int EditorPane::addPage(DocumentPage *page, const QString &title, const QString 
 
 void EditorPane::removePage(int index)
 {
-    ui->tabWidget->removeTab(index);
     if (index >= 0 && index < ui->comboBox_files->count())
     {
+        // Remove the mirror entry first while blocking its index signal. If a
+        // tab before the current one is removed, changing the tab widget first
+        // can make this combo temporarily select the preceding document and
+        // then keep that wrong selection after its rows shift.
+        const QSignalBlocker blocker(ui->comboBox_files);
         ui->comboBox_files->removeItem(index);
     }
+    ui->tabWidget->removeTab(index);
+    syncComboBoxIndex(ui->tabWidget->currentIndex());
 }
 
 void EditorPane::replacePage(int index, DocumentPage *page)

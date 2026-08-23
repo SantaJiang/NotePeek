@@ -117,7 +117,6 @@ private:
         QPointer<CustomEditor> editor;
         QPointer<DocumentPage> page;
         QString filePath;
-        int previousIndex = -1;
         bool activate = true;
     };
 
@@ -152,6 +151,7 @@ private:
                            const QByteArray &utf8Content,
                            const QString &oldFilePath,
                            const QString &newFilePath);
+    QString effectiveSavePath(CustomEditor *editor) const;
     void setSavingTitle(CustomEditor *editor, const QString &filePath);
     void waitForPendingSaves(CustomEditor *editor);
     bool hasPendingSave(CustomEditor *editor) const;
