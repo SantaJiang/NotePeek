@@ -14,7 +14,6 @@
 #include <QFont>
 #include <QFrame>
 #include <QHeaderView>
-#include <QPalette>
 #include <QSize>
 
 namespace {
@@ -111,21 +110,15 @@ void FileExplorerDock::reapplyTheme()
 {
     using namespace ThemeColors::FileTree;
 
-    QPalette palette = m_treeView->palette();
-    palette.setColor(QPalette::Base, background());
-    palette.setColor(QPalette::Window, background());
-    palette.setColor(QPalette::Text, text());
-    palette.setColor(QPalette::Highlight, selectionBg());
-    palette.setColor(QPalette::HighlightedText, selectionText());
-    if (m_treeView->palette() != palette)
-    {
-        m_treeView->setPalette(palette);
-    }
-
+    // Keep the view's semantic palette roles owned by one styling mechanism.
+    // Combining setPalette() with setStyleSheet() lets a repolish restore the
+    // previous scheme's explicitly resolved text roles on some platforms.
     const QString styleSheet = QStringLiteral(
                                   "QTreeView {"
                                   "  background-color: %1;"
                                   "  color: %2;"
+                                  "  selection-background-color: %4;"
+                                  "  selection-color: %5;"
                                   "  border: 0;"
                                   "  outline: 0;"
                                   "  show-decoration-selected: 1;"

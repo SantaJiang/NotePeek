@@ -12,6 +12,10 @@
 #include <QToolButton>
 #include <QSignalSpy>
 #include <QScrollBar>
+#if QT_VERSION >= QT_VERSION_CHECK(6, 8, 0)
+#include <QScopeGuard>
+#include <QStyleHints>
+#endif
 #include <QStackedWidget>
 #include <QStringList>
 #include <QTimer>
@@ -185,6 +189,73 @@ private slots:
                  QApplication::palette().color(QPalette::Button));
         QCOMPARE(editor->verticalScrollBar()->palette().color(QPalette::Mid),
                  QApplication::palette().color(QPalette::Mid));
+    }
+
+    void fileTreeThemePaletteSurvivesLightToDarkRepolish()
+    {
+#if QT_VERSION >= QT_VERSION_CHECK(6, 8, 0)
+        QStyleHints *styleHints = QGuiApplication::styleHints();
+        const Qt::ColorScheme originalScheme = styleHints->colorScheme();
+        const auto restoreScheme = qScopeGuard([styleHints, originalScheme]() {
+            styleHints->setColorScheme(originalScheme);
+            QCoreApplication::processEvents();
+        });
+
+        styleHints->setColorScheme(Qt::ColorScheme::Light);
+        QCoreApplication::processEvents();
+        const bool canOverrideScheme =
+            styleHints->colorScheme() == Qt::ColorScheme::Light;
+#endif
+
+        QMainWindow window;
+        FileExplorerDock dock(&window);
+        auto *tree = qobject_cast<QTreeView *>(dock.dockWidget()->widget());
+        QVERIFY(tree);
+
+        const auto verifyPalette = [tree]() {
+            const QPalette palette = tree->palette();
+            for (const QPalette::ColorGroup group : {
+                     QPalette::Active, QPalette::Inactive, QPalette::Disabled })
+            {
+                QCOMPARE(palette.color(group, QPalette::Base),
+                         ThemeColors::FileTree::background());
+                QCOMPARE(palette.color(group, QPalette::Window),
+                         ThemeColors::FileTree::background());
+                QCOMPARE(palette.color(group, QPalette::Text),
+                         ThemeColors::FileTree::text());
+                QCOMPARE(palette.color(group, QPalette::Highlight),
+                         ThemeColors::FileTree::selectionBg());
+                QCOMPARE(palette.color(group, QPalette::HighlightedText),
+                         ThemeColors::FileTree::selectionText());
+            }
+
+            const QString styleSheet = tree->styleSheet();
+            QVERIFY(styleSheet.contains(
+                ThemeColors::FileTree::background().name(QColor::HexRgb)));
+            QVERIFY(styleSheet.contains(
+                ThemeColors::FileTree::text().name(QColor::HexRgb)));
+            QVERIFY(styleSheet.contains(
+                ThemeColors::FileTree::hoverBg().name(QColor::HexRgb)));
+            QVERIFY(styleSheet.contains(
+                ThemeColors::FileTree::selectionBg().name(QColor::HexRgb)));
+            QVERIFY(styleSheet.contains(
+                ThemeColors::FileTree::selectionText().name(QColor::HexRgb)));
+            QVERIFY(styleSheet.contains(QStringLiteral("QTreeView::item:hover")));
+            QVERIFY(styleSheet.contains(QStringLiteral("QTreeView::item:selected")));
+        };
+
+        verifyPalette();
+
+#if QT_VERSION >= QT_VERSION_CHECK(6, 8, 0)
+        if (!canOverrideScheme)
+            return;
+
+        styleHints->setColorScheme(Qt::ColorScheme::Dark);
+        QCoreApplication::processEvents();
+        QCOMPARE(styleHints->colorScheme(), Qt::ColorScheme::Dark);
+        dock.reapplyTheme();
+        verifyPalette();
+#endif
     }
 
     void usesRequestedChromeBackgroundColors()
