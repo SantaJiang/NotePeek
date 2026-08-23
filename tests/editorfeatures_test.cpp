@@ -1,10 +1,12 @@
 #include "editor/customeditor.h"
 #include "editor/documentcontroller.h"
 #include "editor/documentpath.h"
+#include "editor/documentpage.h"
 #include "editor/documentsavecoordinator.h"
 #include "editor/editorpane.h"
 #include "editor/editormanager.h"
 #include "editor/externalfilewatcher.h"
+#include "editor/backgroundworkscheduler.h"
 #include "editor/performanceconstants.h"
 #include "editor/spliteditorcoordinator.h"
 #include "decorators/highlightedscrollbar.h"
@@ -12,16 +14,23 @@
 #include "find/findreplacemanager.h"
 #include "tool/markdown/markdownpreviewer.h"
 #include "widgets/elidingcombobox.h"
+#include "widgets/qscieditorinfostatusbar.h"
 #include "apppreferences.h"
 #include <NotePeek/semantictokens.h>
 
 #include <QFile>
+#include <QFileInfo>
+#include <QComboBox>
+#include <QDateTime>
 #include <QFocusEvent>
 #include <QImage>
 #include <QKeyEvent>
+#include <QLabel>
+#include <QMainWindow>
 #include <QPaintEvent>
 #include <QScrollBar>
 #include <QTemporaryDir>
+#include <QThreadPool>
 #include <QSplitter>
 #include <QtTest>
 #include <algorithm>
@@ -99,6 +108,68 @@ private slots:
         QVERIFY(displayedText.endsWith(QChar(0x2026)));
         QVERIFY(combo.fontMetrics().horizontalAdvance(displayedText)
                 < combo.fontMetrics().horizontalAdvance(longName));
+    }
+
+    void removingAnEarlierPageKeepsTheCurrentDocumentSelected()
+    {
+        EditorPane pane;
+        auto *firstEditor = new CustomEditor;
+        auto *secondEditor = new CustomEditor;
+        auto *thirdEditor = new CustomEditor;
+        pane.addPage(new PlainDocumentPage(firstEditor), QStringLiteral("first"), QString());
+        pane.addPage(new PlainDocumentPage(secondEditor), QStringLiteral("second"), QString());
+        pane.addPage(new PlainDocumentPage(thirdEditor), QStringLiteral("third"), QString());
+        pane.setCurrentIndex(2);
+
+        pane.removePage(0);
+
+        QCOMPARE(pane.currentEditor(), thirdEditor);
+        QCOMPARE(pane.currentIndex(), 1);
+        auto *combo = pane.findChild<QComboBox *>(QStringLiteral("comboBox_files"));
+        QVERIFY(combo);
+        QCOMPARE(combo->currentIndex(), 1);
+        QCOMPARE(combo->currentText(), QStringLiteral("third"));
+    }
+
+    void emptyStatusBarDropsThePreviousEditorState()
+    {
+        QMainWindow window;
+        QsciEditorInfoStatusBar statusBar(&window);
+        CustomEditor editor;
+        editor.setText(QStringLiteral("content"));
+        statusBar.connectToEditor(&editor);
+        QVERIFY(!statusBar.findChild<QLabel *>(QStringLiteral("statusDocumentPosition"))
+                     ->text().isEmpty());
+
+        statusBar.connectToEditor(nullptr);
+
+        for (const QString &objectName : {
+                 QStringLiteral("statusDocumentPosition"),
+                 QStringLiteral("statusEncoding"),
+                 QStringLiteral("statusLineEnding"),
+                 QStringLiteral("statusDocumentType")})
+        {
+            QLabel *label = statusBar.findChild<QLabel *>(objectName);
+            QVERIFY(label);
+            QVERIFY(label->text().isEmpty());
+        }
+    }
+
+    void closingTheLastPageReportsThatNoEditorIsActive()
+    {
+        EditorPane pane;
+        DocumentController controller(&pane, false);
+        controller.createDefaultDocument();
+        bool reportedNullEditor = false;
+        connect(&controller, &DocumentController::currentEditorChanged,
+                this, [&reportedNullEditor](CustomEditor *editor) {
+            reportedNullEditor = reportedNullEditor || editor == nullptr;
+        });
+
+        controller.requestClose(0);
+
+        QCOMPARE(pane.count(), 0);
+        QVERIFY(reportedNullEditor);
     }
 
     void autoClosesAndSkipsBrackets()
@@ -540,6 +611,86 @@ private slots:
         QCOMPARE(file.readAll(), QByteArray("content that must survive closing"));
     }
 
+    void saveDuringPendingSaveAsKeepsUsingTheNewPath()
+    {
+        QTemporaryDir tempDir;
+        QVERIFY(tempDir.isValid());
+        const QString originalPath = tempDir.filePath(QStringLiteral("original.txt"));
+        const QString newPath = tempDir.filePath(QStringLiteral("renamed.txt"));
+        {
+            QFile original(originalPath);
+            QVERIFY(original.open(QIODevice::WriteOnly));
+            QCOMPARE(original.write("original"), qint64(8));
+        }
+
+        EditorPane pane;
+        DocumentController controller(&pane, false);
+        QSignalSpy opened(&controller, &DocumentController::fileOpened);
+        controller.openFile(originalPath);
+        QTRY_COMPARE_WITH_TIMEOUT(opened.count(), 1, 3000);
+        CustomEditor *editor = controller.currentEditor();
+        QVERIFY(editor);
+
+        editor->setText(QStringLiteral("first"));
+        QVERIFY(controller.saveFile(editor, newPath));
+        editor->append(QStringLiteral("-second"));
+        QVERIFY(controller.save());
+        controller.waitForPendingSaves();
+
+        QCOMPARE(DocumentPath::normalized(editor->filePath()),
+                 DocumentPath::normalized(newPath));
+        QFile renamed(newPath);
+        QVERIFY(renamed.open(QIODevice::ReadOnly));
+        QCOMPARE(renamed.readAll(), QByteArrayLiteral("first-second"));
+        QFile original(originalPath);
+        QVERIFY(original.open(QIODevice::ReadOnly));
+        QCOMPARE(original.readAll(), QByteArrayLiteral("original"));
+    }
+
+    void saveFromAnotherPaneUsesThePendingSaveAsPath()
+    {
+        QTemporaryDir tempDir;
+        QVERIFY(tempDir.isValid());
+        const QString originalPath = tempDir.filePath(QStringLiteral("original.txt"));
+        const QString newPath = tempDir.filePath(QStringLiteral("renamed.txt"));
+        QFile original(originalPath);
+        QVERIFY(original.open(QIODevice::WriteOnly));
+        QCOMPARE(original.write("original"), qint64(8));
+        original.close();
+
+        QSplitter splitter;
+        EditorPane leftPane(&splitter);
+        EditorPane rightPane(&splitter);
+        DocumentSaveCoordinator saveCoordinator;
+        ExternalFileWatcher fileWatcher;
+        DocumentController left(&leftPane, false, &saveCoordinator, &fileWatcher);
+        DocumentController right(&rightPane, false, &saveCoordinator, &fileWatcher);
+        SplitEditorCoordinator coordinator(&left, &right, &splitter, false, &fileWatcher);
+
+        left.openFile(originalPath);
+        QTRY_VERIFY_WITH_TIMEOUT(left.currentEditor() && !left.currentEditor()->isReadOnly(), 3000);
+        coordinator.setActiveController(&left);
+        coordinator.setSplitViewEnabled(true);
+        QTRY_VERIFY_WITH_TIMEOUT(right.currentEditor(), 3000);
+
+        left.currentEditor()->setText(QStringLiteral("first"));
+        QVERIFY(left.saveFile(left.currentEditor(), newPath));
+        right.currentEditor()->append(QStringLiteral("-second"));
+        QVERIFY(right.save());
+        left.waitForPendingSaves();
+        right.waitForPendingSaves();
+
+        QCOMPARE(DocumentPath::normalized(left.currentEditor()->filePath()),
+                 DocumentPath::normalized(newPath));
+        QCOMPARE(DocumentPath::normalized(right.currentEditor()->filePath()),
+                 DocumentPath::normalized(newPath));
+        QFile renamed(newPath);
+        QVERIFY(renamed.open(QIODevice::ReadOnly));
+        QCOMPARE(renamed.readAll(), QByteArrayLiteral("first-second"));
+        QVERIFY(original.open(QIODevice::ReadOnly));
+        QCOMPARE(original.readAll(), QByteArrayLiteral("original"));
+    }
+
     void sharedEditorsUseOneDocumentSession()
     {
         EditorManager manager;
@@ -617,6 +768,35 @@ private slots:
         QCOMPARE(pane.count(), 1);
     }
 
+    void backgroundOpenNeverChangesTheCurrentPage()
+    {
+        QTemporaryDir tempDir;
+        QVERIFY(tempDir.isValid());
+        const QString firstPath = tempDir.filePath(QStringLiteral("first.txt"));
+        const QString secondPath = tempDir.filePath(QStringLiteral("second.txt"));
+        for (const auto &entry : {
+                 qMakePair(firstPath, QByteArrayLiteral("first")),
+                 qMakePair(secondPath, QByteArrayLiteral("second"))})
+        {
+            QFile file(entry.first);
+            QVERIFY(file.open(QIODevice::WriteOnly));
+            QCOMPARE(file.write(entry.second), qint64(entry.second.size()));
+        }
+
+        EditorPane pane;
+        DocumentController controller(&pane, false);
+        QSignalSpy opened(&controller, &DocumentController::fileOpened);
+        controller.openFile(firstPath);
+        QTRY_COMPARE_WITH_TIMEOUT(opened.count(), 1, 3000);
+        CustomEditor *firstEditor = controller.currentEditor();
+        QVERIFY(firstEditor);
+
+        controller.openFile(secondPath, false);
+        QCOMPARE(controller.currentEditor(), firstEditor);
+        QTRY_COMPARE_WITH_TIMEOUT(opened.count(), 2, 3000);
+        QCOMPARE(controller.currentEditor(), firstEditor);
+    }
+
     void splitCoordinatorSharesTheOpenDocument()
     {
         QTemporaryDir tempDir;
@@ -688,6 +868,63 @@ private slots:
 
         QTRY_COMPARE_WITH_TIMEOUT(changed.size(), 1, 3000);
         QCOMPARE(changed.first().first().toString(), DocumentPath::normalized(path));
+    }
+
+    void externalFileWatcherRehashesARecordedSameMetadataRewrite()
+    {
+        QTemporaryDir tempDir;
+        QVERIFY(tempDir.isValid());
+        const QString path = tempDir.filePath(QStringLiteral("same-metadata.txt"));
+        QFile file(path);
+        QVERIFY(file.open(QIODevice::WriteOnly));
+        QCOMPARE(file.write("old"), qint64(3));
+        file.close();
+        const QDateTime originalTimestamp = QFileInfo(path).lastModified();
+
+        QObject owner;
+        ExternalFileWatcher watcher;
+        watcher.setTrackedFilePaths(&owner, {path});
+        watcher.recordFileState(path);
+        QVERIFY(BackgroundWorkScheduler::ioPool()->waitForDone(3000));
+
+        QVERIFY(file.open(QIODevice::WriteOnly | QIODevice::Truncate));
+        QCOMPARE(file.write("new"), qint64(3));
+        file.close();
+        QVERIFY(file.open(QIODevice::ReadOnly));
+        QVERIFY(file.setFileTime(originalTimestamp, QFileDevice::FileModificationTime));
+        file.close();
+        QCOMPARE(QFileInfo(path).lastModified(), originalTimestamp);
+
+        // The first hash worker is done but its queued completion has not yet
+        // run, so this records a newer snapshot with identical metadata while
+        // the watcher still considers the old baseline in flight.
+        watcher.recordFileState(path);
+        QCoreApplication::processEvents();
+        QVERIFY(BackgroundWorkScheduler::ioPool()->waitForDone(3000));
+        QCoreApplication::processEvents();
+
+        QSignalSpy changed(&watcher, &ExternalFileWatcher::externalFileChanged);
+        watcher.requestExternalChangeCheck(path);
+        QTest::qWait(500);
+        QCOMPARE(changed.count(), 0);
+    }
+
+    void replaceDoesNotOverwriteAnUnrelatedSelection()
+    {
+        CustomEditor editor;
+        editor.setText(QStringLiteral("alpha beta alpha"));
+        FindReplaceManager manager;
+        manager.setCurrentEditor(&editor);
+        manager.setFindText(QStringLiteral("alpha"));
+        manager.setReplaceText(QStringLiteral("changed"));
+        editor.setSelection(0, 6, 0, 10);
+
+        manager.replace();
+
+        QCOMPARE(editor.text(), QStringLiteral("alpha beta alpha"));
+        QCOMPARE(editor.selectedText(), QStringLiteral("alpha"));
+        manager.replace();
+        QCOMPARE(editor.text(), QStringLiteral("alpha beta changed"));
     }
 
     void coalescesStaleMarkdownRenders()
