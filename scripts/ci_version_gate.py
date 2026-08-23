@@ -63,7 +63,13 @@ def main() -> int:
         version = ".".join(str(component) for component in after_version)
 
         if args.before == ZERO_SHA:
-            emit(True, False, version, "new branch or repository history")
+            emit(
+                False,
+                False,
+                version,
+                "version comparison unavailable for new repository history; "
+                "skipped to preserve CI quota",
+            )
             return 0
 
         before_version = project_version(args.before)
