@@ -132,9 +132,34 @@ void FindReplaceManager::replace(const QString &replaceText)
 
     addToReplaceHistory(m_replaceText);
 
-    if (m_editor->hasSelectedText()) {
-        m_editor->replaceSelectedText(m_replaceText);
+    bool selectedMatch = false;
+    if (m_editor->hasSelectedText())
+    {
+        const Qt::CaseSensitivity sensitivity = m_caseSensitive
+                                                    ? Qt::CaseSensitive
+                                                    : Qt::CaseInsensitive;
+        selectedMatch = m_editor->selectedText().compare(m_findText, sensitivity) == 0;
+        if (selectedMatch && m_wholeWord)
+        {
+            const long selectionStart = m_editor->SendScintilla(
+                QsciScintillaBase::SCI_GETSELECTIONSTART);
+            const long selectionEnd = m_editor->SendScintilla(
+                QsciScintillaBase::SCI_GETSELECTIONEND);
+            selectedMatch = m_editor->SendScintilla(
+                QsciScintillaBase::SCI_ISRANGEWORD, selectionStart, selectionEnd) != 0;
+        }
     }
+
+    // The Replace command is defined as replacing the current search match.
+    // A user-created unrelated selection must never be overwritten; move to
+    // the next real match first and let a subsequent Replace act on it.
+    if (!selectedMatch)
+    {
+        find();
+        return;
+    }
+
+    m_editor->replaceSelectedText(m_replaceText);
 
     findNext();
     refreshHighlights();
@@ -193,8 +218,17 @@ void FindReplaceManager::replaceAll()
 
 void FindReplaceManager::highlightAllMatches()
 {
-    if (!m_editor || isLargeFile())
+    if (!m_editor)
         return;
+    if (isLargeFile())
+    {
+        // A document can cross the large-file threshold after highlights were
+        // already present. Clear the old indicator layer once instead of
+        // leaving stale matches visible indefinitely.
+        if (!m_searchResults.isEmpty())
+            clearHighlights();
+        return;
+    }
 
     initializeEditor();
 

@@ -103,6 +103,13 @@ void QsciEditorInfoStatusBar::connectToEditor(QsciScintilla *editor)
 
         refresh(editor);
     }
+    else
+    {
+        docPos->clear();
+        unicodeType->clear();
+        eolFormat->clear();
+        docType->clear();
+    }
 }
 
 void QsciEditorInfoStatusBar::editorCursorPositionChanged(int line, int index)

@@ -24,6 +24,7 @@
 #include <QLabel>
 #include <QMouseEvent>
 #include <QEvent>
+#include <QPointer>
 
 
 class QsciScintilla;
@@ -89,7 +90,7 @@ private:
     QLabel *eolFormat;
     QLabel *unicodeType;
 
-    QsciScintilla *currentEditor;
+    QPointer<QsciScintilla> currentEditor;
 };
 
 #endif // QSCIEDITORINFOSTATUSBAR_H
