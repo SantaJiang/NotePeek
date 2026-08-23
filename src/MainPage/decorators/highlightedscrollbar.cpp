@@ -225,7 +225,13 @@ int HighlightedScrollBar::lineToScrollBarY(int line) const
     if (m_lineCount <= 0) return 0;
 
     const QRect groove = grooveRect();
-    const double ratio = qBound(0.0, static_cast<double>(line) / m_lineCount, 1.0);
+    // Lines are zero-based: the last valid line is lineCount - 1 and must map
+    // to the bottom of the groove. Dividing by lineCount leaves the final
+    // marker noticeably too high in short documents.
+    const int lastLine = qMax(0, m_lineCount - 1);
+    const double ratio = lastLine == 0
+                             ? 0.0
+                             : qBound(0.0, static_cast<double>(line) / lastLine, 1.0);
     return groove.top() + static_cast<int>(ratio * qMax(0, groove.height() - DEFAULT_TICK_HEIGHT));
 }
 

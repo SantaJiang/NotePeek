@@ -269,6 +269,7 @@ void SemanticHighlightingEngine::start(State *state)
             state->editor->setProperty("semanticWorkerNanoseconds", result.elapsedNanoseconds);
         }
         if (requestId == state->requestId && state->editor && state->editor->isVisible()
+            && AppPreferences::instance().semanticHighlightingEnabled()
             && !result.canceled && result.revision == state->editor->documentRevision()
             && result.lastLine >= result.firstLine)
         {
