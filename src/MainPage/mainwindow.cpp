@@ -38,6 +38,7 @@
 #include "editor/externalfilewatcher.h"
 #include "editor/spliteditorcoordinator.h"
 #include "tool/format/codeformatter.h"
+#include "versioncontrol/gitrepositoryservice.h"
 #include "widgets/fileexplorerdock.h"
 #include "widgets/searchresultsdock.h"
 
@@ -65,6 +66,22 @@ QString normalizedAbsolutePath(const QString &path)
 bool isPathInsideDirectory(const QString &path, const QString &directory)
 {
     return DocumentPath::isInsideDirectory(path, directory);
+}
+
+bool hasGitMetadataAtOrAbove(const QString &directory)
+{
+    if (directory.isEmpty())
+        return false;
+
+    QDir candidate(directory);
+    while (candidate.exists())
+    {
+        if (QFileInfo(candidate.filePath(QStringLiteral(".git"))).exists())
+            return true;
+        if (!candidate.cdUp())
+            break;
+    }
+    return false;
 }
 
 void applyEditorSplitterStyle(QSplitter *splitter)
@@ -126,6 +143,7 @@ MainWindow::MainWindow(QWidget *parent,
     , m_fileExplorerDock(nullptr)
     , m_saveCoordinator(new DocumentSaveCoordinator(this))
     , m_externalFileWatcher(new ExternalFileWatcher(this))
+    , m_gitRepositoryService(new GitRepositoryService(this))
     , m_editorCoordinator(nullptr)
     , m_singleFileWindow(false)
     , m_fileExplorerRootExplicit(false)
@@ -176,6 +194,21 @@ MainWindow::MainWindow(QWidget *parent,
             });
     connect(m_fileExplorerDock, &FileExplorerDock::openInNewWindowRequested,
             this, &MainWindow::openFileInNewWindow);
+    connect(m_fileExplorerDock, &FileExplorerDock::repositoryContentsChanged,
+            m_gitRepositoryService, &GitRepositoryService::requestRefresh);
+    connect(ui->statusbar, &QsciEditorInfoStatusBar::gitRefreshRequested,
+            m_gitRepositoryService, &GitRepositoryService::refreshNow);
+    connect(m_gitRepositoryService, &GitRepositoryService::snapshotChanged,
+            this, &MainWindow::updateGitPresentation);
+    connect(m_gitRepositoryService, &GitRepositoryService::stateChanged,
+            this, [this](GitRepositoryState state) {
+                if (state == GitRepositoryState::Ready)
+                    return;
+                ui->statusbar->setGitStatus(QString());
+                m_fileExplorerDock->setGitRepositorySnapshot(GitRepositorySnapshot{});
+            });
+    connect(m_externalFileWatcher, &ExternalFileWatcher::externalFileChanged,
+            m_gitRepositoryService, &GitRepositoryService::requestRefresh);
 
     m_searchResultsDock = new SearchResultsDock(this);
     setCorner(Qt::BottomLeftCorner, Qt::LeftDockWidgetArea);
@@ -192,7 +225,20 @@ MainWindow::MainWindow(QWidget *parent,
         // Editors are read-only while their file loads, which gates the tool
         // actions; they have to be re-evaluated once the load completes.
         connect(controller, &DocumentController::fileOpened,
-                this, [this](CustomEditor *, const QString &) { updateToolActions(); });
+                this, [this](CustomEditor *, const QString &) {
+                    updateToolActions();
+                    m_gitRepositoryService->requestRefresh();
+                });
+        connect(controller, &DocumentController::editorModificationChanged,
+                this, [this](CustomEditor *, bool modified) {
+                    if (!modified)
+                        m_gitRepositoryService->requestRefresh();
+                });
+        connect(controller, &DocumentController::filePathChanged,
+                m_gitRepositoryService,
+                [this](CustomEditor *, const QString &, const QString &) {
+                    m_gitRepositoryService->requestRefresh();
+                });
         connect(controller, &DocumentController::emojiFontInstallationRecommended,
                 this, [this](const QString &filePath) {
                     if (m_emojiFontWarningShown)
@@ -343,6 +389,10 @@ MainWindow::~MainWindow()
     m_editorCoordinator = nullptr;
     qDeleteAll(m_documentControllers);
     m_documentControllers.clear();
+    // Cancel Git while the status bar and file tree still exist: cancellation
+    // can synchronously emit stateChanged() and clear their presentation.
+    delete m_gitRepositoryService;
+    m_gitRepositoryService = nullptr;
     delete ui;
 }
 
@@ -450,6 +500,20 @@ void MainWindow::closeEvent(QCloseEvent *event)
     }
 }
 
+bool MainWindow::event(QEvent *event)
+{
+    const bool handled = QMainWindow::event(event);
+    if (event->type() == QEvent::WindowActivate)
+    {
+        if (m_gitRepositoryService->state() == GitRepositoryState::NotRepository
+            && hasGitMetadataAtOrAbove(m_fileExplorerRootDirectory))
+            m_gitRepositoryService->setDirectory(m_fileExplorerRootDirectory);
+        else
+            m_gitRepositoryService->requestRefresh();
+    }
+    return handled;
+}
+
 void MainWindow::changeEvent(QEvent *event)
 {
     QMainWindow::changeEvent(event);
@@ -509,6 +573,34 @@ void MainWindow::setRootDirectory(const QString &dirPath, bool explicitDirectory
     m_fileExplorerRootExplicit = explicitDirectoryRoot && !m_fileExplorerRootDirectory.isEmpty();
     m_fileExplorerDock->setRootDirectory(dirPath);
     m_searchResultsDock->setSearchRoot(m_fileExplorerRootDirectory);
+    m_gitRepositoryService->setDirectory(m_fileExplorerRootDirectory);
+}
+
+void MainWindow::updateGitPresentation(const GitRepositorySnapshot &snapshot)
+{
+    m_fileExplorerDock->setGitRepositorySnapshot(snapshot);
+
+    QString branch = snapshot.branchName;
+    if (snapshot.detachedHead)
+        branch = QStringLiteral("@%1").arg(snapshot.headOid.left(8));
+    if (branch.isEmpty())
+        branch = QStringLiteral("Git");
+
+    QString text = QStringLiteral("Git: %1").arg(branch);
+    if (snapshot.ahead > 0)
+        text += QStringLiteral("  ↑%1").arg(snapshot.ahead);
+    if (snapshot.behind > 0)
+        text += QStringLiteral("  ↓%1").arg(snapshot.behind);
+    if (!snapshot.files.isEmpty())
+        text += QStringLiteral("  •%1").arg(snapshot.files.size());
+
+    const QString toolTip = tr("Repository: %1\nBranch: %2\nChanges: %3\n"
+                               "Ahead: %4, Behind: %5\nClick to refresh")
+                                .arg(snapshot.repositoryRoot, branch)
+                                .arg(snapshot.files.size())
+                                .arg(snapshot.ahead)
+                                .arg(snapshot.behind);
+    ui->statusbar->setGitStatus(text, toolTip);
 }
 
 void MainWindow::syncFileExplorerToFile(const QString &filePath, bool allowImplicitRootChange)

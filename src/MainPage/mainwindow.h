@@ -7,6 +7,7 @@
 #include "find/findreplacemanager.h"
 #include "tool/cpp/headersourcemanager.h"
 #include "tool/markdown/markdownpreviewer.h"
+#include "versioncontrol/gittypes.h"
 
 namespace Ui
 {
@@ -20,6 +21,7 @@ class DocumentController;
 class DocumentSaveCoordinator;
 class ExternalFileWatcher;
 class FileExplorerDock;
+class GitRepositoryService;
 class SearchResultsDock;
 class SplitEditorCoordinator;
 
@@ -36,6 +38,7 @@ public:
     void openFileByArg(const QString &fileName);
 
 protected:
+    bool event(QEvent *event) override;
     void closeEvent(QCloseEvent *event) override;
     void changeEvent(QEvent *event) override;
 
@@ -72,6 +75,7 @@ private:
     // Builds Tools ▸ Encoding.  Called before the first updateToolActions().
     void setupEncodingMenu();
     void setRootDirectory(const QString &dirPath, bool explicitDirectoryRoot = false);
+    void updateGitPresentation(const GitRepositorySnapshot &snapshot);
     void syncFileExplorerToFile(const QString &filePath, bool allowImplicitRootChange);
     bool isPathInExplorerRoot(const QString &filePath) const;
     void refreshHighlights();
@@ -117,6 +121,7 @@ private:
     QList<QAction *> m_convertEncodingActions;
     DocumentSaveCoordinator *m_saveCoordinator;
     ExternalFileWatcher *m_externalFileWatcher;
+    GitRepositoryService *m_gitRepositoryService;
     // One controller per editor pane, in pane order (the .ui currently
     // provides two). Everything downstream iterates the list instead of
     // assuming a left/right pair.

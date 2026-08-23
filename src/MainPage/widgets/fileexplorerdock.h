@@ -5,6 +5,8 @@
 #include <QModelIndex>
 #include <QString>
 
+#include "versioncontrol/gittypes.h"
+
 class FileTreeView;
 class FileTypeFilterProxyModel;
 class QDockWidget;
@@ -22,6 +24,7 @@ public:
     void setVisible(bool visible);
     void reapplyTheme();
     void setRootDirectory(const QString &dirPath);
+    void setGitRepositorySnapshot(const GitRepositorySnapshot &snapshot);
     void selectFile(const QString &filePath);
     void clearSelection();
     void expandDirectory(const QString &dirPath);
@@ -29,6 +32,7 @@ public:
 signals:
     void fileActivated(const QString &filePath);
     void openInNewWindowRequested(const QString &filePath);
+    void repositoryContentsChanged();
 
 private slots:
     void onTreeDoubleClicked(const QModelIndex &index);

@@ -14,7 +14,10 @@
 #include <QFont>
 #include <QFrame>
 #include <QHeaderView>
+#include <QPainter>
 #include <QSize>
+#include <QStyle>
+#include <QStyledItemDelegate>
 
 namespace {
 
@@ -38,6 +41,67 @@ QFont compactTreeFont()
     return font;
 }
 
+QColor gitStatusColor(FileTypeFilterProxyModel::GitStatusKind kind)
+{
+    using Kind = FileTypeFilterProxyModel::GitStatusKind;
+    switch (kind)
+    {
+    case Kind::Added:
+    case Kind::Copied:
+    case Kind::Untracked:
+        return ThemeColors::color(ThemeColors::ColorRole::LexerAdded);
+    case Kind::Deleted:
+        return ThemeColors::color(ThemeColors::ColorRole::LexerRemoved);
+    case Kind::Conflict:
+        return ThemeColors::color(ThemeColors::ColorRole::LexerError);
+    case Kind::Renamed:
+        return ThemeColors::color(ThemeColors::ColorRole::PrefAccent);
+    case Kind::Modified:
+        return ThemeColors::color(ThemeColors::ColorRole::LexerChanged);
+    case Kind::None:
+        break;
+    }
+    return ThemeColors::FileTree::text();
+}
+
+class GitStatusItemDelegate final : public QStyledItemDelegate
+{
+public:
+    using QStyledItemDelegate::QStyledItemDelegate;
+
+    void paint(QPainter *painter,
+               const QStyleOptionViewItem &option,
+               const QModelIndex &index) const override
+    {
+        const QString status = index.data(FileTypeFilterProxyModel::GitStatusTextRole).toString();
+        if (status.isEmpty() || index.column() != 0)
+        {
+            QStyledItemDelegate::paint(painter, option, index);
+            return;
+        }
+
+        if (option.state.testFlag(QStyle::State_Selected))
+            painter->fillRect(option.rect, ThemeColors::FileTree::selectionBg());
+        else if (option.state.testFlag(QStyle::State_MouseOver))
+            painter->fillRect(option.rect, ThemeColors::FileTree::hoverBg());
+
+        const int statusWidth = qMin(option.rect.width(),
+                                     option.fontMetrics.horizontalAdvance(status) + 10);
+        QStyleOptionViewItem contentOption(option);
+        contentOption.rect.adjust(0, 0, -statusWidth, 0);
+        QStyledItemDelegate::paint(painter, contentOption, index);
+
+        const auto kind = static_cast<FileTypeFilterProxyModel::GitStatusKind>(
+            index.data(FileTypeFilterProxyModel::GitStatusKindRole).toInt());
+        painter->save();
+        painter->setPen(gitStatusColor(kind));
+        painter->drawText(option.rect.adjusted(0, 0, -4, 0),
+                          Qt::AlignRight | Qt::AlignVCenter,
+                          status);
+        painter->restore();
+    }
+};
+
 } // namespace
 
 FileExplorerDock::FileExplorerDock(QWidget *parent)
@@ -53,6 +117,7 @@ FileExplorerDock::FileExplorerDock(QWidget *parent)
     m_fileFilterProxy->setDynamicSortFilter(true);
 
     m_treeView->setModel(m_fileFilterProxy);
+    m_treeView->setItemDelegate(new GitStatusItemDelegate(m_treeView));
     // Keep expansion instant: QFileSystemModel populates directory children
     // asynchronously, so an animated expand of a not-yet-cached folder starts on
     // an empty node and jumps when rows arrive mid-animation (the "flicker").
@@ -94,6 +159,16 @@ FileExplorerDock::FileExplorerDock(QWidget *parent)
 
     connect(m_treeView, &QTreeView::doubleClicked, this, &FileExplorerDock::onTreeDoubleClicked);
     connect(m_treeView, &FileTreeView::openInNewWindowRequested, this, &FileExplorerDock::openInNewWindowRequested);
+    connect(m_fileModel, &QFileSystemModel::directoryLoaded,
+            this, [this](const QString &) { emit repositoryContentsChanged(); });
+    connect(m_fileModel, &QAbstractItemModel::rowsInserted,
+            this, [this](const QModelIndex &, int, int) { emit repositoryContentsChanged(); });
+    connect(m_fileModel, &QAbstractItemModel::rowsRemoved,
+            this, [this](const QModelIndex &, int, int) { emit repositoryContentsChanged(); });
+    connect(m_fileModel, &QAbstractItemModel::dataChanged,
+            this, [this](const QModelIndex &, const QModelIndex &, const QList<int> &) {
+                emit repositoryContentsChanged();
+            });
 }
 
 QDockWidget *FileExplorerDock::dockWidget() const
@@ -171,6 +246,12 @@ void FileExplorerDock::setRootDirectory(const QString &dirPath)
     {
         m_treeView->expand(proxyRootIndex);
     }
+}
+
+void FileExplorerDock::setGitRepositorySnapshot(const GitRepositorySnapshot &snapshot)
+{
+    m_fileFilterProxy->setGitRepositorySnapshot(snapshot);
+    m_treeView->viewport()->update();
 }
 
 void FileExplorerDock::selectFile(const QString &filePath)

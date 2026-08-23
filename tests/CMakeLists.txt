@@ -14,6 +14,21 @@ set_tests_properties(notepeek_documentio_test PROPERTIES
     ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
 )
 
+add_executable(notepeek_versioncontrol_test
+    versioncontrol_test.cpp
+)
+
+target_link_libraries(notepeek_versioncontrol_test PRIVATE
+    notepeek_core
+    Qt6::Test
+)
+notepeek_configure_project_target(notepeek_versioncontrol_test)
+
+add_test(NAME notepeek_versioncontrol_test COMMAND notepeek_versioncontrol_test)
+set_tests_properties(notepeek_versioncontrol_test PROPERTIES
+    ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
+)
+
 add_executable(notepeek_editorfeatures_test
     editorfeatures_test.cpp
 )

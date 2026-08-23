@@ -98,6 +98,41 @@ void FileTypeFilterProxyModel::setVisibleRootDirectory(const QString &dirPath)
 #endif
 }
 
+void FileTypeFilterProxyModel::setGitRepositorySnapshot(const GitRepositorySnapshot &snapshot)
+{
+    m_gitDecorations.clear();
+    if (snapshot.repositoryRoot.isEmpty())
+        return;
+
+    const QString repositoryRootKey = lexicalPathKey(snapshot.repositoryRoot);
+    for (const GitFileStatus &status : snapshot.files)
+    {
+        if (status.isIgnored())
+            continue;
+
+        const GitStatusKind kind = gitStatusKind(status);
+        const QString absolutePath = QDir(snapshot.repositoryRoot).absoluteFilePath(status.path);
+        const QString pathKey = lexicalPathKey(absolutePath);
+        m_gitDecorations.insert(pathKey, GitDecoration{kind, gitStatusText(kind), 1});
+
+        QString parentKey = lexicalPathKey(QFileInfo(absolutePath).absolutePath());
+        while (isPathKeyInsideDirectory(parentKey, repositoryRootKey))
+        {
+            GitDecoration &directory = m_gitDecorations[parentKey];
+            ++directory.changeCount;
+            directory.text = QString::number(directory.changeCount);
+            if (int(kind) > int(directory.kind))
+                directory.kind = kind;
+            if (parentKey == repositoryRootKey)
+                break;
+            const QString nextParent = lexicalPathKey(QFileInfo(parentKey).absolutePath());
+            if (nextParent == parentKey)
+                break;
+            parentKey = nextParent;
+        }
+    }
+}
+
 QString FileTypeFilterProxyModel::filePath(const QModelIndex &proxyIndex) const
 {
     QFileSystemModel *model = fileSystemModel();
@@ -112,11 +147,30 @@ bool FileTypeFilterProxyModel::isDir(const QModelIndex &proxyIndex) const
 
 QVariant FileTypeFilterProxyModel::data(const QModelIndex &index, int role) const
 {
+    auto gitDecoration = m_gitDecorations.cend();
+    const bool needsGitDecoration = role == GitStatusTextRole
+                                    || role == GitStatusKindRole
+                                    || role == Qt::ToolTipRole;
+    if (needsGitDecoration && index.isValid() && !m_gitDecorations.isEmpty())
+        gitDecoration = m_gitDecorations.constFind(lexicalPathKey(filePath(index)));
+    if (gitDecoration != m_gitDecorations.cend())
+    {
+        if (role == GitStatusTextRole)
+            return gitDecoration->text;
+        if (role == GitStatusKindRole)
+            return int(gitDecoration->kind);
+    }
+
     // Long names are elided in the tree, so the untruncated name has to stay
     // reachable somewhere.  QFileSystemModel supplies no tooltip of its own.
     if (index.isValid() && role == Qt::ToolTipRole)
     {
-        return QSortFilterProxyModel::data(index, Qt::DisplayRole);
+        const QString name = QSortFilterProxyModel::data(index, Qt::DisplayRole).toString();
+        if (gitDecoration == m_gitDecorations.cend())
+            return name;
+        if (isDir(index))
+            return tr("%1\nGit changes: %2").arg(name).arg(gitDecoration->changeCount);
+        return tr("%1\nGit status: %2").arg(name, gitDecoration->text);
     }
 
     if (index.isValid()
@@ -130,6 +184,40 @@ QVariant FileTypeFilterProxyModel::data(const QModelIndex &index, int role) cons
     }
 
     return QSortFilterProxyModel::data(index, role);
+}
+
+FileTypeFilterProxyModel::GitStatusKind
+FileTypeFilterProxyModel::gitStatusKind(const GitFileStatus &status)
+{
+    if (status.isConflict())
+        return GitStatusKind::Conflict;
+    if (status.isUntracked())
+        return GitStatusKind::Untracked;
+    if (status.recordType == GitChangeRecordType::RenamedOrCopied)
+        return status.renameOrCopyScore.startsWith(QLatin1Char('C'))
+                   ? GitStatusKind::Copied
+                   : GitStatusKind::Renamed;
+    if (status.indexStatus == QLatin1Char('D') || status.workTreeStatus == QLatin1Char('D'))
+        return GitStatusKind::Deleted;
+    if (status.indexStatus == QLatin1Char('A') || status.workTreeStatus == QLatin1Char('A'))
+        return GitStatusKind::Added;
+    return GitStatusKind::Modified;
+}
+
+QString FileTypeFilterProxyModel::gitStatusText(GitStatusKind kind)
+{
+    switch (kind)
+    {
+    case GitStatusKind::Modified:  return QStringLiteral("M");
+    case GitStatusKind::Added:     return QStringLiteral("A");
+    case GitStatusKind::Deleted:   return QStringLiteral("D");
+    case GitStatusKind::Renamed:   return QStringLiteral("R");
+    case GitStatusKind::Copied:    return QStringLiteral("C");
+    case GitStatusKind::Untracked: return QStringLiteral("U");
+    case GitStatusKind::Conflict:  return QStringLiteral("!");
+    case GitStatusKind::None:      break;
+    }
+    return QString();
 }
 
 bool FileTypeFilterProxyModel::filterAcceptsRow(int sourceRow, const QModelIndex &sourceParent) const

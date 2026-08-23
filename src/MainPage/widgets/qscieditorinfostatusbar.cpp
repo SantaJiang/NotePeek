@@ -37,6 +37,14 @@ QsciEditorInfoStatusBar::QsciEditorInfoStatusBar(QMainWindow *window)
 {
     setAttribute(Qt::WA_StyledBackground, true);
 
+    gitStatus = new StatusLabel(this);
+    gitStatus->setObjectName(QStringLiteral("statusGitRepository"));
+    gitStatus->setCursor(Qt::PointingHandCursor);
+    gitStatus->hide();
+    addWidget(gitStatus, 0);
+    connect(gitStatus, &StatusLabel::clicked,
+            this, &QsciEditorInfoStatusBar::gitRefreshRequested);
+
     docPos = new StatusLabel(this);
     docPos->setObjectName(QStringLiteral("statusDocumentPosition"));
     addPermanentWidget(docPos, 0);
@@ -73,6 +81,13 @@ QsciEditorInfoStatusBar::QsciEditorInfoStatusBar(QMainWindow *window)
     addPermanentWidget(docType, 0);
 
     applyChromeTheme();
+}
+
+void QsciEditorInfoStatusBar::setGitStatus(const QString &text, const QString &toolTip)
+{
+    gitStatus->setText(text);
+    gitStatus->setToolTip(toolTip);
+    gitStatus->setVisible(!text.isEmpty());
 }
 
 void QsciEditorInfoStatusBar::refresh(QsciScintilla *editor)

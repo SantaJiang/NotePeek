@@ -39,6 +39,15 @@ add_library(notepeek_core STATIC
     tool/markdown/markdownpreviewer.cpp
     tool/markdown/markdownpreviewer.h
     themecolors.h
+    versioncontrol/gitcommandrunner.cpp
+    versioncontrol/gitcommandrunner.h
+    versioncontrol/gitexecutable.cpp
+    versioncontrol/gitexecutable.h
+    versioncontrol/gitrepositoryservice.cpp
+    versioncontrol/gitrepositoryservice.h
+    versioncontrol/gitstatusparser.cpp
+    versioncontrol/gitstatusparser.h
+    versioncontrol/gittypes.h
 )
 
 target_link_libraries(notepeek_core PUBLIC

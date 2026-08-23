@@ -12,6 +12,7 @@
 #include "decorators/highlightedscrollbar.h"
 #include "decorators/highlightedscrollbardecorator.h"
 #include "tool/markdown/markdownpreviewer.h"
+#include "versioncontrol/gitstatusparser.h"
 #include <NotePeek/semantictokens.h>
 #include <NotePeek/syntaxtheme.h>
 #include <NotePeek/syntaxstyler.h>
@@ -148,6 +149,33 @@ private slots:
         QVERIFY2(DocumentFormatCodec::decode(input, &text, &format, &error), qPrintable(error));
         QVERIFY2(timer.elapsed() < 5000, "10 MB decoding exceeded the 5 second smoke budget");
         QCOMPARE(format.lineEnding, DocumentLineEnding::CrLf);
+    }
+
+    void parsesTwentyThousandGitChangesWithinSmokeBudget()
+    {
+        QByteArray status;
+        status.reserve(3 * 1024 * 1024);
+        status.append("# branch.oid 0123456789abcdef");
+        status.append('\0');
+        status.append("# branch.head performance");
+        status.append('\0');
+        for (int index = 0; index < 20000; ++index)
+        {
+            status.append("1 .M N... 100644 100644 100644 aaaa bbbb src/file-");
+            status.append(QByteArray::number(index));
+            status.append(".cpp");
+            status.append('\0');
+        }
+
+        QElapsedTimer timer;
+        timer.start();
+        const GitStatusParseResult parsed = GitStatusParser::parsePorcelainV2(status);
+        const qint64 elapsedMs = timer.elapsed();
+        QVERIFY2(parsed.succeeded(), qPrintable(parsed.error));
+        QCOMPARE(parsed.snapshot.files.size(), 20000);
+        QVERIFY2(elapsedMs < 2000,
+                 qPrintable(QStringLiteral("20,000 Git changes took %1 ms to parse")
+                                .arg(elapsedMs)));
     }
 
     void snapshotsUtf8WithoutQStringRoundTrip()

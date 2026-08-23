@@ -3,12 +3,14 @@
 #include <QMenu>
 #include <QComboBox>
 #include <QDockWidget>
+#include <QDir>
 #include <QMainWindow>
 #include <QLineEdit>
 #include <QLabel>
 #include <QListWidget>
 #include <QMessageBox>
 #include <QPushButton>
+#include <QProcess>
 #include <QToolButton>
 #include <QSignalSpy>
 #include <QScrollBar>
@@ -45,6 +47,8 @@
 #include "preferencesdialog.h"
 #include "tool/cpp/headersourcemanager.h"
 #include "tool/markdown/emojifontsupport.h"
+#include "versioncontrol/gitexecutable.h"
+#include "versioncontrol/gitrepositoryservice.h"
 #include "widgets/fileexplorerdock.h"
 #include "widgets/filetypefilterproxymodel.h"
 #include "widgets/searchresultsdock.h"
@@ -63,6 +67,19 @@ void writeFile(const QString &path, const QByteArray &content)
     QFile file(path);
     QVERIFY2(file.open(QFile::WriteOnly), qPrintable(path));
     QCOMPARE(file.write(content), qint64(content.size()));
+}
+
+bool runGit(const QString &gitExecutable,
+            const QString &workingDirectory,
+            const QStringList &arguments)
+{
+    QProcess process;
+    process.setProgram(gitExecutable);
+    process.setArguments(arguments);
+    process.setWorkingDirectory(workingDirectory);
+    process.start();
+    return process.waitForStarted(3000) && process.waitForFinished(10000)
+           && process.exitStatus() == QProcess::NormalExit && process.exitCode() == 0;
 }
 
 long scintillaColorValue(const QColor &color)
@@ -335,6 +352,29 @@ private slots:
         }
         QVERIFY(statusBar->styleSheet().contains(
             ThemeColors::EditorTopBar::text().name(QColor::HexRgb)));
+    }
+
+    void statusBarShowsClickableGitSummary()
+    {
+        QMainWindow window;
+        QsciEditorInfoStatusBar statusBar(&window);
+        QLabel *gitLabel = statusBar.findChild<QLabel *>(
+            QStringLiteral("statusGitRepository"));
+        QVERIFY(gitLabel);
+        QVERIFY(gitLabel->isHidden());
+
+        QSignalSpy refreshSpy(&statusBar,
+                              &QsciEditorInfoStatusBar::gitRefreshRequested);
+        statusBar.show();
+        statusBar.setGitStatus(QStringLiteral("Git: main  •2"),
+                               QStringLiteral("Click to refresh"));
+        QVERIFY(!gitLabel->isHidden());
+        QCOMPARE(gitLabel->text(), QStringLiteral("Git: main  •2"));
+        QTest::mouseClick(gitLabel, Qt::LeftButton);
+        QCOMPARE(refreshSpy.count(), 1);
+
+        statusBar.setGitStatus(QString());
+        QVERIFY(gitLabel->isHidden());
     }
 
     void usesUntranslatedNameForUntitledDocuments()
@@ -1576,6 +1616,170 @@ private slots:
             return proxyIndex.isValid();
         }());
         QCOMPARE(proxy.data(proxyIndex, Qt::ToolTipRole).toString(), longName);
+    }
+
+    void fileTreeExposesGitStatusForFilesAndDirectories()
+    {
+        QTemporaryDir dir;
+        QVERIFY(dir.isValid());
+        QVERIFY(QDir(dir.path()).mkpath(QStringLiteral("notes")));
+        const QString modifiedPath = dir.filePath(QStringLiteral("notes/modified.md"));
+        const QString untrackedPath = dir.filePath(QStringLiteral("notes/new.md"));
+        const QString copiedPath = dir.filePath(QStringLiteral("notes/copied.md"));
+        const QString conflictPath = dir.filePath(QStringLiteral("notes/conflict.md"));
+        writeFile(modifiedPath, QByteArrayLiteral("changed\n"));
+        writeFile(untrackedPath, QByteArrayLiteral("new\n"));
+        writeFile(copiedPath, QByteArrayLiteral("copied\n"));
+        writeFile(conflictPath, QByteArrayLiteral("conflict\n"));
+
+        QFileSystemModel model;
+        model.setFilter(QDir::AllEntries | QDir::NoDotAndDotDot | QDir::AllDirs);
+        FileTypeFilterProxyModel proxy;
+        proxy.setSourceModel(&model);
+        model.setRootPath(dir.path());
+        proxy.setVisibleRootDirectory(dir.path());
+
+        GitRepositorySnapshot snapshot;
+        snapshot.repositoryRoot = dir.path();
+        GitFileStatus modified;
+        modified.path = QStringLiteral("notes/modified.md");
+        modified.workTreeStatus = QLatin1Char('M');
+        GitFileStatus untracked;
+        untracked.recordType = GitChangeRecordType::Untracked;
+        untracked.path = QStringLiteral("notes/new.md");
+        GitFileStatus copied;
+        copied.recordType = GitChangeRecordType::RenamedOrCopied;
+        copied.renameOrCopyScore = QStringLiteral("C100");
+        copied.path = QStringLiteral("notes/copied.md");
+        GitFileStatus conflict;
+        conflict.recordType = GitChangeRecordType::Unmerged;
+        conflict.path = QStringLiteral("notes/conflict.md");
+        snapshot.files = {modified, untracked, copied, conflict};
+        proxy.setGitRepositorySnapshot(snapshot);
+
+        QModelIndex modifiedIndex;
+        QModelIndex directoryIndex;
+        QModelIndex copiedIndex;
+        QModelIndex conflictIndex;
+        QTRY_VERIFY([&]() {
+            modifiedIndex = proxy.mapFromSource(model.index(modifiedPath));
+            directoryIndex = proxy.mapFromSource(
+                model.index(dir.filePath(QStringLiteral("notes"))));
+            copiedIndex = proxy.mapFromSource(model.index(copiedPath));
+            conflictIndex = proxy.mapFromSource(model.index(conflictPath));
+            return modifiedIndex.isValid() && directoryIndex.isValid()
+                   && copiedIndex.isValid() && conflictIndex.isValid();
+        }());
+        QCOMPARE(proxy.data(modifiedIndex,
+                            FileTypeFilterProxyModel::GitStatusTextRole).toString(),
+                 QStringLiteral("M"));
+        QCOMPARE(proxy.data(directoryIndex,
+                            FileTypeFilterProxyModel::GitStatusTextRole).toString(),
+                 QStringLiteral("4"));
+        QVERIFY(proxy.data(modifiedIndex, Qt::ToolTipRole).toString()
+                    .contains(QStringLiteral("Git status: M")));
+        QCOMPARE(proxy.data(copiedIndex,
+                            FileTypeFilterProxyModel::GitStatusTextRole).toString(),
+                 QStringLiteral("C"));
+        QCOMPARE(proxy.data(conflictIndex,
+                            FileTypeFilterProxyModel::GitStatusTextRole).toString(),
+                 QStringLiteral("!"));
+    }
+
+    void nonRepositoryRediscoveryWaitsForGitMetadata()
+    {
+        const QString git = GitExecutable::find();
+        if (git.isEmpty())
+            QSKIP("System Git is unavailable", 0);
+
+        QTemporaryDir dir;
+        QVERIFY(dir.isValid());
+        const QString filePath = dir.filePath(QStringLiteral("note.md"));
+        writeFile(filePath, QByteArrayLiteral("note\n"));
+
+        MainWindow window(nullptr, {filePath});
+        window.show();
+        auto *service = window.findChild<GitRepositoryService *>();
+        QVERIFY(service);
+        QTRY_COMPARE_WITH_TIMEOUT(service->state(), GitRepositoryState::NotRepository, 5000);
+
+        QSignalSpy states(service, &GitRepositoryService::stateChanged);
+        QEvent activateWithoutRepository(QEvent::WindowActivate);
+        QCoreApplication::sendEvent(&window, &activateWithoutRepository);
+        QTest::qWait(500);
+        QCOMPARE(states.count(), 0);
+
+        QVERIFY(runGit(git, dir.path(),
+                       {QStringLiteral("init"), QStringLiteral("--quiet")}));
+        QEvent activateWithRepository(QEvent::WindowActivate);
+        QCoreApplication::sendEvent(&window, &activateWithRepository);
+        QTRY_COMPARE_WITH_TIMEOUT(service->state(), GitRepositoryState::Ready, 5000);
+    }
+
+    void openingGitProjectShowsBranchAndFileStatus()
+    {
+        const QString git = GitExecutable::find();
+        if (git.isEmpty())
+            QSKIP("System Git is unavailable", 0);
+
+        QTemporaryDir dir;
+        QVERIFY(dir.isValid());
+        const QString filePath = dir.filePath(QStringLiteral("tracked.md"));
+        writeFile(filePath, QByteArrayLiteral("original\n"));
+        QVERIFY(runGit(git, dir.path(),
+                       {QStringLiteral("init"), QStringLiteral("--quiet")}));
+        QVERIFY(runGit(git, dir.path(),
+                       {QStringLiteral("add"), QStringLiteral("tracked.md")}));
+        QVERIFY(runGit(git, dir.path(),
+                       {QStringLiteral("-c"), QStringLiteral("user.name=NotePeek Test"),
+                        QStringLiteral("-c"), QStringLiteral("user.email=notepeek@example.invalid"),
+                        QStringLiteral("-c"), QStringLiteral("commit.gpgSign=false"),
+                        QStringLiteral("commit"), QStringLiteral("--quiet"),
+                        QStringLiteral("-m"), QStringLiteral("initial")}));
+        writeFile(filePath, QByteArrayLiteral("modified\n"));
+
+        MainWindow window(nullptr, {filePath});
+        window.show();
+        QLabel *gitLabel = window.findChild<QLabel *>(
+            QStringLiteral("statusGitRepository"));
+        QVERIFY(gitLabel);
+        QTRY_VERIFY_WITH_TIMEOUT(gitLabel->isVisible(), 10000);
+        QVERIFY(gitLabel->text().startsWith(QStringLiteral("Git: ")));
+        QVERIFY(gitLabel->text().contains(QStringLiteral("•1")));
+
+        FileTypeFilterProxyModel *proxy = nullptr;
+        for (QTreeView *tree : window.findChildren<QTreeView *>())
+        {
+            proxy = qobject_cast<FileTypeFilterProxyModel *>(tree->model());
+            if (proxy)
+                break;
+        }
+        QVERIFY(proxy);
+        auto *model = qobject_cast<QFileSystemModel *>(proxy->sourceModel());
+        QVERIFY(model);
+        QModelIndex fileIndex;
+        QTRY_VERIFY_WITH_TIMEOUT([&]() {
+            const QString treeFilePath = QDir(model->rootPath()).filePath(
+                QStringLiteral("tracked.md"));
+            fileIndex = proxy->mapFromSource(model->index(treeFilePath));
+            return fileIndex.isValid()
+                   && proxy->data(fileIndex,
+                                  FileTypeFilterProxyModel::GitStatusTextRole).toString()
+                          == QStringLiteral("M");
+        }(), 10000);
+
+        const QString untrackedPath = dir.filePath(QStringLiteral("new.md"));
+        writeFile(untrackedPath, QByteArrayLiteral("new\n"));
+        QTRY_VERIFY_WITH_TIMEOUT(gitLabel->text().contains(QStringLiteral("•2")), 10000);
+        QTRY_VERIFY_WITH_TIMEOUT([&]() {
+            const QString treeFilePath = QDir(model->rootPath()).filePath(
+                QStringLiteral("new.md"));
+            const QModelIndex newFileIndex = proxy->mapFromSource(model->index(treeFilePath));
+            return newFileIndex.isValid()
+                   && proxy->data(newFileIndex,
+                                  FileTypeFilterProxyModel::GitStatusTextRole).toString()
+                          == QStringLiteral("U");
+        }(), 10000);
     }
 
     void fileTreeClassifiesBinaryFilesOffTheUiThread()

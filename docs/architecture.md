@@ -37,6 +37,10 @@ BackgroundWorkScheduler
   -> IO pool (load, save, external reload)
   -> background pool (Markdown rendering, file-type filtering)
 
+GitRepositoryService
+  -> GitCommandRunner (asynchronous system-Git processes)
+  -> GitStatusParser (porcelain-v2 status snapshots)
+
 EditorPane (view)
   -> DocumentPage (one per tab, plain or Markdown-capable)
 ```
@@ -80,6 +84,24 @@ Centralizes directory exclusions for project traversal. Standard generated and
 metadata directories are skipped consistently, root `.gitignore` rules retain
 their order and negation semantics, and callers may add temporary glob rules
 without changing repository files.
+
+### `versioncontrol/GitRepositoryService`
+
+Provides the UI-independent Git foundation. It locates and version-checks the
+system Git executable, discovers the repository containing a directory, and
+coalesces explicit status refresh requests. `GitCommandRunner` launches Git
+asynchronously with separate arguments, C-locale output, disabled terminal
+prompts, and no optional index locks for read-only work. `GitStatusParser`
+turns NUL-delimited porcelain-v2 output into immutable repository snapshots,
+including branch/upstream counts, stash count, renames, conflicts, and unusual
+file names. The service performs no index or working-tree mutations; UI and
+future operation coordinators consume it rather than parsing Git output directly.
+`MainWindow` binds the current explorer root to this service. Repository
+snapshots populate a clickable branch summary in the status bar and lightweight
+right-aligned status markers in the existing file-tree delegate. Source-model,
+editor-save, external-change, and window-activation notifications request a
+debounced refresh; non-repositories and unavailable Git installations leave the
+ordinary editor UI unchanged.
 
 ### `editor/EditorPane`
 

@@ -66,9 +66,11 @@ public:
     void refresh(QsciScintilla *editor);
     void connectToEditor(QsciScintilla *editor);
     void reapplyTheme();
+    void setGitStatus(const QString &text, const QString &toolTip = QString());
 
 signals:
     void customContextMenuRequestedForEOLLabel(const QPoint &pos);
+    void gitRefreshRequested();
 
 protected:
     void changeEvent(QEvent *event) override;
@@ -89,6 +91,7 @@ private:
     QLabel *docPos;
     QLabel *eolFormat;
     QLabel *unicodeType;
+    StatusLabel *gitStatus;
 
     QPointer<QsciScintilla> currentEditor;
 };
