@@ -21,6 +21,11 @@
 
 namespace {
 
+constexpr int kGitStatusLeftSpacing = 6;
+constexpr int kGitStatusRightMargin = 6;
+constexpr int kDirectoryGitStatusDiameter = 5;
+const QString kDirectoryGitStatusMarker = QStringLiteral("●");
+
 QString normalizedAbsolutePath(const QString &path)
 {
     return DocumentPath::normalized(path);
@@ -85,8 +90,14 @@ public:
         else if (option.state.testFlag(QStyle::State_MouseOver))
             painter->fillRect(option.rect, ThemeColors::FileTree::hoverBg());
 
+        const bool isDirectoryMarker = status == kDirectoryGitStatusMarker;
+        const int markerWidth = isDirectoryMarker
+                                    ? kDirectoryGitStatusDiameter
+                                    : option.fontMetrics.horizontalAdvance(status);
         const int statusWidth = qMin(option.rect.width(),
-                                     option.fontMetrics.horizontalAdvance(status) + 10);
+                                     markerWidth
+                                         + kGitStatusLeftSpacing
+                                         + kGitStatusRightMargin);
         QStyleOptionViewItem contentOption(option);
         contentOption.rect.adjust(0, 0, -statusWidth, 0);
         QStyledItemDelegate::paint(painter, contentOption, index);
@@ -95,9 +106,26 @@ public:
             index.data(FileTypeFilterProxyModel::GitStatusKindRole).toInt());
         painter->save();
         painter->setPen(gitStatusColor(kind));
-        painter->drawText(option.rect.adjusted(0, 0, -4, 0),
-                          Qt::AlignRight | Qt::AlignVCenter,
-                          status);
+        if (isDirectoryMarker)
+        {
+            painter->setRenderHint(QPainter::Antialiasing, true);
+            painter->setBrush(gitStatusColor(kind));
+            painter->setPen(Qt::NoPen);
+            const QRectF itemRect(option.rect);
+            const QRectF markerRect(itemRect.right() - kGitStatusRightMargin
+                                        - kDirectoryGitStatusDiameter,
+                                    itemRect.center().y()
+                                        - (kDirectoryGitStatusDiameter / 2.0),
+                                    kDirectoryGitStatusDiameter,
+                                    kDirectoryGitStatusDiameter);
+            painter->drawEllipse(markerRect);
+        }
+        else
+        {
+            painter->drawText(option.rect.adjusted(0, 0, -kGitStatusRightMargin, 0),
+                              Qt::AlignRight | Qt::AlignVCenter,
+                              status);
+        }
         painter->restore();
     }
 };

@@ -75,6 +75,7 @@ private:
     // Builds Tools ▸ Encoding.  Called before the first updateToolActions().
     void setupEncodingMenu();
     void setRootDirectory(const QString &dirPath, bool explicitDirectoryRoot = false);
+    void setGitIntegrationEnabled(bool enabled);
     void updateGitPresentation(const GitRepositorySnapshot &snapshot);
     void syncFileExplorerToFile(const QString &filePath, bool allowImplicitRootChange);
     bool isPathInExplorerRoot(const QString &filePath) const;

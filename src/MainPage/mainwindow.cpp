@@ -143,7 +143,7 @@ MainWindow::MainWindow(QWidget *parent,
     , m_fileExplorerDock(nullptr)
     , m_saveCoordinator(new DocumentSaveCoordinator(this))
     , m_externalFileWatcher(new ExternalFileWatcher(this))
-    , m_gitRepositoryService(new GitRepositoryService(this))
+    , m_gitRepositoryService(nullptr)
     , m_editorCoordinator(nullptr)
     , m_singleFileWindow(false)
     , m_fileExplorerRootExplicit(false)
@@ -194,21 +194,7 @@ MainWindow::MainWindow(QWidget *parent,
             });
     connect(m_fileExplorerDock, &FileExplorerDock::openInNewWindowRequested,
             this, &MainWindow::openFileInNewWindow);
-    connect(m_fileExplorerDock, &FileExplorerDock::repositoryContentsChanged,
-            m_gitRepositoryService, &GitRepositoryService::requestRefresh);
-    connect(ui->statusbar, &QsciEditorInfoStatusBar::gitRefreshRequested,
-            m_gitRepositoryService, &GitRepositoryService::refreshNow);
-    connect(m_gitRepositoryService, &GitRepositoryService::snapshotChanged,
-            this, &MainWindow::updateGitPresentation);
-    connect(m_gitRepositoryService, &GitRepositoryService::stateChanged,
-            this, [this](GitRepositoryState state) {
-                if (state == GitRepositoryState::Ready)
-                    return;
-                ui->statusbar->setGitStatus(QString());
-                m_fileExplorerDock->setGitRepositorySnapshot(GitRepositorySnapshot{});
-            });
-    connect(m_externalFileWatcher, &ExternalFileWatcher::externalFileChanged,
-            m_gitRepositoryService, &GitRepositoryService::requestRefresh);
+    setGitIntegrationEnabled(AppPreferences::instance().gitIntegrationEnabled());
 
     m_searchResultsDock = new SearchResultsDock(this);
     setCorner(Qt::BottomLeftCorner, Qt::LeftDockWidgetArea);
@@ -227,17 +213,19 @@ MainWindow::MainWindow(QWidget *parent,
         connect(controller, &DocumentController::fileOpened,
                 this, [this](CustomEditor *, const QString &) {
                     updateToolActions();
-                    m_gitRepositoryService->requestRefresh();
+                    if (m_gitRepositoryService)
+                        m_gitRepositoryService->requestRefresh();
                 });
         connect(controller, &DocumentController::editorModificationChanged,
                 this, [this](CustomEditor *, bool modified) {
-                    if (!modified)
+                    if (!modified && m_gitRepositoryService)
                         m_gitRepositoryService->requestRefresh();
                 });
         connect(controller, &DocumentController::filePathChanged,
-                m_gitRepositoryService,
+                this,
                 [this](CustomEditor *, const QString &, const QString &) {
-                    m_gitRepositoryService->requestRefresh();
+                    if (m_gitRepositoryService)
+                        m_gitRepositoryService->requestRefresh();
                 });
         connect(controller, &DocumentController::emojiFontInstallationRecommended,
                 this, [this](const QString &filePath) {
@@ -503,7 +491,7 @@ void MainWindow::closeEvent(QCloseEvent *event)
 bool MainWindow::event(QEvent *event)
 {
     const bool handled = QMainWindow::event(event);
-    if (event->type() == QEvent::WindowActivate)
+    if (event->type() == QEvent::WindowActivate && m_gitRepositoryService)
     {
         if (m_gitRepositoryService->state() == GitRepositoryState::NotRepository
             && hasGitMetadataAtOrAbove(m_fileExplorerRootDirectory))
@@ -573,11 +561,50 @@ void MainWindow::setRootDirectory(const QString &dirPath, bool explicitDirectory
     m_fileExplorerRootExplicit = explicitDirectoryRoot && !m_fileExplorerRootDirectory.isEmpty();
     m_fileExplorerDock->setRootDirectory(dirPath);
     m_searchResultsDock->setSearchRoot(m_fileExplorerRootDirectory);
-    m_gitRepositoryService->setDirectory(m_fileExplorerRootDirectory);
+    if (m_gitRepositoryService)
+        m_gitRepositoryService->setDirectory(m_fileExplorerRootDirectory);
+}
+
+void MainWindow::setGitIntegrationEnabled(bool enabled)
+{
+    if (enabled)
+    {
+        if (m_gitRepositoryService)
+            return;
+
+        m_gitRepositoryService = new GitRepositoryService(this);
+        connect(m_fileExplorerDock, &FileExplorerDock::repositoryContentsChanged,
+                m_gitRepositoryService, &GitRepositoryService::requestRefresh);
+        connect(ui->statusbar, &QsciEditorInfoStatusBar::gitRefreshRequested,
+                m_gitRepositoryService, &GitRepositoryService::refreshNow);
+        connect(m_gitRepositoryService, &GitRepositoryService::snapshotChanged,
+                this, &MainWindow::updateGitPresentation);
+        connect(m_gitRepositoryService, &GitRepositoryService::stateChanged,
+                this, [this](GitRepositoryState state) {
+                    if (state == GitRepositoryState::Ready)
+                        return;
+                    ui->statusbar->setGitStatus(QString());
+                    m_fileExplorerDock->setGitRepositorySnapshot(GitRepositorySnapshot{});
+                });
+        connect(m_externalFileWatcher, &ExternalFileWatcher::externalFileChanged,
+                m_gitRepositoryService, &GitRepositoryService::requestRefresh);
+        m_gitRepositoryService->setDirectory(m_fileExplorerRootDirectory);
+        return;
+    }
+
+    delete m_gitRepositoryService;
+    m_gitRepositoryService = nullptr;
+    ui->statusbar->setGitStatus(QString());
+    m_fileExplorerDock->setGitRepositorySnapshot(GitRepositorySnapshot{});
 }
 
 void MainWindow::updateGitPresentation(const GitRepositorySnapshot &snapshot)
 {
+    // A queued snapshot can outlive a service that was just disabled. Never
+    // restore stale decorations after the preference has cleared them.
+    if (!m_gitRepositoryService)
+        return;
+
     m_fileExplorerDock->setGitRepositorySnapshot(snapshot);
 
     QString branch = snapshot.branchName;
@@ -586,7 +613,7 @@ void MainWindow::updateGitPresentation(const GitRepositorySnapshot &snapshot)
     if (branch.isEmpty())
         branch = QStringLiteral("Git");
 
-    QString text = QStringLiteral("Git: %1").arg(branch);
+    QString text = branch;
     if (snapshot.ahead > 0)
         text += QStringLiteral("  ↑%1").arg(snapshot.ahead);
     if (snapshot.behind > 0)
@@ -750,6 +777,7 @@ void MainWindow::applyPreferences()
     reapplyChromeTheme();
     m_editorCoordinator->refreshVisibleMarkdownPreviews();
     ui->statusbar->setVisible(AppPreferences::instance().showStatusBar());
+    setGitIntegrationEnabled(AppPreferences::instance().gitIntegrationEnabled());
     if (CustomEditor *editor = activeController()->currentEditor())
     {
         updateEditActions(editor->hasSelectedText());

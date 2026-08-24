@@ -20,6 +20,8 @@
 #include "editor/customeditor.h"
 #include "editor/documentformat.h"
 #include "themecolors.h"
+#include "widgets/iconfont.h"
+#include <QHBoxLayout>
 #include <QMainWindow>
 #include <QTimer>
 #include <Qsci/qsciscintilla.h>
@@ -29,6 +31,7 @@
 namespace {
 
 constexpr int kItemSpacing = 15;
+constexpr int kGitIconSpacing = 5;
 
 } // namespace
 
@@ -37,11 +40,35 @@ QsciEditorInfoStatusBar::QsciEditorInfoStatusBar(QMainWindow *window)
 {
     setAttribute(Qt::WA_StyledBackground, true);
 
-    gitStatus = new StatusLabel(this);
+    gitStatusContainer = new QWidget(this);
+    gitStatusContainer->setObjectName(QStringLiteral("statusGitContainer"));
+    auto *gitLayout = new QHBoxLayout(gitStatusContainer);
+    gitLayout->setContentsMargins(0, 0, 0, 0);
+    gitLayout->setSpacing(0);
+
+    gitLeftPadding = new QWidget(gitStatusContainer);
+    gitLeftPadding->setObjectName(QStringLiteral("statusGitLeftPadding"));
+    gitLeftPadding->setFixedWidth(kItemSpacing);
+    gitLayout->addWidget(gitLeftPadding);
+
+    gitBranchIcon = new StatusLabel(gitStatusContainer);
+    gitBranchIcon->setObjectName(QStringLiteral("statusGitBranchIcon"));
+    const QString &iconFontFamily = IconFont::fontAwesomeFamily();
+    if (!iconFontFamily.isEmpty())
+        gitBranchIcon->setFont(QFont(iconFontFamily));
+    gitBranchIcon->setText(QChar(0xf126));
+    gitBranchIcon->setCursor(Qt::PointingHandCursor);
+    gitLayout->addWidget(gitBranchIcon);
+    gitLayout->addSpacing(kGitIconSpacing);
+
+    gitStatus = new StatusLabel(gitStatusContainer);
     gitStatus->setObjectName(QStringLiteral("statusGitRepository"));
     gitStatus->setCursor(Qt::PointingHandCursor);
-    gitStatus->hide();
-    addWidget(gitStatus, 0);
+    gitLayout->addWidget(gitStatus);
+    gitStatusContainer->hide();
+    addWidget(gitStatusContainer, 0);
+    connect(gitBranchIcon, &StatusLabel::clicked,
+            this, &QsciEditorInfoStatusBar::gitRefreshRequested);
     connect(gitStatus, &StatusLabel::clicked,
             this, &QsciEditorInfoStatusBar::gitRefreshRequested);
 
@@ -87,7 +114,10 @@ void QsciEditorInfoStatusBar::setGitStatus(const QString &text, const QString &t
 {
     gitStatus->setText(text);
     gitStatus->setToolTip(toolTip);
-    gitStatus->setVisible(!text.isEmpty());
+    gitBranchIcon->setToolTip(toolTip);
+    gitStatusContainer->setVisible(!text.isEmpty());
+    if (!text.isEmpty())
+        QTimer::singleShot(0, this, &QsciEditorInfoStatusBar::syncGitEdgeSpacing);
 }
 
 void QsciEditorInfoStatusBar::refresh(QsciScintilla *editor)
@@ -191,6 +221,29 @@ void QsciEditorInfoStatusBar::changeEvent(QEvent *event)
         // repolishes this widget and its children.
         QTimer::singleShot(0, this, &QsciEditorInfoStatusBar::applyChromeTheme);
     }
+}
+
+void QsciEditorInfoStatusBar::resizeEvent(QResizeEvent *event)
+{
+    QStatusBar::resizeEvent(event);
+    QTimer::singleShot(0, this, &QsciEditorInfoStatusBar::syncGitEdgeSpacing);
+}
+
+void QsciEditorInfoStatusBar::showEvent(QShowEvent *event)
+{
+    QStatusBar::showEvent(event);
+    QTimer::singleShot(0, this, &QsciEditorInfoStatusBar::syncGitEdgeSpacing);
+}
+
+void QsciEditorInfoStatusBar::syncGitEdgeSpacing()
+{
+    if (docType->geometry().isEmpty())
+        return;
+
+    const int rightEdgeSpacing = width() - docType->geometry().right() - 1;
+    const int targetWidth = qMax(0, rightEdgeSpacing - gitStatusContainer->geometry().left());
+    if (gitLeftPadding->width() != targetWidth)
+        gitLeftPadding->setFixedWidth(targetWidth);
 }
 
 void QsciEditorInfoStatusBar::updateSelectionInfo(QsciScintilla *editor)

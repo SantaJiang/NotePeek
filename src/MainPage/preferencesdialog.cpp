@@ -363,6 +363,7 @@ PreferencesDialog::PreferencesDialog(QWidget *parent)
     , m_openSyntaxThemeFolderButton(new QPushButton(tr("Open theme folder"), this))
     , m_showFileTree(new QCheckBox(tr("Show file tree on startup"), this))
     , m_showStatusBar(new QCheckBox(tr("Show bottom status bar"), this))
+    , m_gitIntegrationEnabled(new QCheckBox(tr("Enable Git integration"), this))
     , m_markdownSidePreview(new QCheckBox(tr("Open with side preview"), this))
     , m_untitledModeCombo(new QComboBox(this))
     , m_overtypeMode(new QComboBox(this))
@@ -379,6 +380,8 @@ PreferencesDialog::PreferencesDialog(QWidget *parent)
     setWindowTitle(tr("Preferences"));
     setModal(true);
     m_showStatusBar->setObjectName(QStringLiteral("showStatusBarCheckBox"));
+    m_gitIntegrationEnabled->setObjectName(
+        QStringLiteral("gitIntegrationEnabledCheckBox"));
     reapplyTheme();
 
     // The text font picker shows every family; the code font picker is
@@ -471,6 +474,13 @@ PreferencesDialog::PreferencesDialog(QWidget *parent)
     codeLayout->addLayout(makeSettingsRow(tr("Semantic highlighting"), m_semanticHighlighting, codeSection));
     codeLayout->addStretch();
 
+    auto *versionControlSection = makeSection(tr("Version Control"), this);
+    auto *versionControlLayout =
+        qobject_cast<QVBoxLayout *>(versionControlSection->layout());
+    versionControlLayout->addLayout(
+        makeSettingsRow(tr("Git"), m_gitIntegrationEnabled, versionControlSection));
+    versionControlLayout->addStretch();
+
     // Wire each section into the right pane as a stacked page, and add a
     // matching sidebar entry.  The page index returned by addWidget is stored
     // on the list item (Qt::UserRole) so each entry stays bound to its page
@@ -481,6 +491,8 @@ PreferencesDialog::PreferencesDialog(QWidget *parent)
         makeScrollablePage(generalSection, m_sectionStack));
     const int codeIndex = m_sectionStack->addWidget(
         makeScrollablePage(codeSection, m_sectionStack));
+    const int versionControlIndex = m_sectionStack->addWidget(
+        makeScrollablePage(versionControlSection, m_sectionStack));
 
     auto *editorItem = new QListWidgetItem(tr("Editor"), m_sectionList);
     editorItem->setData(Qt::UserRole, editorIndex);
@@ -488,6 +500,8 @@ PreferencesDialog::PreferencesDialog(QWidget *parent)
     generalItem->setData(Qt::UserRole, generalIndex);
     auto *codeItem = new QListWidgetItem(tr("Code Editing"), m_sectionList);
     codeItem->setData(Qt::UserRole, codeIndex);
+    auto *versionControlItem = new QListWidgetItem(tr("Version Control"), m_sectionList);
+    versionControlItem->setData(Qt::UserRole, versionControlIndex);
 
     connect(m_sectionList, &QListWidget::currentRowChanged, this, [this](int row) {
         if (row < 0)
@@ -661,6 +675,7 @@ void PreferencesDialog::connectLiveUpdates()
     const QList<QCheckBox *> checkBoxes = {
         m_showFileTree,
         m_showStatusBar,
+        m_gitIntegrationEnabled,
         m_markdownSidePreview,
         m_codeFolding,
         m_bracketAssistance,
@@ -770,6 +785,7 @@ void PreferencesDialog::loadFromPreferences()
     m_lightSyntaxThemeCombo->setCurrentIndex(lightThemeIndex >= 0 ? lightThemeIndex : 0);
     m_showFileTree->setChecked(prefs.showFileTreeOnStartup());
     m_showStatusBar->setChecked(prefs.showStatusBar());
+    m_gitIntegrationEnabled->setChecked(prefs.gitIntegrationEnabled());
     m_markdownSidePreview->setChecked(prefs.markdownDefaultPreview());
     const int untitledModeIndex = m_untitledModeCombo->findData(prefs.untitledUsesCodeMode());
     m_untitledModeCombo->setCurrentIndex(untitledModeIndex >= 0 ? untitledModeIndex : 0);
@@ -795,6 +811,7 @@ void PreferencesDialog::commit()
     prefs.setLightSyntaxThemeId(m_lightSyntaxThemeCombo->currentData().toString());
     prefs.setShowFileTreeOnStartup(m_showFileTree->isChecked());
     prefs.setShowStatusBar(m_showStatusBar->isChecked());
+    prefs.setGitIntegrationEnabled(m_gitIntegrationEnabled->isChecked());
     prefs.setMarkdownDefaultPreview(m_markdownSidePreview->isChecked());
     prefs.setUntitledUsesCodeMode(m_untitledModeCombo->currentData().toBool());
     prefs.setOverwriteMode(m_overtypeMode->currentData().toBool());

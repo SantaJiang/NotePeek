@@ -57,6 +57,8 @@ public:
 };
 
 class QLabel;
+class QResizeEvent;
+class QShowEvent;
 class QsciEditorInfoStatusBar : public QStatusBar
 {
     Q_OBJECT
@@ -74,6 +76,8 @@ signals:
 
 protected:
     void changeEvent(QEvent *event) override;
+    void resizeEvent(QResizeEvent *event) override;
+    void showEvent(QShowEvent *event) override;
 
 private slots:
     void editorCursorPositionChanged(int line, int index);
@@ -86,11 +90,15 @@ private:
     void updateEol(QsciScintilla *editor);
     void updateEncoding(QsciScintilla *editor);
     void applyChromeTheme();
+    void syncGitEdgeSpacing();
 
     QLabel *docType;
     QLabel *docPos;
     QLabel *eolFormat;
     QLabel *unicodeType;
+    QWidget *gitStatusContainer;
+    QWidget *gitLeftPadding;
+    StatusLabel *gitBranchIcon;
     StatusLabel *gitStatus;
 
     QPointer<QsciScintilla> currentEditor;

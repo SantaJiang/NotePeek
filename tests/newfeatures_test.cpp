@@ -82,6 +82,25 @@ bool runGit(const QString &gitExecutable,
            && process.exitStatus() == QProcess::NormalExit && process.exitCode() == 0;
 }
 
+class GitIntegrationPreferenceGuard
+{
+public:
+    explicit GitIntegrationPreferenceGuard(bool enabled)
+        : m_original(AppPreferences::instance().gitIntegrationEnabled())
+    {
+        AppPreferences::instance().setGitIntegrationEnabled(enabled);
+    }
+
+    ~GitIntegrationPreferenceGuard()
+    {
+        AppPreferences::instance().setGitIntegrationEnabled(m_original);
+        AppPreferences::instance().save();
+    }
+
+private:
+    bool m_original;
+};
+
 long scintillaColorValue(const QColor &color)
 {
     return (color.blue() << 16) | (color.green() << 8) | color.red();
@@ -118,9 +137,11 @@ private slots:
     // in front of a user.
     void constructsMainWindowShell()
     {
+        QVERIFY(!AppPreferences::instance().gitIntegrationEnabled());
         MainWindow blankWindow;
         blankWindow.show();
         QVERIFY(blankWindow.isVisible());
+        QVERIFY(!blankWindow.findChild<GitRepositoryService *>());
 
         QTemporaryDir dir;
         QVERIFY(dir.isValid());
@@ -350,6 +371,13 @@ private slots:
             QVERIFY(spacing);
             QCOMPARE(spacing->width(), 15);
         }
+        statusBar->setGitStatus(QStringLiteral("main"));
+        auto *gitIcon = statusBar->findChild<QLabel *>(
+            QStringLiteral("statusGitBranchIcon"));
+        QVERIFY(gitIcon);
+        const int rightEdgeSpacing = statusBar->width()
+                                     - documentType->geometry().right() - 1;
+        QTRY_COMPARE(gitIcon->mapTo(statusBar, QPoint(0, 0)).x(), rightEdgeSpacing);
         QVERIFY(statusBar->styleSheet().contains(
             ThemeColors::EditorTopBar::text().name(QColor::HexRgb)));
     }
@@ -358,23 +386,35 @@ private slots:
     {
         QMainWindow window;
         QsciEditorInfoStatusBar statusBar(&window);
+        QWidget *gitContainer = statusBar.findChild<QWidget *>(
+            QStringLiteral("statusGitContainer"));
+        QWidget *gitLeftPadding = statusBar.findChild<QWidget *>(
+            QStringLiteral("statusGitLeftPadding"));
+        QLabel *gitIcon = statusBar.findChild<QLabel *>(
+            QStringLiteral("statusGitBranchIcon"));
         QLabel *gitLabel = statusBar.findChild<QLabel *>(
             QStringLiteral("statusGitRepository"));
+        QVERIFY(gitContainer);
+        QVERIFY(gitLeftPadding);
+        QVERIFY(gitIcon);
         QVERIFY(gitLabel);
-        QVERIFY(gitLabel->isHidden());
+        QVERIFY(gitContainer->isHidden());
+        QCOMPARE(gitIcon->text(), QString(QChar(0xf126)));
 
         QSignalSpy refreshSpy(&statusBar,
                               &QsciEditorInfoStatusBar::gitRefreshRequested);
         statusBar.show();
-        statusBar.setGitStatus(QStringLiteral("Git: main  •2"),
+        statusBar.setGitStatus(QStringLiteral("main  •2"),
                                QStringLiteral("Click to refresh"));
-        QVERIFY(!gitLabel->isHidden());
-        QCOMPARE(gitLabel->text(), QStringLiteral("Git: main  •2"));
-        QTest::mouseClick(gitLabel, Qt::LeftButton);
+        QVERIFY(!gitContainer->isHidden());
+        QCOMPARE(gitLabel->text(), QStringLiteral("main  •2"));
+        QTest::mouseClick(gitIcon, Qt::LeftButton);
         QCOMPARE(refreshSpy.count(), 1);
+        QTest::mouseClick(gitLabel, Qt::LeftButton);
+        QCOMPARE(refreshSpy.count(), 2);
 
         statusBar.setGitStatus(QString());
-        QVERIFY(gitLabel->isHidden());
+        QVERIFY(gitContainer->isHidden());
     }
 
     void usesUntranslatedNameForUntitledDocuments()
@@ -1163,7 +1203,7 @@ private slots:
             dialog.findChild<QListWidget *>(QStringLiteral("sectionList"));
         QVERIFY(search);
         QVERIFY(sections);
-        QCOMPARE(sections->count(), 3);
+        QCOMPARE(sections->count(), 4);
         QVERIFY(dialog.width() <= 700);
         QVERIFY(dialog.height() <= 320);
         QCOMPARE(search->width(), sections->viewport()->width());
@@ -1204,37 +1244,57 @@ private slots:
         AppPreferences &preferences = AppPreferences::instance();
         auto *statusBarCheckBox = dialog.findChild<QCheckBox *>(
             QStringLiteral("showStatusBarCheckBox"));
+        auto *gitIntegrationCheckBox = dialog.findChild<QCheckBox *>(
+            QStringLiteral("gitIntegrationEnabledCheckBox"));
         QVERIFY(statusBarCheckBox);
+        QVERIFY(gitIntegrationCheckBox);
         QSignalSpy appliedSpy(&dialog, &PreferencesDialog::applied);
+
+        const bool previousGitIntegration = preferences.gitIntegrationEnabled();
+        gitIntegrationCheckBox->setChecked(!previousGitIntegration);
+        QCOMPARE(preferences.gitIntegrationEnabled(), !previousGitIntegration);
+        QCOMPARE(appliedSpy.count(), 1);
+        gitIntegrationCheckBox->setChecked(previousGitIntegration);
+        QCOMPARE(preferences.gitIntegrationEnabled(), previousGitIntegration);
+        QCOMPARE(appliedSpy.count(), 2);
 
         const bool previousStatusBar = preferences.showStatusBar();
         statusBarCheckBox->setChecked(!previousStatusBar);
         QCOMPARE(preferences.showStatusBar(), !previousStatusBar);
-        QCOMPARE(appliedSpy.count(), 1);
+        QCOMPARE(appliedSpy.count(), 3);
         statusBarCheckBox->setChecked(previousStatusBar);
         QCOMPARE(preferences.showStatusBar(), previousStatusBar);
-        QCOMPARE(appliedSpy.count(), 2);
+        QCOMPARE(appliedSpy.count(), 4);
 
         const QString previousDarkTheme = preferences.darkSyntaxThemeId();
         const int alternativeTheme = (darkCombo->currentIndex() + 1) % darkCombo->count();
         darkCombo->setCurrentIndex(alternativeTheme);
         QCOMPARE(preferences.darkSyntaxThemeId(), darkCombo->currentData().toString());
-        QCOMPARE(appliedSpy.count(), 3);
+        QCOMPARE(appliedSpy.count(), 5);
         darkCombo->setCurrentIndex(darkCombo->findData(previousDarkTheme));
         QCOMPARE(preferences.darkSyntaxThemeId(), previousDarkTheme);
-        QCOMPARE(appliedSpy.count(), 4);
+        QCOMPARE(appliedSpy.count(), 6);
 
         search->setText(QStringLiteral("Markdown"));
         QVERIFY(sections->item(0)->isHidden());
         QVERIFY(!sections->item(1)->isHidden());
         QVERIFY(sections->item(2)->isHidden());
+        QVERIFY(sections->item(3)->isHidden());
         QCOMPARE(sections->currentItem(), sections->item(1));
 
         search->setText(QStringLiteral("Brackets"));
         QVERIFY(sections->item(0)->isHidden());
         QVERIFY(sections->item(1)->isHidden());
         QVERIFY(!sections->item(2)->isHidden());
+        QVERIFY(sections->item(3)->isHidden());
         QCOMPARE(sections->currentItem(), sections->item(2));
+
+        search->setText(QStringLiteral("Git"));
+        QVERIFY(sections->item(0)->isHidden());
+        QVERIFY(sections->item(1)->isHidden());
+        QVERIFY(sections->item(2)->isHidden());
+        QVERIFY(!sections->item(3)->isHidden());
+        QCOMPARE(sections->currentItem(), sections->item(3));
 
         search->setText(QStringLiteral("No such setting"));
         QVERIFY(dialog.findChild<QStackedWidget *>()->isHidden());
@@ -1675,7 +1735,9 @@ private slots:
                  QStringLiteral("M"));
         QCOMPARE(proxy.data(directoryIndex,
                             FileTypeFilterProxyModel::GitStatusTextRole).toString(),
-                 QStringLiteral("4"));
+                 QStringLiteral("●"));
+        QVERIFY(proxy.data(directoryIndex, Qt::ToolTipRole).toString()
+                    .contains(QStringLiteral("Git changes: 4")));
         QVERIFY(proxy.data(modifiedIndex, Qt::ToolTipRole).toString()
                     .contains(QStringLiteral("Git status: M")));
         QCOMPARE(proxy.data(copiedIndex,
@@ -1686,11 +1748,83 @@ private slots:
                  QStringLiteral("!"));
     }
 
+    void gitIntegrationPreferenceAppliesLive()
+    {
+        const QString git = GitExecutable::find();
+        if (git.isEmpty())
+            QSKIP("System Git is unavailable", 0);
+
+        GitIntegrationPreferenceGuard gitPreference(false);
+        QTemporaryDir dir;
+        QVERIFY(dir.isValid());
+        const QString filePath = dir.filePath(QStringLiteral("tracked.md"));
+        writeFile(filePath, QByteArrayLiteral("original\n"));
+        QVERIFY(runGit(git, dir.path(),
+                       {QStringLiteral("init"), QStringLiteral("--quiet")}));
+        QVERIFY(runGit(git, dir.path(),
+                       {QStringLiteral("add"), QStringLiteral("tracked.md")}));
+        QVERIFY(runGit(git, dir.path(),
+                       {QStringLiteral("-c"), QStringLiteral("user.name=NotePeek Test"),
+                        QStringLiteral("-c"), QStringLiteral("user.email=notepeek@example.invalid"),
+                        QStringLiteral("-c"), QStringLiteral("commit.gpgSign=false"),
+                        QStringLiteral("commit"), QStringLiteral("--quiet"),
+                        QStringLiteral("-m"), QStringLiteral("initial")}));
+
+        MainWindow window(nullptr, {filePath});
+        window.show();
+        QVERIFY(!window.findChild<GitRepositoryService *>());
+        auto *gitLabel = window.findChild<QLabel *>(
+            QStringLiteral("statusGitRepository"));
+        QVERIFY(gitLabel);
+        QVERIFY(!gitLabel->isVisible());
+
+        QAction *preferencesAction = window.findChild<QAction *>(
+            QStringLiteral("action_preferences"));
+        QVERIFY(preferencesAction);
+        auto setThroughPreferences = [&](bool enabled) {
+            bool dialogFound = false;
+            QTimer::singleShot(0, &window, [&]() {
+                auto *dialog = qobject_cast<PreferencesDialog *>(
+                    QApplication::activeModalWidget());
+                if (!dialog)
+                {
+                    if (QWidget *modal = QApplication::activeModalWidget())
+                        modal->close();
+                    return;
+                }
+                dialogFound = true;
+                auto *checkBox = dialog->findChild<QCheckBox *>(
+                    QStringLiteral("gitIntegrationEnabledCheckBox"));
+                if (checkBox)
+                    checkBox->setChecked(enabled);
+                else
+                    dialogFound = false;
+                dialog->accept();
+            });
+            preferencesAction->trigger();
+            return dialogFound;
+        };
+
+        QVERIFY(setThroughPreferences(true));
+        QCOMPARE(AppPreferences::instance().gitIntegrationEnabled(), true);
+        auto *service = window.findChild<GitRepositoryService *>();
+        QVERIFY(service);
+        QTRY_COMPARE_WITH_TIMEOUT(service->state(), GitRepositoryState::Ready, 5000);
+        QTRY_VERIFY_WITH_TIMEOUT(gitLabel->isVisible(), 5000);
+
+        QVERIFY(setThroughPreferences(false));
+        QCOMPARE(AppPreferences::instance().gitIntegrationEnabled(), false);
+        QVERIFY(!window.findChild<GitRepositoryService *>());
+        QVERIFY(!gitLabel->isVisible());
+    }
+
     void nonRepositoryRediscoveryWaitsForGitMetadata()
     {
         const QString git = GitExecutable::find();
         if (git.isEmpty())
             QSKIP("System Git is unavailable", 0);
+
+        GitIntegrationPreferenceGuard gitPreference(true);
 
         QTemporaryDir dir;
         QVERIFY(dir.isValid());
@@ -1722,6 +1856,8 @@ private slots:
         if (git.isEmpty())
             QSKIP("System Git is unavailable", 0);
 
+        GitIntegrationPreferenceGuard gitPreference(true);
+
         QTemporaryDir dir;
         QVERIFY(dir.isValid());
         const QString filePath = dir.filePath(QStringLiteral("tracked.md"));
@@ -1744,7 +1880,7 @@ private slots:
             QStringLiteral("statusGitRepository"));
         QVERIFY(gitLabel);
         QTRY_VERIFY_WITH_TIMEOUT(gitLabel->isVisible(), 10000);
-        QVERIFY(gitLabel->text().startsWith(QStringLiteral("Git: ")));
+        QVERIFY(!gitLabel->text().startsWith(QStringLiteral("Git:")));
         QVERIFY(gitLabel->text().contains(QStringLiteral("•1")));
 
         FileTypeFilterProxyModel *proxy = nullptr;

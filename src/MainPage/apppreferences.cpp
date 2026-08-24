@@ -74,6 +74,7 @@ AppPreferences::AppPreferences()
     , m_lightSyntaxThemeId(QStringLiteral("upstream-vscode-light-2026"))
     , m_showFileTreeOnStartup(false)
     , m_showStatusBar(true)
+    , m_gitIntegrationEnabled(false)
     , m_markdownDefaultPreview(false)
     , m_untitledUsesCodeMode(false)
     , m_overwriteMode(false)
@@ -234,6 +235,8 @@ void AppPreferences::load()
         settings.value(QStringLiteral("showFileTreeOnStartup"), false).toBool();
     m_showStatusBar =
         settings.value(QStringLiteral("showStatusBar"), true).toBool();
+    m_gitIntegrationEnabled =
+        settings.value(QStringLiteral("gitIntegrationEnabled"), false).toBool();
     m_markdownDefaultPreview =
         settings.value(QStringLiteral("markdownDefaultPreview"), false).toBool();
     // Stored as a readable mode name; anything other than "code" (including a
@@ -274,6 +277,7 @@ void AppPreferences::save() const
     settings.remove(QStringLiteral("syntaxThemeFollowsSystem"));
     settings.setValue(QStringLiteral("showFileTreeOnStartup"), m_showFileTreeOnStartup);
     settings.setValue(QStringLiteral("showStatusBar"), m_showStatusBar);
+    settings.setValue(QStringLiteral("gitIntegrationEnabled"), m_gitIntegrationEnabled);
     settings.setValue(QStringLiteral("markdownDefaultPreview"), m_markdownDefaultPreview);
     settings.setValue(QStringLiteral("untitledDocumentMode"),
                       m_untitledUsesCodeMode ? QStringLiteral("code") : QStringLiteral("text"));

@@ -120,7 +120,7 @@ void FileTypeFilterProxyModel::setGitRepositorySnapshot(const GitRepositorySnaps
         {
             GitDecoration &directory = m_gitDecorations[parentKey];
             ++directory.changeCount;
-            directory.text = QString::number(directory.changeCount);
+            directory.text = QStringLiteral("●");
             if (int(kind) > int(directory.kind))
                 directory.kind = kind;
             if (parentKey == repositoryRootKey)

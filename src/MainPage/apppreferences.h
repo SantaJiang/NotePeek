@@ -49,6 +49,11 @@ public:
     bool showStatusBar() const { return m_showStatusBar; }
     void setShowStatusBar(bool show) { m_showStatusBar = show; }
 
+    // Enables repository discovery and Git decorations for the current
+    // project. Disabled by default so Git performs no work unless opted in.
+    bool gitIntegrationEnabled() const { return m_gitIntegrationEnabled; }
+    void setGitIntegrationEnabled(bool enabled) { m_gitIntegrationEnabled = enabled; }
+
     // When true, freshly opened Markdown files start in preview mode instead
     // of source mode.
     bool markdownDefaultPreview() const { return m_markdownDefaultPreview; }
@@ -107,6 +112,7 @@ private:
     QString m_lightSyntaxThemeId;
     bool m_showFileTreeOnStartup;
     bool m_showStatusBar;
+    bool m_gitIntegrationEnabled;
     bool m_markdownDefaultPreview;
     bool m_untitledUsesCodeMode;
     bool m_overwriteMode;
