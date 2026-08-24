@@ -137,11 +137,11 @@ private slots:
     // in front of a user.
     void constructsMainWindowShell()
     {
-        QVERIFY(!AppPreferences::instance().gitIntegrationEnabled());
+        QVERIFY(AppPreferences::instance().gitIntegrationEnabled());
         MainWindow blankWindow;
         blankWindow.show();
         QVERIFY(blankWindow.isVisible());
-        QVERIFY(!blankWindow.findChild<GitRepositoryService *>());
+        QVERIFY(blankWindow.findChild<GitRepositoryService *>());
 
         QTemporaryDir dir;
         QVERIFY(dir.isValid());

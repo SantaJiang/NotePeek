@@ -50,7 +50,7 @@ public:
     void setShowStatusBar(bool show) { m_showStatusBar = show; }
 
     // Enables repository discovery and Git decorations for the current
-    // project. Disabled by default so Git performs no work unless opted in.
+    // project. Enabled by default and can be disabled to avoid all Git work.
     bool gitIntegrationEnabled() const { return m_gitIntegrationEnabled; }
     void setGitIntegrationEnabled(bool enabled) { m_gitIntegrationEnabled = enabled; }
 
