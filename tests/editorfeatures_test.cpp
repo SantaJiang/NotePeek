@@ -286,6 +286,84 @@ private slots:
                  documentBackground);
     }
 
+    void caretLineBackgroundExtendsIntoNumberGutter()
+    {
+        CustomEditor editor;
+        editor.resize(320, 160);
+        editor.setMargins(2);
+        editor.setMarginType(0, QsciScintilla::NumberMargin);
+        editor.setMarginWidth(0, 40);
+        editor.setMarginType(1, QsciScintilla::SymbolMargin);
+        editor.setMarginWidth(1, 14);
+
+        const QColor documentBackground(24, 48, 72);
+        const QColor caretLineBackground(180, 90, 30);
+        editor.setPaper(documentBackground);
+        editor.setMarginsBackgroundColor(documentBackground);
+        editor.setCaretLineBackgroundColor(caretLineBackground);
+        editor.setCaretLineVisible(true);
+        QPalette palette = editor.palette();
+        palette.setColor(QPalette::Base, documentBackground);
+        editor.setPalette(palette);
+        editor.setText(QStringLiteral("first\nsecond"));
+        editor.setCursorPosition(0, 0);
+        editor.ensurePolished();
+        QApplication::processEvents();
+
+        QFocusEvent focusIn(QEvent::FocusIn, Qt::OtherFocusReason);
+        QApplication::sendEvent(&editor, &focusIn);
+
+        QImage rendered(editor.size(), QImage::Format_RGB32);
+        rendered.fill(Qt::transparent);
+        editor.render(&rendered);
+
+        const QRect viewportGeometry = editor.viewport()->geometry();
+        const int lineHeight = static_cast<int>(editor.SendScintilla(
+            QsciScintillaBase::SCI_TEXTHEIGHT, 0UL));
+        const int currentLineY = viewportGeometry.top() + lineHeight / 2;
+        const int nextLineY = currentLineY + lineHeight;
+        // The caret-line background spans the number gutter and the fold
+        // margin.  Sample clear of the centred "1" glyph.
+        QCOMPARE(rendered.pixelColor(viewportGeometry.left() + 9, currentLineY),
+                 caretLineBackground);
+        QCOMPARE(rendered.pixelColor(viewportGeometry.left() + 38, currentLineY),
+                 caretLineBackground);
+        QCOMPARE(rendered.pixelColor(viewportGeometry.left() + 48, currentLineY),
+                 caretLineBackground);
+        QCOMPARE(rendered.pixelColor(viewportGeometry.left() + 9, nextLineY),
+                 documentBackground);
+    }
+
+    void horizontalCaretMoveInvalidatesLineNumberMargin()
+    {
+        PaintTrackingEditor editor;
+        editor.resize(320, 240);
+        editor.setMargins(1);
+        editor.setMarginType(0, QsciScintilla::NumberMargin);
+        editor.setMarginWidth(0, 40);
+        editor.setCaretLineVisible(true);
+        editor.setText(QStringLiteral("first\nsecond"));
+        editor.setCursorPosition(1, 0);
+        editor.show();
+        QApplication::processEvents();
+
+        QFocusEvent focusIn(QEvent::FocusIn, Qt::OtherFocusReason);
+        QApplication::sendEvent(&editor, &focusIn);
+        QApplication::processEvents();
+        editor.paintRects.clear();
+
+        // Moving left from column 0 crosses the line boundary.  The caret-line
+        // highlight lives in the margin, so the margin must be repainted too.
+        editor.SendScintilla(QsciScintillaBase::SCI_CHARLEFT);
+        QApplication::processEvents();
+
+        QVERIFY(!editor.paintRects.isEmpty());
+        int leftmostPaint = editor.width();
+        for (const QRect &rect : editor.paintRects)
+            leftmostPaint = std::min(leftmostPaint, rect.left());
+        QCOMPARE(leftmostPaint, 0);
+    }
+
     void editorThemeSynchronizesViewportBackground()
     {
         EditorManager manager;

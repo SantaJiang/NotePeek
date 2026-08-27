@@ -52,6 +52,14 @@ distributed under GNU GPL version 3.0 when they form part of QScintilla.
   line change; it is called from the selection setters and again at the end of
   `Editor::MovedCaret`, after scrolling, because a per-line invalidation
   computed before the scroll can land outside the viewport and repaint nothing.
+- Extended the caret-line background into the gutter: `MarginView` now fills
+  the active line's cell across every gutter margin with the caret-line
+  background (respecting the caret-line alpha and frame settings), and draws
+  the line number transparently so it does not repaint over that background,
+  keeping the highlighted number and fold markers on the same background as the
+  text. `Editor::HorizontalMove` records the previous main caret so `MovedCaret`
+  repaints the margin when a horizontal move crosses a line boundary, keeping
+  that background on the right line.
 
 These rendering changes predate the formal fork interface.  They will be
 converted into opt-in public configuration while the NotePeek editor API is

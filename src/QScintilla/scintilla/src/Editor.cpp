@@ -3377,6 +3377,9 @@ int Editor::HorizontalMove(unsigned int iMessage) {
 	if (sel.selType == Selection::selLines) {
 		return 0; // horizontal moves with line selection have no effect
 	}
+	// Keep the previous main caret so MovedCaret() can repaint the caret-line
+	// highlight in the margin when a horizontal move crosses a line boundary.
+	const SelectionPosition spCaretBefore = sel.RangeMain().caret;
 	if (sel.MoveExtends()) {
 		iMessage = WithExtends(iMessage);
 	}
@@ -3608,7 +3611,7 @@ int Editor::HorizontalMove(unsigned int iMessage) {
 
 	sel.RemoveDuplicates();
 
-	MovedCaret(sel.RangeMain().caret, SelectionPosition(INVALID_POSITION), true);
+	MovedCaret(sel.RangeMain().caret, spCaretBefore, true);
 
 	// Invalidate the new state of the selection
 	InvalidateWholeSelection();

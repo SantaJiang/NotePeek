@@ -376,6 +376,17 @@ void MarginView::PaintMargin(Surface *surface, Sci::Line topLine, PRectangle rc,
 				PRectangle rcMarker = rcSelMargin;
 				rcMarker.top = static_cast<XYPOSITION>(yposScreen);
 				rcMarker.bottom = static_cast<XYPOSITION>(yposScreen + vs.lineHeight);
+				// Extend the caret-line background across every gutter margin so
+				// the active line number and its fold markers sit on the same
+				// highlight as the text.
+				if (highlightCaretLineNumber && lineDoc == caretLine && !vs.caretLineFrame) {
+					if (vs.caretLineAlpha == SC_ALPHA_NOALPHA) {
+						surface->FillRectangle(rcMarker, vs.caretLineBackground);
+					} else {
+						surface->AlphaRectangle(rcMarker, 0, vs.caretLineBackground,
+							vs.caretLineAlpha, vs.caretLineBackground, vs.caretLineAlpha, 0);
+					}
+				}
 				if (vs.ms[margin].style == SC_MARGIN_NUMBER) {
 					if (firstSubLine) {
 						std::string sNumber;
@@ -407,7 +418,7 @@ void MarginView::PaintMargin(Surface *surface, Sci::Line topLine, PRectangle rc,
 						rcNumber.left = xpos;
 						const bool activeLineNumber = highlightCaretLineNumber && lineDoc == caretLine;
 						DrawTextNoClipPhase(surface, rcNumber, vs.styles[STYLE_LINENUMBER],
-							rcNumber.top + vs.maxAscent, sNumber.c_str(), static_cast<int>(sNumber.length()), drawAll,
+							rcNumber.top + vs.maxAscent, sNumber.c_str(), static_cast<int>(sNumber.length()), drawText,
 							activeLineNumber ? activeLineNumberFore : vs.styles[STYLE_LINENUMBER].fore);
 					} else if (vs.wrapVisualFlags & SC_WRAPVISUALFLAG_MARGIN) {
 						PRectangle rcWrapMarker = rcMarker;
