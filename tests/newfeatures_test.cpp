@@ -344,7 +344,8 @@ private slots:
         const QStringList spacingObjectNames = {
             QStringLiteral("statusSpacingAfterPosition"),
             QStringLiteral("statusSpacingAfterEncoding"),
-            QStringLiteral("statusSpacingAfterLineEnding")
+            QStringLiteral("statusSpacingAfterLineEnding"),
+            QStringLiteral("statusRightEdgeSpacing")
         };
         QVERIFY(statusBar);
         QVERIFY(editor);
@@ -375,9 +376,31 @@ private slots:
         auto *gitIcon = statusBar->findChild<QLabel *>(
             QStringLiteral("statusGitBranchIcon"));
         QVERIFY(gitIcon);
-        const int rightEdgeSpacing = statusBar->width()
-                                     - documentType->geometry().right() - 1;
-        QTRY_COMPARE(gitIcon->mapTo(statusBar, QPoint(0, 0)).x(), rightEdgeSpacing);
+        auto *rightEdgeSpacing = statusBar->findChild<QWidget *>(
+            QStringLiteral("statusRightEdgeSpacing"));
+        QVERIFY(rightEdgeSpacing);
+        QVERIFY(!statusBar->isSizeGripEnabled());
+        const int initialLeftEdgeSpacing =
+            gitIcon->mapTo(statusBar, QPoint(0, 0)).x();
+        const int initialRightEdgeSpacing =
+            statusBar->width() - documentType->geometry().right() - 1;
+        QVERIFY(initialLeftEdgeSpacing >= 15);
+        QVERIFY(initialRightEdgeSpacing >= 15);
+
+        window.resize(1400, 800);
+        QApplication::processEvents();
+        QCOMPARE(gitIcon->mapTo(statusBar, QPoint(0, 0)).x(),
+                 initialLeftEdgeSpacing);
+        QCOMPARE(statusBar->width() - documentType->geometry().right() - 1,
+                 initialRightEdgeSpacing);
+        QCOMPARE(rightEdgeSpacing->width(), 15);
+
+        window.showMaximized();
+        QApplication::processEvents();
+        QCOMPARE(gitIcon->mapTo(statusBar, QPoint(0, 0)).x(),
+                 initialLeftEdgeSpacing);
+        QCOMPARE(statusBar->width() - documentType->geometry().right() - 1,
+                 initialRightEdgeSpacing);
         QVERIFY(statusBar->styleSheet().contains(
             ThemeColors::EditorTopBar::text().name(QColor::HexRgb)));
     }
