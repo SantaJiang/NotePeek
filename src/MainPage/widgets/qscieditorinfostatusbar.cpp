@@ -39,6 +39,11 @@ QsciEditorInfoStatusBar::QsciEditorInfoStatusBar(QMainWindow *window)
     : QStatusBar(window), currentEditor(nullptr)
 {
     setAttribute(Qt::WA_StyledBackground, true);
+    // The platform size grip changes width (and disappears when maximized),
+    // which makes the document information drift against the window edge.
+    // Native window borders still provide resizing, so use explicit edge
+    // spacers to keep the status-bar inset stable in every window state.
+    setSizeGripEnabled(false);
 
     gitStatusContainer = new QWidget(this);
     gitStatusContainer->setObjectName(QStringLiteral("statusGitContainer"));
@@ -46,7 +51,7 @@ QsciEditorInfoStatusBar::QsciEditorInfoStatusBar(QMainWindow *window)
     gitLayout->setContentsMargins(0, 0, 0, 0);
     gitLayout->setSpacing(0);
 
-    gitLeftPadding = new QWidget(gitStatusContainer);
+    auto *gitLeftPadding = new QWidget(gitStatusContainer);
     gitLeftPadding->setObjectName(QStringLiteral("statusGitLeftPadding"));
     gitLeftPadding->setFixedWidth(kItemSpacing);
     gitLayout->addWidget(gitLeftPadding);
@@ -107,6 +112,8 @@ QsciEditorInfoStatusBar::QsciEditorInfoStatusBar(QMainWindow *window)
     docType->setObjectName(QStringLiteral("statusDocumentType"));
     addPermanentWidget(docType, 0);
 
+    addItemSpacing(QStringLiteral("statusRightEdgeSpacing"));
+
     applyChromeTheme();
 }
 
@@ -116,8 +123,6 @@ void QsciEditorInfoStatusBar::setGitStatus(const QString &text, const QString &t
     gitStatus->setToolTip(toolTip);
     gitBranchIcon->setToolTip(toolTip);
     gitStatusContainer->setVisible(!text.isEmpty());
-    if (!text.isEmpty())
-        QTimer::singleShot(0, this, &QsciEditorInfoStatusBar::syncGitEdgeSpacing);
 }
 
 void QsciEditorInfoStatusBar::refresh(QsciScintilla *editor)
@@ -221,29 +226,6 @@ void QsciEditorInfoStatusBar::changeEvent(QEvent *event)
         // repolishes this widget and its children.
         QTimer::singleShot(0, this, &QsciEditorInfoStatusBar::applyChromeTheme);
     }
-}
-
-void QsciEditorInfoStatusBar::resizeEvent(QResizeEvent *event)
-{
-    QStatusBar::resizeEvent(event);
-    QTimer::singleShot(0, this, &QsciEditorInfoStatusBar::syncGitEdgeSpacing);
-}
-
-void QsciEditorInfoStatusBar::showEvent(QShowEvent *event)
-{
-    QStatusBar::showEvent(event);
-    QTimer::singleShot(0, this, &QsciEditorInfoStatusBar::syncGitEdgeSpacing);
-}
-
-void QsciEditorInfoStatusBar::syncGitEdgeSpacing()
-{
-    if (docType->geometry().isEmpty())
-        return;
-
-    const int rightEdgeSpacing = width() - docType->geometry().right() - 1;
-    const int targetWidth = qMax(0, rightEdgeSpacing - gitStatusContainer->geometry().left());
-    if (gitLeftPadding->width() != targetWidth)
-        gitLeftPadding->setFixedWidth(targetWidth);
 }
 
 void QsciEditorInfoStatusBar::updateSelectionInfo(QsciScintilla *editor)
