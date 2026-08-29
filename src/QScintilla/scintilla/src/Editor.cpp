@@ -1813,6 +1813,25 @@ void Editor::Paint(Surface *surfaceWindow, PRectangle rcArea) {
 
 	view.PaintText(surfaceWindow, *this, rcArea, rcClient, vs);
 
+	// Mark the boundary between the fixed gutter and horizontally moving text.
+	// Paint after text composition because the text buffer deliberately extends
+	// into the gutter to cover the editor's left content padding.
+	const bool hasVisibleNumberMargin = std::any_of(vs.ms.cbegin(), vs.ms.cend(),
+		[](const MarginStyle &margin) {
+			return margin.width > 0 && margin.style == SC_MARGIN_NUMBER;
+		});
+	if (hasVisibleNumberMargin && xOffset > 0 && vs.fixedColumnWidth > 0) {
+		PRectangle rcSeparator = rcClient;
+		rcSeparator.left = static_cast<XYPOSITION>(vs.fixedColumnWidth - 1);
+		rcSeparator.right = rcSeparator.left + 1;
+		rcSeparator.top = std::max(rcSeparator.top, rcArea.top);
+		rcSeparator.bottom = std::min(rcSeparator.bottom, rcArea.bottom);
+		if (!rcSeparator.Empty()) {
+			surfaceWindow->SetClip(rcArea);
+			surfaceWindow->FillRectangle(rcSeparator, vs.styles[STYLE_INDENTGUIDE].fore);
+		}
+	}
+
 	if (horizontalScrollBarVisible && trackLineWidth && (view.lineWidthMaxSeen > scrollWidth)) {
 		scrollWidth = view.lineWidthMaxSeen;
 		if (!FineTickerRunning(tickWiden)) {

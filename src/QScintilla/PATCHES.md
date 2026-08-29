@@ -60,6 +60,10 @@ distributed under GNU GPL version 3.0 when they form part of QScintilla.
   text. `Editor::HorizontalMove` records the previous main caret so `MovedCaret`
   repaints the margin when a horizontal move crosses a line boundary, keeping
   that background on the right line.
+- When a visible number margin is present and the text is horizontally scrolled
+  away from its left edge, draw a one-pixel separator in the themed indentation-
+  guide colour at the right edge of the fixed gutter. The separator disappears at
+  horizontal offset zero and when the number margin is hidden.
 
 These rendering changes predate the formal fork interface.  They will be
 converted into opt-in public configuration while the NotePeek editor API is

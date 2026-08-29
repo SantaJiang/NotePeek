@@ -364,6 +364,58 @@ private slots:
         QCOMPARE(leftmostPaint, 0);
     }
 
+    void horizontalScrollShowsNumberGutterSeparator()
+    {
+        CustomEditor editor;
+        editor.resize(320, 160);
+        editor.setMargins(2);
+        editor.setMarginType(0, QsciScintilla::NumberMargin);
+        editor.setMarginWidth(0, 40);
+        editor.setMarginType(1, QsciScintilla::SymbolMargin);
+        editor.setMarginWidth(1, 14);
+
+        const QColor background(24, 48, 72);
+        const QColor marginForeground(104, 112, 120);
+        const QColor separator(190, 198, 206);
+        editor.setPaper(background);
+        editor.setMarginsBackgroundColor(background);
+        editor.setMarginsForegroundColor(marginForeground);
+        editor.setIndentationGuidesForegroundColor(separator);
+        editor.setText(QString(200, QLatin1Char('x')));
+        editor.ensurePolished();
+        QApplication::processEvents();
+
+        const auto boundaryColour = [&editor]() {
+            QImage rendered(editor.size(), QImage::Format_RGB32);
+            rendered.fill(Qt::transparent);
+            editor.render(&rendered);
+            const QRect viewportGeometry = editor.viewport()->geometry();
+            const int contentPadding = static_cast<int>(editor.SendScintilla(
+                QsciScintillaBase::SCI_GETMARGINLEFT));
+            const int gutterWidth = contentPadding
+                + editor.marginWidth(0) + editor.marginWidth(1);
+            return rendered.pixelColor(viewportGeometry.left() + gutterWidth - 1,
+                                       viewportGeometry.center().y());
+        };
+
+        QCOMPARE(boundaryColour(), background);
+
+        editor.SendScintilla(QsciScintillaBase::SCI_SETXOFFSET, 24UL);
+        QApplication::processEvents();
+        QCOMPARE(editor.SendScintilla(QsciScintillaBase::SCI_GETXOFFSET), 24L);
+        QCOMPARE(boundaryColour(), separator);
+
+        editor.SendScintilla(QsciScintillaBase::SCI_SETXOFFSET, 0UL);
+        QApplication::processEvents();
+        QCOMPARE(boundaryColour(), background);
+
+        editor.SendScintilla(QsciScintillaBase::SCI_SETXOFFSET, 24UL);
+        QApplication::processEvents();
+        editor.setMarginWidth(0, 0);
+        QApplication::processEvents();
+        QCOMPARE(boundaryColour(), background);
+    }
+
     void editorThemeSynchronizesViewportBackground()
     {
         EditorManager manager;
