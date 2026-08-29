@@ -9,18 +9,22 @@
 #include <QString>
 #include <QUrl>
 
-#include <functional>
+#include <memory>
 
 #include "editor/documentpersistenceservice.h"
 
 class CustomEditor;
 class DocumentPage;
 class DocumentSaveCoordinator;
+class DocumentSaveTransactionStore;
+class DocumentEncodingReloadService;
 class EditorManager;
+class EditorContentReplacer;
 class ExternalFileWatcher;
 class FindReplaceManager;
 class EditorPane;
 class MarkdownPreviewer;
+struct DocumentEncodingReloadResult;
 
 // Drives the document lifecycle of one editor pane: open/save/close
 // workflows, save prompts, the default blank document policy, shared
@@ -38,7 +42,7 @@ public:
                                 QObject *parent = nullptr);
     ~DocumentController() override;
 
-    EditorPane *pane() const { return m_pane.data(); }
+    EditorPane *pane() const;
     EditorManager *editorManager() const { return m_editorManager; }
     CustomEditor *currentEditor() const;
     void setCreateDefaultWhenEmpty(bool createDefault);
@@ -60,7 +64,7 @@ public:
     bool maybeSave(CustomEditor *editor);
     bool saveEditorForClose(CustomEditor *editor);
     bool saveFile(CustomEditor *editor, const QString &filePath);
-    bool hasPendingSaves() const { return !m_pendingSaves.isEmpty(); }
+    bool hasPendingSaves() const;
     void waitForPendingSaves();
     void requestClose(int index);
     bool closeFileIfUnmodified(const QString &filePath);
@@ -110,6 +114,7 @@ private slots:
     void onEditorModificationChanged();
     void onFileLoaded(const DocumentLoadResult &result);
     void onFileSaved(const DocumentSaveResult &result);
+    void onFileReloadedWithEncoding(const DocumentEncodingReloadResult &result);
 
 private:
     struct PendingLoad
@@ -120,32 +125,17 @@ private:
         bool activate = true;
     };
 
-    struct PendingSave
+    struct PendingEncodingReload
     {
         QPointer<CustomEditor> editor;
-        QString oldFilePath;
-        QString newFilePath;
-        void *documentKey = nullptr;
-        quint64 documentGeneration = 0;
-        bool restoreFormatOnFailure = false;
-        DocumentFormat formatAtDispatch;
+        QString filePath;
+        quint64 expectedRevision = 0;
+        quint64 reloadGeneration = 0;
+        bool wasReadOnly = false;
     };
 
     void connectEditorSignals(CustomEditor *editor);
     bool closeDefaultEditorIfUnused();
-    // Replaces the editor content, yielding to the event loop between chunks
-    // for content above the per-tick budget. onFinished runs after the last
-    // chunk (immediately for small content); it is skipped if the editor or
-    // the controller is destroyed mid-insert.
-    void insertContentInChunks(CustomEditor *editor,
-                               const QByteArray &utf8Content,
-                               std::function<void()> onFinished);
-    // Used by reload paths that must finish before their caller updates all
-    // views sharing the same Scintilla document. Large buffers are appended in
-    // bounded chunks and the event loop is serviced between chunks without
-    // accepting user input.
-    bool replaceContentWithEventLoopYield(CustomEditor *editor,
-                                          const QByteArray &utf8Content);
     void dispatchAsyncSave(CustomEditor *editor,
                            const QString &filePath,
                            const QByteArray &utf8Content,
@@ -170,18 +160,20 @@ private:
 
     QPointer<EditorPane> m_pane;
     EditorManager *m_editorManager;
+    EditorContentReplacer *m_contentReplacer;
     DocumentPersistenceService *m_persistence;
     DocumentSaveCoordinator *m_saveCoordinator;
+    std::unique_ptr<DocumentSaveTransactionStore> m_saveTransactions;
+    DocumentEncodingReloadService *m_encodingReloadService;
     ExternalFileWatcher *m_externalFileWatcher;
     CustomEditor *m_defaultEditor;
     bool m_createDefaultWhenEmpty;
     MarkdownPreviewer *m_markdownPreviewer = nullptr;
-    quint64 m_nextAsyncRequestId = 1;
+    quint64 m_nextLoadRequestId = 1;
+    quint64 m_nextEncodingReloadRequestId = 1;
     QHash<quint64, PendingLoad> m_pendingLoads;
-    QHash<quint64, PendingSave> m_pendingSaves;
-    QSet<CustomEditor *> m_editorsWithChunkedInsert;
+    QHash<quint64, PendingEncodingReload> m_pendingEncodingReloads;
     QSet<CustomEditor *> m_editorsLoading;
-    QSet<CustomEditor *> m_editorsWithEncodingReload;
     QHash<CustomEditor *, quint64> m_editorContentRevisions;
     // True while a synchronous save drain is processing events; guards
     // against re-entrant document mutations during the wait.

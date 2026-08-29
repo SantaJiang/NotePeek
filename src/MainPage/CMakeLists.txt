@@ -8,22 +8,20 @@ set(NOTEPEEK_QT_LIBS
 add_library(notepeek_core STATIC
     apppreferences.cpp
     apppreferences.h
-    editor/backgroundworkscheduler.cpp
-    editor/backgroundworkscheduler.h
-    editor/performanceconstants.h
     editor/projectpathfilter.cpp
     editor/projectpathfilter.h
     editor/documentformat.cpp
     editor/documentformat.h
-    editor/documentpath.cpp
-    editor/documentpath.h
     editor/documentsavecoordinator.cpp
     editor/documentsavecoordinator.h
     editor/documentsession.h
+    editor/documentsession.cpp
     editor/documentio.cpp
     editor/documentio.h
     editor/documentpersistenceservice.cpp
     editor/documentpersistenceservice.h
+    editor/documentencodingreloadservice.cpp
+    editor/documentencodingreloadservice.h
     editor/documentregistry.cpp
     editor/documentregistry.h
     editor/supportedfilepolicy.cpp
@@ -51,7 +49,9 @@ add_library(notepeek_core STATIC
 )
 
 target_link_libraries(notepeek_core PUBLIC
-    qscintilla2
+    notepeek_foundation
+    notepeek_settings
+    notepeek_editor_kit
     qlitehtml
     libcmark-gfm-extensions_static
     libcmark-gfm_static
@@ -83,6 +83,14 @@ add_library(notepeek_widgets STATIC
     editor/documentpage.h
     editor/editormanager.cpp
     editor/editormanager.h
+    editor/editorcontentreplacer.cpp
+    editor/editorcontentreplacer.h
+    editor/documentfiledialogservice.cpp
+    editor/documentfiledialogservice.h
+    editor/editorsnapshotencoder.cpp
+    editor/editorsnapshotencoder.h
+    editor/documentsavetransactionstore.cpp
+    editor/documentsavetransactionstore.h
     editor/semantichighlightingengine.cpp
     editor/semantichighlightingengine.h
     editor/editorswitchpopup.cpp
@@ -105,6 +113,8 @@ add_library(notepeek_widgets STATIC
     find/findreplacewidget.cpp
     find/findreplacewidget.h
     find/findreplacewidget.ui
+    find/searchnavigationcoordinator.cpp
+    find/searchnavigationcoordinator.h
     widgets/fileexplorerdock.cpp
     widgets/fileexplorerdock.h
     widgets/elidingcombobox.h
@@ -116,6 +126,14 @@ add_library(notepeek_widgets STATIC
     widgets/iconfont.h
     widgets/qscieditorinfostatusbar.cpp
     widgets/qscieditorinfostatusbar.h
+    tool/cpp/cppnavigationcoordinator.cpp
+    tool/cpp/cppnavigationcoordinator.h
+    tool/format/codeformattingcoordinator.cpp
+    tool/format/codeformattingcoordinator.h
+    tool/markdown/markdowntoolcoordinator.cpp
+    tool/markdown/markdowntoolcoordinator.h
+    versioncontrol/gitpresentationcoordinator.cpp
+    versioncontrol/gitpresentationcoordinator.h
     widgets/searchresultsdock.cpp
     widgets/searchresultsdock.h
 )
@@ -131,7 +149,6 @@ add_executable(notepeek
 )
 
 target_link_libraries(notepeek PRIVATE
-    notepeek_core
     notepeek_widgets
 )
 notepeek_configure_project_target(notepeek)
@@ -139,10 +156,6 @@ notepeek_configure_project_target(notepeek)
 target_compile_definitions(notepeek PRIVATE
     APP_VERSION="${PROJECT_VERSION}"
 )
-
-if(WIN32)
-    target_compile_definitions(notepeek_core PUBLIC QSCINTILLA_DLL)
-endif()
 
 # ---- Translations ----
 file(GLOB_RECURSE NOTEPEEK_TRANSLATION_SOURCES CONFIGURE_DEPENDS

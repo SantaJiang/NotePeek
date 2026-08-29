@@ -1,10 +1,12 @@
 #include "apppreferences.h"
+#include "features/settings/settingsrepository.h"
 
 #include <QFontDatabase>
 #include <QFontMetrics>
-#include <QSettings>
 #include <QtGlobal>
 #include <NotePeek/syntaxtheme.h>
+
+#include <utility>
 
 namespace {
 
@@ -66,6 +68,11 @@ AppPreferences &AppPreferences::instance()
 }
 
 AppPreferences::AppPreferences()
+    : AppPreferences(std::make_unique<QSettingsRepository>())
+{
+}
+
+AppPreferences::AppPreferences(std::unique_ptr<SettingsRepository> repository)
     : m_textFontFamily(defaultTextFontFamily())
     , m_textFontSize(defaultFontSize())
     , m_codeFontFamily(defaultCodeFontFamily())
@@ -74,6 +81,7 @@ AppPreferences::AppPreferences()
     , m_lightSyntaxThemeId(QStringLiteral("upstream-vscode-light-2026"))
     , m_showFileTreeOnStartup(false)
     , m_showStatusBar(true)
+    , m_revealCurrentFileInTree(false)
     , m_gitIntegrationEnabled(true)
     , m_markdownDefaultPreview(false)
     , m_untitledUsesCodeMode(false)
@@ -83,8 +91,13 @@ AppPreferences::AppPreferences()
     , m_smartIndentationEnabled(true)
     , m_documentCompletionEnabled(false)
     , m_semanticHighlightingEnabled(true)
+    , m_repository(std::move(repository))
 {
+    if (!m_repository)
+        m_repository = std::make_unique<QSettingsRepository>();
 }
+
+AppPreferences::~AppPreferences() = default;
 
 QString AppPreferences::defaultCodeFontFamily()
 {
@@ -154,8 +167,7 @@ bool AppPreferences::isMonospaceFamily(const QString &family)
 
 void AppPreferences::load()
 {
-    QSettings settings;
-    settings.beginGroup(QStringLiteral("preferences"));
+    const SettingsValues settings = m_repository->load();
 
     m_textFontFamily = validatedFamily(
         settings.value(QStringLiteral("textFontFamily"), defaultTextFontFamily()).toString(),
@@ -227,14 +239,16 @@ void AppPreferences::load()
         }
     }
     if (settings.contains(QStringLiteral("fixedSyntaxTheme")))
-        settings.remove(QStringLiteral("fixedSyntaxTheme"));
+        m_repository->remove({QStringLiteral("fixedSyntaxTheme")});
     if (settings.contains(QStringLiteral("syntaxThemeFollowsSystem")))
-        settings.remove(QStringLiteral("syntaxThemeFollowsSystem"));
+        m_repository->remove({QStringLiteral("syntaxThemeFollowsSystem")});
 
     m_showFileTreeOnStartup =
         settings.value(QStringLiteral("showFileTreeOnStartup"), false).toBool();
     m_showStatusBar =
         settings.value(QStringLiteral("showStatusBar"), true).toBool();
+    m_revealCurrentFileInTree =
+        settings.value(QStringLiteral("revealCurrentFileInTree"), false).toBool();
     m_gitIntegrationEnabled =
         settings.value(QStringLiteral("gitIntegrationEnabled"), true).toBool();
     m_markdownDefaultPreview =
@@ -258,38 +272,37 @@ void AppPreferences::load()
         settings.value(QStringLiteral("semanticHighlightingEnabled"), true).toBool();
     m_language = settings.value(QStringLiteral("language"), QString()).toString();
 
-    settings.endGroup();
 }
 
 void AppPreferences::save() const
 {
-    QSettings settings;
-    settings.beginGroup(QStringLiteral("preferences"));
+    SettingsValues settings;
 
-    settings.setValue(QStringLiteral("textFontFamily"), m_textFontFamily);
-    settings.setValue(QStringLiteral("textFontSize"), m_textFontSize);
-    settings.setValue(QStringLiteral("codeFontFamily"), m_codeFontFamily);
-    settings.setValue(QStringLiteral("codeFontSize"), m_codeFontSize);
-    settings.setValue(QStringLiteral("darkSyntaxTheme"), m_darkSyntaxThemeId);
-    settings.setValue(QStringLiteral("lightSyntaxTheme"), m_lightSyntaxThemeId);
-    settings.remove(QStringLiteral("syntaxTheme"));
-    settings.remove(QStringLiteral("fixedSyntaxTheme"));
-    settings.remove(QStringLiteral("syntaxThemeFollowsSystem"));
-    settings.setValue(QStringLiteral("showFileTreeOnStartup"), m_showFileTreeOnStartup);
-    settings.setValue(QStringLiteral("showStatusBar"), m_showStatusBar);
-    settings.setValue(QStringLiteral("gitIntegrationEnabled"), m_gitIntegrationEnabled);
-    settings.setValue(QStringLiteral("markdownDefaultPreview"), m_markdownDefaultPreview);
-    settings.setValue(QStringLiteral("untitledDocumentMode"),
-                      m_untitledUsesCodeMode ? QStringLiteral("code") : QStringLiteral("text"));
-    settings.setValue(QStringLiteral("overwriteMode"), m_overwriteMode);
-    settings.setValue(QStringLiteral("codeFoldingEnabled"), m_codeFoldingEnabled);
-    settings.setValue(QStringLiteral("bracketAssistanceEnabled"), m_bracketAssistanceEnabled);
-    settings.setValue(QStringLiteral("smartIndentationEnabled"), m_smartIndentationEnabled);
-    settings.setValue(QStringLiteral("documentCompletionEnabled"), m_documentCompletionEnabled);
-    settings.setValue(QStringLiteral("semanticHighlightingEnabled"), m_semanticHighlightingEnabled);
-    settings.setValue(QStringLiteral("language"), m_language);
+    settings.insert(QStringLiteral("textFontFamily"), m_textFontFamily);
+    settings.insert(QStringLiteral("textFontSize"), m_textFontSize);
+    settings.insert(QStringLiteral("codeFontFamily"), m_codeFontFamily);
+    settings.insert(QStringLiteral("codeFontSize"), m_codeFontSize);
+    settings.insert(QStringLiteral("darkSyntaxTheme"), m_darkSyntaxThemeId);
+    settings.insert(QStringLiteral("lightSyntaxTheme"), m_lightSyntaxThemeId);
+    settings.insert(QStringLiteral("showFileTreeOnStartup"), m_showFileTreeOnStartup);
+    settings.insert(QStringLiteral("showStatusBar"), m_showStatusBar);
+    settings.insert(QStringLiteral("revealCurrentFileInTree"), m_revealCurrentFileInTree);
+    settings.insert(QStringLiteral("gitIntegrationEnabled"), m_gitIntegrationEnabled);
+    settings.insert(QStringLiteral("markdownDefaultPreview"), m_markdownDefaultPreview);
+    settings.insert(QStringLiteral("untitledDocumentMode"),
+                    m_untitledUsesCodeMode ? QStringLiteral("code") : QStringLiteral("text"));
+    settings.insert(QStringLiteral("overwriteMode"), m_overwriteMode);
+    settings.insert(QStringLiteral("codeFoldingEnabled"), m_codeFoldingEnabled);
+    settings.insert(QStringLiteral("bracketAssistanceEnabled"), m_bracketAssistanceEnabled);
+    settings.insert(QStringLiteral("smartIndentationEnabled"), m_smartIndentationEnabled);
+    settings.insert(QStringLiteral("documentCompletionEnabled"), m_documentCompletionEnabled);
+    settings.insert(QStringLiteral("semanticHighlightingEnabled"), m_semanticHighlightingEnabled);
+    settings.insert(QStringLiteral("language"), m_language);
 
-    settings.endGroup();
+    m_repository->save(settings,
+                       {QStringLiteral("syntaxTheme"),
+                        QStringLiteral("fixedSyntaxTheme"),
+                        QStringLiteral("syntaxThemeFollowsSystem")});
 }
 
 QFont AppPreferences::textFont() const

@@ -363,6 +363,8 @@ PreferencesDialog::PreferencesDialog(QWidget *parent)
     , m_openSyntaxThemeFolderButton(new QPushButton(tr("Open theme folder"), this))
     , m_showFileTree(new QCheckBox(tr("Show file tree on startup"), this))
     , m_showStatusBar(new QCheckBox(tr("Show bottom status bar"), this))
+    , m_revealCurrentFileInTree(
+          new QCheckBox(tr("Reveal current file in file tree"), this))
     , m_gitIntegrationEnabled(new QCheckBox(tr("Enable Git integration"), this))
     , m_markdownSidePreview(new QCheckBox(tr("Open with side preview"), this))
     , m_untitledModeCombo(new QComboBox(this))
@@ -380,6 +382,8 @@ PreferencesDialog::PreferencesDialog(QWidget *parent)
     setWindowTitle(tr("Preferences"));
     setModal(true);
     m_showStatusBar->setObjectName(QStringLiteral("showStatusBarCheckBox"));
+    m_revealCurrentFileInTree->setObjectName(
+        QStringLiteral("revealCurrentFileInTreeCheckBox"));
     m_gitIntegrationEnabled->setObjectName(
         QStringLiteral("gitIntegrationEnabledCheckBox"));
     reapplyTheme();
@@ -460,6 +464,8 @@ PreferencesDialog::PreferencesDialog(QWidget *parent)
     generalLayout->addLayout(makeSettingsRow(tr("Language"), m_languageCombo, generalSection));
     generalLayout->addLayout(makeSettingsRow(tr("Interface"), m_showStatusBar, generalSection));
     generalLayout->addLayout(makeSettingsRow(tr("Startup"), m_showFileTree, generalSection));
+    generalLayout->addLayout(
+        makeSettingsRow(tr("File tree"), m_revealCurrentFileInTree, generalSection));
     generalLayout->addLayout(makeSettingsRow(tr("New document"), m_untitledModeCombo, generalSection));
     generalLayout->addLayout(makeSettingsRow(tr("Typing"), m_overtypeMode, generalSection));
     generalLayout->addLayout(makeSettingsRow(tr("Markdown"), m_markdownSidePreview, generalSection));
@@ -675,6 +681,7 @@ void PreferencesDialog::connectLiveUpdates()
     const QList<QCheckBox *> checkBoxes = {
         m_showFileTree,
         m_showStatusBar,
+        m_revealCurrentFileInTree,
         m_gitIntegrationEnabled,
         m_markdownSidePreview,
         m_codeFolding,
@@ -785,6 +792,7 @@ void PreferencesDialog::loadFromPreferences()
     m_lightSyntaxThemeCombo->setCurrentIndex(lightThemeIndex >= 0 ? lightThemeIndex : 0);
     m_showFileTree->setChecked(prefs.showFileTreeOnStartup());
     m_showStatusBar->setChecked(prefs.showStatusBar());
+    m_revealCurrentFileInTree->setChecked(prefs.revealCurrentFileInTree());
     m_gitIntegrationEnabled->setChecked(prefs.gitIntegrationEnabled());
     m_markdownSidePreview->setChecked(prefs.markdownDefaultPreview());
     const int untitledModeIndex = m_untitledModeCombo->findData(prefs.untitledUsesCodeMode());
@@ -811,6 +819,7 @@ void PreferencesDialog::commit()
     prefs.setLightSyntaxThemeId(m_lightSyntaxThemeCombo->currentData().toString());
     prefs.setShowFileTreeOnStartup(m_showFileTree->isChecked());
     prefs.setShowStatusBar(m_showStatusBar->isChecked());
+    prefs.setRevealCurrentFileInTree(m_revealCurrentFileInTree->isChecked());
     prefs.setGitIntegrationEnabled(m_gitIntegrationEnabled->isChecked());
     prefs.setMarkdownDefaultPreview(m_markdownSidePreview->isChecked());
     prefs.setUntitledUsesCodeMode(m_untitledModeCombo->currentData().toBool());

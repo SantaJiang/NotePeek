@@ -1,7 +1,7 @@
 #include "editor/documentpage.h"
 
 #include "editor/customeditor.h"
-#include "editor/performanceconstants.h"
+#include "foundation/performanceconstants.h"
 #include "themecolors.h"
 #include "tool/markdown/markdownpreviewer.h"
 

@@ -1,9 +1,7 @@
 #include "tool/cpp/headersourcemanager.h"
 
-HeaderSourceManager::HeaderSourceManager(QObject *parent)
-    : QObject(parent)
-{
-}
+#include <QDir>
+#include <QFileInfo>
 
 bool HeaderSourceManager::isCppFile(const QString &filePath) const
 {

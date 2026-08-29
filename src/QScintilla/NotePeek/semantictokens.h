@@ -17,7 +17,7 @@ namespace NotePeek {
 
 // Positions use the Language Server Protocol convention: zero-based line and
 // UTF-16 code-unit columns. The editor converts them to Scintilla UTF-8 bytes.
-struct QSCINTILLA_EXPORT SemanticToken
+struct SemanticToken
 {
     int line = 0;
     int utf16Column = 0;
@@ -36,7 +36,7 @@ enum class SemanticEntryState : quint8
     MultiLineString
 };
 
-struct QSCINTILLA_EXPORT SemanticDocument
+struct SemanticDocument
 {
     QString uri;
     QString languageId;
@@ -46,13 +46,13 @@ struct QSCINTILLA_EXPORT SemanticDocument
     SemanticEntryState entryState = SemanticEntryState::Code;
 };
 
-struct QSCINTILLA_EXPORT SemanticAnalysisControl
+struct SemanticAnalysisControl
 {
     std::shared_ptr<std::atomic_bool> cancellation;
     qint64 budgetNanoseconds = 0;
 };
 
-struct QSCINTILLA_EXPORT SemanticAnalysisResult
+struct SemanticAnalysisResult
 {
     quint64 revision = 0;
     int firstLine = 0;
@@ -69,7 +69,7 @@ struct QSCINTILLA_EXPORT SemanticAnalysisResult
 // Replaceable language-service boundary. MainPage can use the built-in fast
 // classifier today and later plug in clangd, rust-analyzer or another LSP
 // client without changing the editor widget or its theme machinery.
-class QSCINTILLA_EXPORT SemanticTokenProvider
+class SemanticTokenProvider
 {
 public:
     virtual ~SemanticTokenProvider() = default;
@@ -83,7 +83,7 @@ public:
     }
 };
 
-class QSCINTILLA_EXPORT BasicSemanticTokenProvider final : public SemanticTokenProvider
+class BasicSemanticTokenProvider final : public SemanticTokenProvider
 {
 public:
     SemanticAnalysisResult analyze(

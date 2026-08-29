@@ -1,7 +1,7 @@
 #include "find/filesearcher.h"
 
-#include "editor/backgroundworkscheduler.h"
-#include "editor/performanceconstants.h"
+#include "foundation/backgroundworkscheduler.h"
+#include "foundation/performanceconstants.h"
 #include "editor/projectpathfilter.h"
 #include "editor/supportedfilepolicy.h"
 

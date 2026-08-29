@@ -14,6 +14,8 @@ checks continue to describe API compatibility.  The
 `NOTEPEEK_QSCINTILLA_VERSION*` macros identify the fork itself.
 
 New NotePeek-facing APIs should be kept in the `NotePeek` namespace and in
-dedicated source files where possible.  Changes to the Scintilla engine and
-upstream QScintilla wrappers must be listed in `PATCHES.md` so a future upstream
-refresh can replay or retire them deliberately.
+dedicated source files where possible. They are compiled by the application
+static `notepeek_editor_kit` target and must not be added to the exported fork
+binary. Changes to the Scintilla engine and upstream QScintilla wrappers must
+be listed in `PATCHES.md` so a future upstream refresh can replay or retire them
+deliberately.

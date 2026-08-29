@@ -8,9 +8,7 @@
 
 #include "editor/documentformat.h"
 
-class CustomEditor;
 class DocumentSaveCoordinator;
-class QWidget;
 
 struct DocumentLoadRequest
 {
@@ -57,14 +55,9 @@ public:
     explicit DocumentPersistenceService(DocumentSaveCoordinator *saveCoordinator,
                                         QObject *parent = nullptr);
 
-    bool saveEditorSnapshot(CustomEditor *editor,
-                            QByteArray *utf8Content,
-                            QString *errorMessage) const;
     void loadFileAsync(const DocumentLoadRequest &request);
     void saveFileAsync(const DocumentSaveRequest &request);
     void waitForPendingSavePath(const QString &filePath);
-    QString promptSaveFileName(QWidget *parent) const;
-    QString displayNameForSavePrompt(CustomEditor *editor) const;
 
 signals:
     void fileLoaded(const DocumentLoadResult &result);

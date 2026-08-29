@@ -18,7 +18,7 @@ namespace NotePeek {
 // Stable public editor surface supplied by the NotePeek QScintilla fork.  This class
 // owns reusable editing mechanics only; file paths, encoding, persistence and
 // application document state intentionally remain outside the library.
-class QSCINTILLA_EXPORT Editor : public QsciScintilla
+class Editor : public QsciScintilla
 {
 public:
     explicit Editor(QWidget *parent = nullptr);

@@ -1,17 +1,13 @@
 #ifndef HEADERSOURCEMANAGER_H
 #define HEADERSOURCEMANAGER_H
 
-#include <QObject>
 #include <QString>
-#include <QFileInfo>
-#include <QDir>
+#include <QStringList>
 
-class HeaderSourceManager : public QObject
+class HeaderSourceManager final
 {
-    Q_OBJECT
-
 public:
-    explicit HeaderSourceManager(QObject *parent = nullptr);
+    HeaderSourceManager() = default;
 
     // True if the file is a C++ header or source file
     bool isCppFile(const QString &filePath) const;

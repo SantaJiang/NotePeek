@@ -1,8 +1,8 @@
 #include "editor/documentsavecoordinator.h"
 
 #include "editor/documentio.h"
-#include "editor/backgroundworkscheduler.h"
-#include "editor/documentpath.h"
+#include "foundation/backgroundworkscheduler.h"
+#include "foundation/documentpath.h"
 
 #include <QEventLoop>
 #include <QFutureWatcher>

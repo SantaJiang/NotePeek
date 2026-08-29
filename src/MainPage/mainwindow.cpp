@@ -6,9 +6,6 @@
 #include <QFileDialog>
 #include <QScreen>
 #include <QFileInfo>
-#include <QFutureWatcher>
-#include <QPointer>
-#include <QDir>
 #include <QScrollBar>
 #include <QMessageBox>
 #include <QIcon>
@@ -24,39 +21,27 @@
 #include <QDockWidget>
 #include <QMenu>
 #include <QSplitter>
-#include <QtConcurrent>
 
 #include <utility>
 #include "editor/documentformat.h"
-#include "editor/backgroundworkscheduler.h"
 #include "editor/customeditor.h"
 #include "editor/documentcontroller.h"
-#include "editor/documentpath.h"
+#include "foundation/documentpath.h"
 #include "editor/editormanager.h"
 #include "editor/documentsavecoordinator.h"
 #include "editor/editorpane.h"
 #include "editor/externalfilewatcher.h"
 #include "editor/spliteditorcoordinator.h"
+#include "find/searchnavigationcoordinator.h"
+#include "tool/cpp/cppnavigationcoordinator.h"
 #include "tool/format/codeformatter.h"
-#include "versioncontrol/gitrepositoryservice.h"
+#include "tool/format/codeformattingcoordinator.h"
+#include "tool/markdown/markdowntoolcoordinator.h"
+#include "versioncontrol/gitpresentationcoordinator.h"
 #include "widgets/fileexplorerdock.h"
 #include "widgets/searchresultsdock.h"
 
 namespace {
-
-QString eolText(QsciScintilla::EolMode mode)
-{
-    switch (mode)
-    {
-    case QsciScintilla::EolWindows:
-        return QStringLiteral("\r\n");
-    case QsciScintilla::EolMac:
-        return QStringLiteral("\r");
-    case QsciScintilla::EolUnix:
-        break;
-    }
-    return QStringLiteral("\n");
-}
 
 QString normalizedAbsolutePath(const QString &path)
 {
@@ -66,22 +51,6 @@ QString normalizedAbsolutePath(const QString &path)
 bool isPathInsideDirectory(const QString &path, const QString &directory)
 {
     return DocumentPath::isInsideDirectory(path, directory);
-}
-
-bool hasGitMetadataAtOrAbove(const QString &directory)
-{
-    if (directory.isEmpty())
-        return false;
-
-    QDir candidate(directory);
-    while (candidate.exists())
-    {
-        if (QFileInfo(candidate.filePath(QStringLiteral(".git"))).exists())
-            return true;
-        if (!candidate.cdUp())
-            break;
-    }
-    return false;
 }
 
 void applyEditorSplitterStyle(QSplitter *splitter)
@@ -143,15 +112,38 @@ MainWindow::MainWindow(QWidget *parent,
     , m_fileExplorerDock(nullptr)
     , m_saveCoordinator(new DocumentSaveCoordinator(this))
     , m_externalFileWatcher(new ExternalFileWatcher(this))
-    , m_gitRepositoryService(nullptr)
+    , m_gitCoordinator(nullptr)
     , m_editorCoordinator(nullptr)
     , m_singleFileWindow(false)
     , m_fileExplorerRootExplicit(false)
     , m_findReplaceManager(new FindReplaceManager(this))
-    , m_headerSourceManager(new HeaderSourceManager(this))
-    , m_markdownPreviewer(new MarkdownPreviewer(this))
+    , m_cppNavigation(nullptr)
+    , m_codeFormattingCoordinator(nullptr)
+    , m_markdownTools(new MarkdownToolCoordinator(this, this))
 {
     ui->setupUi(this);
+    m_codeFormattingCoordinator = new CodeFormattingCoordinator(
+        this,
+        [this](CustomEditor *editor) {
+            DocumentController *controller = activeController();
+            return controller && controller->currentEditor() == editor
+                   && !controller->pane()->isCurrentEditorHidden();
+        },
+        this);
+    connect(m_codeFormattingCoordinator,
+            &CodeFormattingCoordinator::formattingStateChanged,
+            this,
+            &MainWindow::updateToolActions);
+    m_cppNavigation = std::make_unique<CppNavigationCoordinator>(
+        [this]() { return activeController(); },
+        [this](const QString &filePath) { syncFileExplorerToFile(filePath, false); });
+    connect(m_markdownTools, &MarkdownToolCoordinator::previewStateChanged,
+            this, [this](CustomEditor *editor, bool visible) {
+                if (visible)
+                    ui->widget_findreplace->setVisible(false);
+                updateEditActions(editor && editor->hasSelectedText());
+                updateToolActions();
+            });
     setAcceptDrops(false); // Drag and drop is handled by the editors.
     ui->statusbar->setVisible(AppPreferences::instance().showStatusBar());
 
@@ -170,7 +162,7 @@ MainWindow::MainWindow(QWidget *parent,
                                                   this);
         // Every pane needs the previewer so the "open Markdown in preview"
         // preference can render on open.
-        controller->setMarkdownPreviewer(m_markdownPreviewer);
+        controller->setMarkdownPreviewer(m_markdownTools->previewer());
         // Each pane's side-preview toolbar button toggles the preview for its
         // own pane, mirroring the Tools ▸ Markdown ▸ Side Preview action.
         connect(controller->pane(), &EditorPane::sidePreviewToggleRequested,
@@ -194,38 +186,45 @@ MainWindow::MainWindow(QWidget *parent,
             });
     connect(m_fileExplorerDock, &FileExplorerDock::openInNewWindowRequested,
             this, &MainWindow::openFileInNewWindow);
-    setGitIntegrationEnabled(AppPreferences::instance().gitIntegrationEnabled());
+    m_gitCoordinator = new GitPresentationCoordinator(m_fileExplorerDock,
+                                                       ui->statusbar,
+                                                       m_externalFileWatcher,
+                                                       this);
+    m_gitCoordinator->setEnabled(AppPreferences::instance().gitIntegrationEnabled());
 
     m_searchResultsDock = new SearchResultsDock(this);
     setCorner(Qt::BottomLeftCorner, Qt::LeftDockWidgetArea);
     addDockWidget(Qt::BottomDockWidgetArea, m_searchResultsDock->dockWidget());
     m_searchResultsDock->setVisible(false);
+    m_searchNavigation = new SearchNavigationCoordinator(
+        [this]() { return activeController(); },
+        [this](const QString &filePath) { syncFileExplorerToFile(filePath, false); },
+        this);
     connect(m_searchResultsDock, &SearchResultsDock::matchActivated,
-            this, &MainWindow::openFileAtSearchMatch);
+            m_searchNavigation, &SearchNavigationCoordinator::openMatch);
     connect(ui->widget_findreplace, &FindReplaceWidget::advancedSearchRequested,
             this, &MainWindow::on_action_findInFiles_triggered);
     // Search-result jumps into files that are still loading complete once the
     // controller reports the file as opened.
     for (DocumentController *controller : m_documentControllers)
     {
+        m_searchNavigation->observeController(controller);
         // Editors are read-only while their file loads, which gates the tool
         // actions; they have to be re-evaluated once the load completes.
         connect(controller, &DocumentController::fileOpened,
                 this, [this](CustomEditor *, const QString &) {
                     updateToolActions();
-                    if (m_gitRepositoryService)
-                        m_gitRepositoryService->requestRefresh();
+                    m_gitCoordinator->requestRefresh();
                 });
         connect(controller, &DocumentController::editorModificationChanged,
                 this, [this](CustomEditor *, bool modified) {
-                    if (!modified && m_gitRepositoryService)
-                        m_gitRepositoryService->requestRefresh();
+                    if (!modified)
+                        m_gitCoordinator->requestRefresh();
                 });
         connect(controller, &DocumentController::filePathChanged,
                 this,
                 [this](CustomEditor *, const QString &, const QString &) {
-                    if (m_gitRepositoryService)
-                        m_gitRepositoryService->requestRefresh();
+                    m_gitCoordinator->requestRefresh();
                 });
         connect(controller, &DocumentController::emojiFontInstallationRecommended,
                 this, [this](const QString &filePath) {
@@ -245,27 +244,6 @@ MainWindow::MainWindow(QWidget *parent,
                     message->setAttribute(Qt::WA_DeleteOnClose);
                     message->setModal(false);
                     message->show();
-                });
-        connect(controller, &DocumentController::fileOpened,
-                this, [this](CustomEditor *editor, const QString &filePath) {
-                    if (!m_pendingSearchJump.active
-                        || !DocumentPath::equivalent(filePath, m_pendingSearchJump.filePath))
-                    {
-                        return;
-                    }
-                    m_pendingSearchJump.active = false;
-                    jumpToEditorLocation(editor,
-                                         m_pendingSearchJump.line,
-                                         m_pendingSearchJump.column,
-                                         m_pendingSearchJump.length);
-                });
-        connect(controller, &DocumentController::fileOpenFailed,
-                this, [this](const QString &filePath) {
-                    if (m_pendingSearchJump.active
-                        && DocumentPath::equivalent(filePath, m_pendingSearchJump.filePath))
-                    {
-                        m_pendingSearchJump.active = false;
-                    }
                 });
     }
 
@@ -379,8 +357,8 @@ MainWindow::~MainWindow()
     m_documentControllers.clear();
     // Cancel Git while the status bar and file tree still exist: cancellation
     // can synchronously emit stateChanged() and clear their presentation.
-    delete m_gitRepositoryService;
-    m_gitRepositoryService = nullptr;
+    delete m_gitCoordinator;
+    m_gitCoordinator = nullptr;
     delete ui;
 }
 
@@ -464,7 +442,8 @@ void MainWindow::applyActiveController(DocumentController *controller)
         updateWindowTitle(editor->isModified());
 
         const QString filePath = editor->filePath();
-        if (!filePath.isEmpty())
+        if (!filePath.isEmpty()
+            && AppPreferences::instance().revealCurrentFileInTree())
         {
             syncFileExplorerToFile(filePath, false);
         }
@@ -491,14 +470,8 @@ void MainWindow::closeEvent(QCloseEvent *event)
 bool MainWindow::event(QEvent *event)
 {
     const bool handled = QMainWindow::event(event);
-    if (event->type() == QEvent::WindowActivate && m_gitRepositoryService)
-    {
-        if (m_gitRepositoryService->state() == GitRepositoryState::NotRepository
-            && hasGitMetadataAtOrAbove(m_fileExplorerRootDirectory))
-            m_gitRepositoryService->setDirectory(m_fileExplorerRootDirectory);
-        else
-            m_gitRepositoryService->requestRefresh();
-    }
+    if (event->type() == QEvent::WindowActivate && m_gitCoordinator)
+        m_gitCoordinator->handleWindowActivated();
     return handled;
 }
 
@@ -561,73 +534,7 @@ void MainWindow::setRootDirectory(const QString &dirPath, bool explicitDirectory
     m_fileExplorerRootExplicit = explicitDirectoryRoot && !m_fileExplorerRootDirectory.isEmpty();
     m_fileExplorerDock->setRootDirectory(dirPath);
     m_searchResultsDock->setSearchRoot(m_fileExplorerRootDirectory);
-    if (m_gitRepositoryService)
-        m_gitRepositoryService->setDirectory(m_fileExplorerRootDirectory);
-}
-
-void MainWindow::setGitIntegrationEnabled(bool enabled)
-{
-    if (enabled)
-    {
-        if (m_gitRepositoryService)
-            return;
-
-        m_gitRepositoryService = new GitRepositoryService(this);
-        connect(m_fileExplorerDock, &FileExplorerDock::repositoryContentsChanged,
-                m_gitRepositoryService, &GitRepositoryService::requestRefresh);
-        connect(ui->statusbar, &QsciEditorInfoStatusBar::gitRefreshRequested,
-                m_gitRepositoryService, &GitRepositoryService::refreshNow);
-        connect(m_gitRepositoryService, &GitRepositoryService::snapshotChanged,
-                this, &MainWindow::updateGitPresentation);
-        connect(m_gitRepositoryService, &GitRepositoryService::stateChanged,
-                this, [this](GitRepositoryState state) {
-                    if (state == GitRepositoryState::Ready)
-                        return;
-                    ui->statusbar->setGitStatus(QString());
-                    m_fileExplorerDock->setGitRepositorySnapshot(GitRepositorySnapshot{});
-                });
-        connect(m_externalFileWatcher, &ExternalFileWatcher::externalFileChanged,
-                m_gitRepositoryService, &GitRepositoryService::requestRefresh);
-        m_gitRepositoryService->setDirectory(m_fileExplorerRootDirectory);
-        return;
-    }
-
-    delete m_gitRepositoryService;
-    m_gitRepositoryService = nullptr;
-    ui->statusbar->setGitStatus(QString());
-    m_fileExplorerDock->setGitRepositorySnapshot(GitRepositorySnapshot{});
-}
-
-void MainWindow::updateGitPresentation(const GitRepositorySnapshot &snapshot)
-{
-    // A queued snapshot can outlive a service that was just disabled. Never
-    // restore stale decorations after the preference has cleared them.
-    if (!m_gitRepositoryService)
-        return;
-
-    m_fileExplorerDock->setGitRepositorySnapshot(snapshot);
-
-    QString branch = snapshot.branchName;
-    if (snapshot.detachedHead)
-        branch = QStringLiteral("@%1").arg(snapshot.headOid.left(8));
-    if (branch.isEmpty())
-        branch = QStringLiteral("Git");
-
-    QString text = branch;
-    if (snapshot.ahead > 0)
-        text += QStringLiteral("  ↑%1").arg(snapshot.ahead);
-    if (snapshot.behind > 0)
-        text += QStringLiteral("  ↓%1").arg(snapshot.behind);
-    if (!snapshot.files.isEmpty())
-        text += QStringLiteral("  •%1").arg(snapshot.files.size());
-
-    const QString toolTip = tr("Repository: %1\nBranch: %2\nChanges: %3\n"
-                               "Ahead: %4, Behind: %5\nClick to refresh")
-                                .arg(snapshot.repositoryRoot, branch)
-                                .arg(snapshot.files.size())
-                                .arg(snapshot.ahead)
-                                .arg(snapshot.behind);
-    ui->statusbar->setGitStatus(text, toolTip);
+    m_gitCoordinator->setDirectory(m_fileExplorerRootDirectory);
 }
 
 void MainWindow::syncFileExplorerToFile(const QString &filePath, bool allowImplicitRootChange)
@@ -777,7 +684,15 @@ void MainWindow::applyPreferences()
     reapplyChromeTheme();
     m_editorCoordinator->refreshVisibleMarkdownPreviews();
     ui->statusbar->setVisible(AppPreferences::instance().showStatusBar());
-    setGitIntegrationEnabled(AppPreferences::instance().gitIntegrationEnabled());
+    m_gitCoordinator->setEnabled(AppPreferences::instance().gitIntegrationEnabled());
+    if (AppPreferences::instance().revealCurrentFileInTree())
+    {
+        if (CustomEditor *editor = activeController()->currentEditor())
+        {
+            if (!editor->filePath().isEmpty())
+                syncFileExplorerToFile(editor->filePath(), false);
+        }
+    }
     if (CustomEditor *editor = activeController()->currentEditor())
     {
         updateEditActions(editor->hasSelectedText());
@@ -863,152 +778,18 @@ void MainWindow::on_action_findInFiles_triggered()
     m_searchResultsDock->focusSearchInput(editor ? editor->selectedText() : QString());
 }
 
-void MainWindow::openFileAtSearchMatch(const QString &filePath, int line, int column, int length)
-{
-    DocumentController *controller = activeController();
-    CustomEditor *existingEditor = controller->editorManager()->getEditorByFilePath(filePath);
-    if (existingEditor && !controller->isEditorLoading(existingEditor))
-    {
-        controller->openFile(filePath);
-        jumpToEditorLocation(existingEditor, line, column, length);
-    }
-    else
-    {
-        m_pendingSearchJump = { filePath, line, column, length, true };
-        controller->openFile(filePath);
-    }
-    syncFileExplorerToFile(filePath, false);
-}
-
-void MainWindow::jumpToEditorLocation(CustomEditor *editor, int line, int column, int length)
-{
-    if (!editor)
-        return;
-
-    const int lastLine = qMax(0, editor->lines() - 1);
-    const int targetLine = qBound(0, line, lastLine);
-    const int targetColumn = qBound(0, column, editor->lineLength(targetLine));
-    editor->ensureLineVisible(targetLine);
-    if (length > 0)
-    {
-        const int targetEnd = qBound(targetColumn,
-                                     targetColumn + length,
-                                     editor->lineLength(targetLine));
-        editor->setSelection(targetLine, targetColumn, targetLine, targetEnd);
-    }
-    else
-    {
-        editor->setCursorPosition(targetLine, targetColumn);
-    }
-    editor->setFocus();
-}
-
 void MainWindow::on_action_formatCode_triggered()
 {
     DocumentController *controller = activeController();
     CustomEditor *editor = controller->currentEditor();
-    if (!editor || controller->pane()->isCurrentEditorHidden() || editor->isReadOnly()
-        || editor->property("notepeekFormattingInProgress").toBool())
+    if (!editor || controller->pane()->isCurrentEditorHidden())
         return;
-
-    const QString filePath = editor->filePath();
-    if (!CodeFormatter::canFormat(filePath))
-        return;
-
-    CodeFormatter::Options options;
-    // indentationWidth() is 0 when the editor follows the tab width.
-    options.indentWidth = editor->indentationWidth() > 0 ? editor->indentationWidth()
-                                                         : editor->tabWidth();
-    options.useTabs = editor->indentationsUseTabs();
-    options.eol = eolText(editor->eolMode());
-
-    const QString original = editor->text();
-    const quint64 revision = editor->documentRevision();
-    QPointer<CustomEditor> editorGuard(editor);
-    editor->setProperty("notepeekFormattingInProgress", true);
-    updateToolActions();
-
-    auto *watcher = new QFutureWatcher<CodeFormatter::Result>(this);
-    connect(watcher, &QFutureWatcher<CodeFormatter::Result>::finished,
-            this, [this, watcher, editorGuard, revision, original, filePath]() {
-        const CodeFormatter::Result result = watcher->result();
-        watcher->deleteLater();
-        if (editorGuard)
-            editorGuard->setProperty("notepeekFormattingInProgress", false);
-        updateToolActions();
-
-        CustomEditor *editor = editorGuard.data();
-        if (!editor || editor->documentRevision() != revision
-            || editor->filePath() != filePath)
-            return;
-        if (!result.ok)
-        {
-            QMessageBox::warning(this,
-                                 tr("Format Code"),
-                                 tr("Could not format %1.\n\n%2")
-                                     .arg(QFileInfo(filePath).fileName(), result.error));
-            return;
-        }
-
-        // Replacing identical text would still push an undo step and mark the
-        // document modified, so an already-formatted file is left alone.
-        if (result.text == original)
-            return;
-
-        int line = 0;
-        int index = 0;
-        editor->getCursorPosition(&line, &index);
-        const int firstVisibleLine = int(editor->SendScintilla(
-            QsciScintillaBase::SCI_GETFIRSTVISIBLELINE));
-        const int xOffset = int(editor->SendScintilla(QsciScintillaBase::SCI_GETXOFFSET));
-
-        // selectAll()/replaceSelectedText() rather than setText(): the latter
-        // empties the undo buffer, and formatting stays one undoable action.
-        const bool updatesWereEnabled = editor->updatesEnabled();
-        editor->setUpdatesEnabled(false);
-        editor->beginUndoAction();
-        editor->selectAll();
-        editor->replaceSelectedText(result.text);
-        editor->endUndoAction();
-        editor->setUpdatesEnabled(updatesWereEnabled);
-
-        const int lastLine = qMax(0, editor->lines() - 1);
-        const int targetLine = qBound(0, line, lastLine);
-        editor->setCursorPosition(targetLine,
-                                  qBound(0, index, editor->lineLength(targetLine)));
-        editor->SendScintilla(QsciScintillaBase::SCI_SETFIRSTVISIBLELINE,
-                              firstVisibleLine);
-        editor->SendScintilla(QsciScintillaBase::SCI_SETXOFFSET, xOffset);
-        editor->viewport()->update();
-        DocumentController *currentController = activeController();
-        if (currentController && currentController->currentEditor() == editor
-            && !currentController->pane()->isCurrentEditorHidden())
-        {
-            editor->setFocus();
-        }
-    });
-    watcher->setFuture(QtConcurrent::run(BackgroundWorkScheduler::interactivePool(), [original, filePath, options]() {
-        return CodeFormatter::format(original, filePath, options);
-    }));
+    m_codeFormattingCoordinator->format(editor);
 }
 
 void MainWindow::on_action_switchHeaderSource_triggered()
 {
-    DocumentController *controller = activeController();
-    CustomEditor *editor = controller->currentEditor();
-    if (!editor)
-        return;
-
-    const QString currentFilePath = editor->filePath();
-    if (currentFilePath.isEmpty())
-        return;
-
-    const QString correspondingFile = m_headerSourceManager->getCorrespondingFile(currentFilePath);
-    if (!correspondingFile.isEmpty())
-    {
-        controller->openFile(correspondingFile);
-        syncFileExplorerToFile(correspondingFile, false);
-    }
+    m_cppNavigation->switchHeaderSource();
 }
 
 void MainWindow::on_action_markdownPreview_triggered()
@@ -1018,62 +799,12 @@ void MainWindow::on_action_markdownPreview_triggered()
 
 void MainWindow::toggleMarkdownSidePreviewFor(DocumentController *controller)
 {
-    if (!controller)
-        return;
-
-    CustomEditor *editor = controller->currentEditor();
-    if (!editor)
-        return;
-
-    if (!m_markdownPreviewer->isMarkdownFile(editor->filePath()))
-        return;
-
-    const bool previewVisible = controller->pane()->toggleMarkdownPreview(m_markdownPreviewer);
-    if (previewVisible)
-    {
-        ui->widget_findreplace->setVisible(false);
-    }
-
-    controller->pane()->updateSidePreviewButton();
-    updateEditActions(editor->hasSelectedText());
-    updateToolActions();
+    m_markdownTools->togglePreview(controller);
 }
 
 void MainWindow::on_action_markdownExportPdf_triggered()
 {
-    CustomEditor *editor = activeController()->currentEditor();
-    if (!editor)
-        return;
-
-    const QString currentFilePath = editor->filePath();
-    if (!m_markdownPreviewer->isMarkdownFile(currentFilePath))
-        return;
-
-    const QFileInfo fileInfo(currentFilePath);
-    const QString defaultPath = fileInfo.absolutePath()
-                                + QDir::separator()
-                                + fileInfo.completeBaseName()
-                                + QStringLiteral(".pdf");
-    QString outputPath = QFileDialog::getSaveFileName(this,
-                                                      tr("Export Markdown to PDF"),
-                                                      defaultPath,
-                                                      tr("PDF Files (*.pdf)"));
-    if (outputPath.isEmpty())
-    {
-        return;
-    }
-
-    if (QFileInfo(outputPath).suffix().isEmpty())
-    {
-        outputPath += QStringLiteral(".pdf");
-    }
-
-    if (!m_markdownPreviewer->exportToPdf(editor->text(), currentFilePath, outputPath))
-    {
-        QMessageBox::warning(this,
-                             tr("Export Failed"),
-                             tr("Could not export Markdown to PDF."));
-    }
+    m_markdownTools->exportToPdf(activeController()->currentEditor());
 }
 
 void MainWindow::onFileDraged(const QList<QUrl> &urls)
@@ -1151,8 +882,8 @@ void MainWindow::updateToolActions()
         ui->widget_findreplace->setVisible(false);
     }
 
-    const bool cppSupported = !filePath.isEmpty() && m_headerSourceManager->isCppFile(filePath);
-    const bool markdownSupported = !filePath.isEmpty() && m_markdownPreviewer->isMarkdownFile(filePath);
+    const bool cppSupported = !filePath.isEmpty() && m_cppNavigation->isCppFile(filePath);
+    const bool markdownSupported = !filePath.isEmpty() && m_markdownTools->isMarkdownFile(filePath);
 
     // A formatter has to exist for the language *and* be usable: C-family files
     // report false while clang-format is not installed, so the entry is never

@@ -14,6 +14,15 @@
 #include <QMutexLocker>
 #include <QStandardPaths>
 
+static void initializeNotePeekThemeResources()
+{
+    static const bool initialized = []() {
+        Q_INIT_RESOURCE(notepeekthemes);
+        return true;
+    }();
+    Q_UNUSED(initialized);
+}
+
 namespace {
 
 using Role = NotePeek::SyntaxRole;
@@ -187,6 +196,7 @@ SyntaxTheme SyntaxThemeCatalog::fromJson(const QByteArray &json, QString *error)
 
 QVector<SyntaxTheme> SyntaxThemeCatalog::builtInThemes()
 {
+    initializeNotePeekThemeResources();
     // Resources are immutable for the lifetime of the process. Parse all ten
     // JSON files once rather than repeating that work on viewport refreshes,
     // then share the resulting Qt value data on subsequent calls.

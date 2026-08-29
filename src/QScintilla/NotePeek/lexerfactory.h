@@ -8,7 +8,7 @@
 #include <QStringList>
 #include <QHash>
 
-class QSCINTILLA_EXPORT LexerFactory
+class LexerFactory
 {
 public:
     enum Language {

@@ -1,83 +1,20 @@
 #include "editor/documentpersistenceservice.h"
 
-#include "editor/customeditor.h"
-#include "editor/backgroundworkscheduler.h"
+#include "foundation/backgroundworkscheduler.h"
 #include "editor/documentio.h"
 #include "editor/documentsavecoordinator.h"
 #include <NotePeek/lexerfactory.h>
-#include "editor/performanceconstants.h"
+#include "foundation/performanceconstants.h"
 
-#include <QFileDialog>
 #include <QFileInfo>
 #include <QFutureWatcher>
-#include <QRegularExpression>
 #include <QtConcurrent>
-#include <Qsci/qsciscintillabase.h>
-
-#include <limits>
-#include <cstring>
 DocumentPersistenceService::DocumentPersistenceService(DocumentSaveCoordinator *saveCoordinator,
                                                        QObject *parent)
     : QObject(parent)
     , m_saveCoordinator(saveCoordinator)
 {
     Q_ASSERT(m_saveCoordinator);
-}
-
-bool DocumentPersistenceService::saveEditorSnapshot(CustomEditor *editor,
-                                                     QByteArray *utf8Content,
-                                                     QString *errorMessage) const
-{
-    if (!editor || !utf8Content)
-    {
-        if (errorMessage)
-        {
-            *errorMessage = tr("No editor content to save.");
-        }
-        return false;
-    }
-
-    const auto length = editor->SendScintilla(QsciScintillaBase::SCI_GETLENGTH);
-    if (length > std::numeric_limits<int>::max())
-    {
-        if (errorMessage)
-        {
-            *errorMessage = tr("The document is too large to snapshot for saving.");
-        }
-        return false;
-    }
-    const DocumentFormat format = editor->documentFormat();
-    if ((format.encoding == DocumentEncoding::Utf8
-         || format.encoding == DocumentEncoding::Utf8Bom)
-        && (format.lineEnding == DocumentLineEnding::Lf
-            || format.lineEnding == DocumentLineEnding::Mixed))
-    {
-        const char *buffer = reinterpret_cast<const char *>(
-            editor->SendScintillaPtrResult(QsciScintillaBase::SCI_GETCHARACTERPOINTER));
-        if (!buffer && length > 0)
-        {
-            if (errorMessage)
-                *errorMessage = tr("Cannot access editor buffer.");
-            return false;
-        }
-        const int bomSize = format.encoding == DocumentEncoding::Utf8Bom ? 3 : 0;
-        utf8Content->resize(bomSize + int(length));
-        if (bomSize != 0)
-            std::memcpy(utf8Content->data(), "\xef\xbb\xbf", 3);
-        if (length > 0)
-            std::memcpy(utf8Content->data() + bomSize, buffer, size_t(length));
-    }
-    else
-    {
-        // Convert straight from Scintilla's buffer; text() would copy the
-        // whole document an extra time before the encode pass.
-        const char *buffer = reinterpret_cast<const char *>(
-            editor->SendScintillaPtrResult(QsciScintillaBase::SCI_GETCHARACTERPOINTER));
-        const QString text = buffer ? QString::fromUtf8(buffer, int(length))
-                                    : editor->text();
-        *utf8Content = DocumentFormatCodec::encode(text, format);
-    }
-    return true;
 }
 
 void DocumentPersistenceService::loadFileAsync(const DocumentLoadRequest &request)
@@ -128,54 +65,4 @@ void DocumentPersistenceService::saveFileAsync(const DocumentSaveRequest &reques
 void DocumentPersistenceService::waitForPendingSavePath(const QString &filePath)
 {
     m_saveCoordinator->waitForPath(filePath);
-}
-
-QString DocumentPersistenceService::promptSaveFileName(QWidget *parent) const
-{
-    QStringList filters;
-    filters.append(tr("Text Files (*.txt)"));
-    for (const QString &ext : LexerFactory::supportedExtensions())
-    {
-        filters.append(
-            QStringLiteral("%1 (*.%2)").arg(LexerFactory::languageName(LexerFactory::languageFromExtension(ext)), ext));
-    }
-    for (const QString &fileName : LexerFactory::supportedFileNames())
-    {
-        filters.append(QStringLiteral("%1 (%2)").arg(
-            LexerFactory::languageName(LexerFactory::languageFromFileName(fileName)), fileName));
-    }
-    filters.append(tr("All Files (*)"));
-
-    QString selectedFilter;
-    QString fileName = QFileDialog::getSaveFileName(parent, tr("Save As"), QStringLiteral("untitled.txt"),
-                                                    filters.join(QStringLiteral(";;")), &selectedFilter);
-    if (fileName.isEmpty())
-    {
-        return {};
-    }
-
-    if (QFileInfo(fileName).suffix().isEmpty() && !selectedFilter.isEmpty() && selectedFilter != tr("All Files (*)"))
-    {
-        const QRegularExpression re(QStringLiteral("\\(\\*\\.([^)]+)\\)"));
-        const QRegularExpressionMatch match = re.match(selectedFilter);
-        if (match.hasMatch())
-        {
-            const QString ext = match.captured(1);
-            if (!ext.isEmpty())
-            {
-                fileName += u'.' + ext;
-            }
-        }
-    }
-    return fileName;
-}
-
-QString DocumentPersistenceService::displayNameForSavePrompt(CustomEditor *editor) const
-{
-    if (!editor || editor->filePath().isEmpty())
-    {
-        return QStringLiteral("untitled.txt");
-    }
-
-    return QFileInfo(editor->filePath()).fileName();
 }

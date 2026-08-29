@@ -9,16 +9,21 @@ distributed under GNU GPL version 3.0 when they form part of QScintilla.
 - Renamed the shipped binary to `NotePeekScintilla` and assigned an independent
   fork version and ABI.
 - Added Qt 6 and cross-platform packaging integration.
+- Split NotePeek-specific editor APIs, lexers, semantic services, and theme
+  resources into the application-owned static `notepeek_editor_kit` target.
+  The shared fork binary now contains only QScintilla and Scintilla code, so
+  application extensions have one build owner on every platform.
 
 ## Lexer wrappers
 
 - Added QML and Rust QScintilla wrapper classes for bundled Scintilla lexers.
-- Moved the NotePeek language registry and Dockerfile, qmake, ignore-file,
-  Groovy, Starlark, and Meson lexers into the fork library.
+- Added the NotePeek language registry and Dockerfile, qmake, ignore-file,
+  Groovy, Starlark, and Meson lexers alongside the fork sources. They are built
+  by `notepeek_editor_kit`, not exported by the shared fork binary.
 
-## Public NotePeek editor API
+## Internal NotePeek editor API
 
-- Added `NotePeek::Editor`, an exported QScintilla subclass that owns reusable
+- Added `NotePeek::Editor`, an application-level QScintilla subclass that owns reusable
   bracket assistance, folding commands, matching-brace navigation and
   document-word completion without depending on MainPage document state.
 - Added an LSP-compatible semantic-token model, replaceable provider boundary,

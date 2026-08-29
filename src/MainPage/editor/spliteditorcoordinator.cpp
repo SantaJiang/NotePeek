@@ -2,14 +2,14 @@
 
 #include "editor/customeditor.h"
 #include "editor/documentcontroller.h"
-#include "editor/backgroundworkscheduler.h"
+#include "foundation/backgroundworkscheduler.h"
 #include "editor/documentio.h"
-#include "editor/documentpath.h"
+#include "foundation/documentpath.h"
 #include "editor/editormanager.h"
 #include "editor/filesavedialog.h"
 #include "editor/editorpane.h"
 #include "editor/externalfilewatcher.h"
-#include "editor/performanceconstants.h"
+#include "foundation/performanceconstants.h"
 #include <NotePeek/lexerfactory.h>
 
 #include <QFileInfo>

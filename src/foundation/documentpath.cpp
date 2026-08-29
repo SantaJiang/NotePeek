@@ -1,4 +1,4 @@
-#include "editor/documentpath.h"
+#include "foundation/documentpath.h"
 
 #include <QDir>
 #include <QFileInfo>

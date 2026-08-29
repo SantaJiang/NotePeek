@@ -1,7 +1,7 @@
 #include "editor/semantichighlightingengine.h"
 
 #include "apppreferences.h"
-#include "editor/backgroundworkscheduler.h"
+#include "foundation/backgroundworkscheduler.h"
 #include "editor/customeditor.h"
 #include "themecolors.h"
 

@@ -26,30 +26,27 @@ QString CustomEditor::filePath() const
 
 void CustomEditor::setDocumentFormat(const DocumentFormat &format)
 {
-    m_documentSession->format = format;
+    m_documentSession->setFormat(format);
 }
 
 DocumentFormat CustomEditor::documentFormat() const
 {
-    return m_documentSession->format;
+    return m_documentSession->format();
 }
 
 void CustomEditor::setExternalConflict(bool conflict, bool fileDeleted)
 {
-    m_documentSession->externalConflict = conflict;
-    m_documentSession->deletedExternally = conflict && fileDeleted;
-    if (conflict)
-        m_documentSession->persistenceState = DocumentPersistenceState::ExternalConflict;
+    m_documentSession->setExternalConflict(conflict, fileDeleted);
 }
 
 bool CustomEditor::hasExternalConflict() const
 {
-    return m_documentSession->externalConflict;
+    return m_documentSession->hasExternalConflict();
 }
 
 bool CustomEditor::wasDeletedExternally() const
 {
-    return m_documentSession->deletedExternally;
+    return m_documentSession->wasDeletedExternally();
 }
 
 void CustomEditor::shareDocumentSessionFrom(const CustomEditor *source)
@@ -65,30 +62,52 @@ bool CustomEditor::sharesDocumentSessionWith(const CustomEditor *other) const
 
 void CustomEditor::setLargeFileMode(bool enabled)
 {
-    // Promotion is sticky.  Re-enabling expensive editor services after a
-    // temporary shrink can immediately stall on the next undo or external
-    // reload that restores the large buffer.
-    m_documentSession->largeFileMode = m_documentSession->largeFileMode || enabled;
+    m_documentSession->promoteToLargeFileMode(enabled);
 }
 
 bool CustomEditor::isLargeFileMode() const
 {
-    return m_documentSession->largeFileMode;
+    return m_documentSession->isLargeFileMode();
 }
 
-void CustomEditor::setPersistenceState(DocumentPersistenceState state)
+void CustomEditor::beginSave()
 {
-    m_documentSession->persistenceState = state;
+    m_documentSession->beginSave();
+}
+
+void CustomEditor::completeSave()
+{
+    m_documentSession->completeSave(isModified());
+}
+
+void CustomEditor::failSave()
+{
+    m_documentSession->failSave();
+}
+
+void CustomEditor::markClean()
+{
+    m_documentSession->markClean();
+}
+
+void CustomEditor::markDirty()
+{
+    m_documentSession->markDirty();
+}
+
+void CustomEditor::updatePersistenceForModification()
+{
+    m_documentSession->updateForModification(isModified());
 }
 
 DocumentPersistenceState CustomEditor::persistenceState() const
 {
-    return m_documentSession->persistenceState;
+    return m_documentSession->persistenceState();
 }
 
 bool CustomEditor::isModified() const
 {
-    return m_documentSession->forcedModified || QsciScintilla::isModified();
+    return m_documentSession->isModified(QsciScintilla::isModified());
 }
 
 void CustomEditor::setModified(bool modified)
@@ -99,53 +118,40 @@ void CustomEditor::setModified(bool modified)
         return;
     }
 
-    m_documentSession->forcedModified = false;
+    m_documentSession->clearForcedModification();
     QsciScintilla::setModified(false);
 }
 
 void CustomEditor::markModified()
 {
-    if (m_documentSession->forcedModified)
-        return;
-
     const bool wasModified = QsciScintilla::isModified();
-    m_documentSession->forcedModified = true;
-    if (!wasModified)
+    if (m_documentSession->forceModified(wasModified))
         emit modificationChanged(true);
 }
 
 void CustomEditor::beginEncodingConversion(DocumentEncoding encoding)
 {
-    if (!m_documentSession->encodingConversionPending)
-    {
-        m_documentSession->formatBeforeEncodingConversion = m_documentSession->format;
-        m_documentSession->encodingConversionPending = true;
-    }
-    m_documentSession->format.encoding = encoding;
+    m_documentSession->beginEncodingConversion(encoding);
 }
 
 bool CustomEditor::hasPendingEncodingConversion() const
 {
-    return m_documentSession->encodingConversionPending;
+    return m_documentSession->hasPendingEncodingConversion();
 }
 
 void CustomEditor::finishEncodingConversion(bool success)
 {
-    if (!m_documentSession->encodingConversionPending)
-        return;
-    if (!success)
-        m_documentSession->format = m_documentSession->formatBeforeEncodingConversion;
-    m_documentSession->encodingConversionPending = false;
+    m_documentSession->finishEncodingConversion(success);
 }
 
 quint64 CustomEditor::beginEncodingReload()
 {
-    return ++m_documentSession->encodingReloadGeneration;
+    return m_documentSession->beginEncodingReload();
 }
 
 bool CustomEditor::isCurrentEncodingReload(quint64 generation) const
 {
-    return m_documentSession->encodingReloadGeneration == generation;
+    return m_documentSession->isCurrentEncodingReload(generation);
 }
 
 void CustomEditor::dragEnterEvent(QDragEnterEvent *e)

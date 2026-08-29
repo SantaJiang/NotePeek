@@ -1,6 +1,6 @@
 #include "widgets/fileexplorerdock.h"
 
-#include "editor/documentpath.h"
+#include "foundation/documentpath.h"
 #include "themecolors.h"
 #include "widgets/filetreeview.h"
 #include "widgets/filetypefilterproxymodel.h"

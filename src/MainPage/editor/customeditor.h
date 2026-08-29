@@ -26,7 +26,12 @@ public:
     bool sharesDocumentSessionWith(const CustomEditor *other) const;
     void setLargeFileMode(bool enabled);
     bool isLargeFileMode() const;
-    void setPersistenceState(DocumentPersistenceState state);
+    void beginSave();
+    void completeSave();
+    void failSave();
+    void markClean();
+    void markDirty();
+    void updatePersistenceForModification();
     DocumentPersistenceState persistenceState() const;
     bool isModified() const;
     void setModified(bool modified) override;

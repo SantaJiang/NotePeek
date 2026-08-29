@@ -1,12 +1,11 @@
 #include "editor/customeditor.h"
 #include "apppreferences.h"
 #include "editor/documentformat.h"
-#include "editor/documentpersistenceservice.h"
-#include "editor/documentsavecoordinator.h"
+#include "editor/editorsnapshotencoder.h"
 #include "editor/documentcontroller.h"
 #include "editor/editormanager.h"
 #include "editor/editorpane.h"
-#include "editor/performanceconstants.h"
+#include "foundation/performanceconstants.h"
 #include "find/findreplacemanager.h"
 #include "find/filesearcher.h"
 #include "decorators/highlightedscrollbar.h"
@@ -183,14 +182,11 @@ private slots:
         CustomEditor editor;
         editor.setDocumentFormat({DocumentEncoding::Utf8, DocumentLineEnding::Lf});
         editor.setText(QString(2 * 1024 * 1024, QLatin1Char('x')));
-        DocumentSaveCoordinator coordinator;
-        DocumentPersistenceService persistence(&coordinator);
-
         QByteArray snapshot;
         QString error;
         QElapsedTimer timer;
         timer.start();
-        QVERIFY2(persistence.saveEditorSnapshot(&editor, &snapshot, &error), qPrintable(error));
+        QVERIFY2(EditorSnapshotEncoder::encode(&editor, &snapshot, &error), qPrintable(error));
         QVERIFY2(timer.elapsed() < 2000, "2 MB snapshot exceeded the 2 second smoke budget");
         QCOMPARE(snapshot.size(), 2 * 1024 * 1024);
     }
@@ -200,14 +196,11 @@ private slots:
         CustomEditor editor;
         editor.setDocumentFormat({DocumentEncoding::Utf8, DocumentLineEnding::Lf});
         editor.setText(QString(50 * 1024 * 1024, QLatin1Char('x')));
-        DocumentSaveCoordinator coordinator;
-        DocumentPersistenceService persistence(&coordinator);
-
         QByteArray snapshot;
         QString error;
         QElapsedTimer timer;
         timer.start();
-        QVERIFY2(persistence.saveEditorSnapshot(&editor, &snapshot, &error), qPrintable(error));
+        QVERIFY2(EditorSnapshotEncoder::encode(&editor, &snapshot, &error), qPrintable(error));
         QVERIFY2(timer.elapsed() < 5000, "50 MB snapshot exceeded the 5 second smoke budget");
         QCOMPARE(snapshot.size(), 50 * 1024 * 1024);
     }

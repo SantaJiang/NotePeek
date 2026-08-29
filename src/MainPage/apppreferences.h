@@ -4,6 +4,10 @@
 #include <QFont>
 #include <QString>
 
+#include <memory>
+
+class SettingsRepository;
+
 // Application-wide user preferences, persisted across restarts via QSettings.
 //
 // Stores editor fonts, startup/view preferences and code-editing feature
@@ -13,6 +17,11 @@ class AppPreferences
 {
 public:
     static AppPreferences &instance();
+
+    // Injectable persistence is used by focused settings tests and is the
+    // migration seam for the application composition root.
+    explicit AppPreferences(std::unique_ptr<SettingsRepository> repository);
+    ~AppPreferences();
 
     void load();
     void save() const;
@@ -48,6 +57,12 @@ public:
     // Unlike the file-tree startup preference, this is applied immediately.
     bool showStatusBar() const { return m_showStatusBar; }
     void setShowStatusBar(bool show) { m_showStatusBar = show; }
+
+    // When enabled, changing the active editor also reveals its file in the
+    // file tree. Explicit file-opening and search-navigation commands may
+    // still reveal their target regardless of this preference.
+    bool revealCurrentFileInTree() const { return m_revealCurrentFileInTree; }
+    void setRevealCurrentFileInTree(bool reveal) { m_revealCurrentFileInTree = reveal; }
 
     // Enables repository discovery and Git decorations for the current
     // project. Enabled by default and can be disabled to avoid all Git work.
@@ -112,6 +127,7 @@ private:
     QString m_lightSyntaxThemeId;
     bool m_showFileTreeOnStartup;
     bool m_showStatusBar;
+    bool m_revealCurrentFileInTree;
     bool m_gitIntegrationEnabled;
     bool m_markdownDefaultPreview;
     bool m_untitledUsesCodeMode;
@@ -122,6 +138,7 @@ private:
     bool m_documentCompletionEnabled;
     bool m_semanticHighlightingEnabled;
     QString m_language;
+    std::unique_ptr<SettingsRepository> m_repository;
 };
 
 #endif // APPPREFERENCES_H

@@ -42,7 +42,7 @@ enum class SyntaxRole
 
 using SyntaxPalette = QMap<SyntaxRole, QColor>;
 
-class QSCINTILLA_EXPORT SyntaxStyler
+class SyntaxStyler
 {
 public:
     static SyntaxRole roleForStyle(const QsciLexer *lexer, int style);

@@ -1,7 +1,7 @@
 #include "editor/documentregistry.h"
 
 #include "editor/customeditor.h"
-#include "editor/documentpath.h"
+#include "foundation/documentpath.h"
 
 #include <QDir>
 #include <QFileInfo>

@@ -1,4 +1,4 @@
-#include "editor/backgroundworkscheduler.h"
+#include "foundation/backgroundworkscheduler.h"
 
 #include <QThreadPool>
 

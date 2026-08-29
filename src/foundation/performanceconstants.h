@@ -1,5 +1,5 @@
-#ifndef PERFORMANCECONSTANTS_H
-#define PERFORMANCECONSTANTS_H
+#ifndef NOTEPEEK_FOUNDATION_PERFORMANCECONSTANTS_H
+#define NOTEPEEK_FOUNDATION_PERFORMANCECONSTANTS_H
 
 #include <QByteArray>
 #include <QtGlobal>
@@ -32,4 +32,4 @@ inline bool containsAbnormallyLongLine(const QByteArray &content)
 
 } // namespace PerformanceConstants
 
-#endif // PERFORMANCECONSTANTS_H
+#endif // NOTEPEEK_FOUNDATION_PERFORMANCECONSTANTS_H

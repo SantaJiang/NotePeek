@@ -1,6 +1,7 @@
 #include "editor/documentio.h"
+#include "editor/documentencodingreloadservice.h"
 #include "editor/documentpersistenceservice.h"
-#include "editor/documentpath.h"
+#include "foundation/documentpath.h"
 #include "editor/documentsavecoordinator.h"
 
 #include <QDir>
@@ -133,6 +134,33 @@ private slots:
         QVERIFY(file.open(QIODevice::ReadOnly));
         QCOMPARE(file.readAll(), latin1Bytes);
         file.close();
+    }
+
+    void encodingReloadPreservesCallerRequestIdentity()
+    {
+        QTemporaryDir tempDir;
+        QVERIFY(tempDir.isValid());
+        const QString path = tempDir.filePath(QStringLiteral("reload-latin1.txt"));
+        QFile file(path);
+        QVERIFY(file.open(QIODevice::WriteOnly));
+        QCOMPARE(file.write(QByteArray("caf\xe9\n", 5)), qint64(5));
+        file.close();
+
+        DocumentEncodingReloadService service;
+        DocumentEncodingReloadResult completed;
+        connect(&service, &DocumentEncodingReloadService::fileReloaded,
+                this, [&completed](const DocumentEncodingReloadResult &result) {
+                    completed = result;
+                });
+
+        constexpr quint64 requestId = 0x123456789ULL;
+        service.reloadFileAsync({requestId, path, DocumentEncoding::Latin1});
+
+        QTRY_COMPARE_WITH_TIMEOUT(completed.requestId, requestId, 3000);
+        QCOMPARE(completed.filePath, path);
+        QVERIFY2(completed.success, qPrintable(completed.errorMessage));
+        QCOMPARE(QString::fromUtf8(completed.content), QStringLiteral("café\n"));
+        QCOMPARE(completed.format.encoding, DocumentEncoding::Latin1);
     }
 
     void reportsCharactersLatin1CannotStore()

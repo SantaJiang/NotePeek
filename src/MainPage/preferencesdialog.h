@@ -57,6 +57,7 @@ private:
     QWidget *m_lightSyntaxThemeRow = nullptr;
     QCheckBox *m_showFileTree;
     QCheckBox *m_showStatusBar;
+    QCheckBox *m_revealCurrentFileInTree;
     QCheckBox *m_gitIntegrationEnabled;
     QCheckBox *m_markdownSidePreview;
     QComboBox *m_untitledModeCombo;

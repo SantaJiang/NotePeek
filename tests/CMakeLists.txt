@@ -4,7 +4,6 @@ add_executable(notepeek_documentio_test
 
 target_link_libraries(notepeek_documentio_test PRIVATE
     notepeek_core
-    notepeek_widgets
     Qt6::Test
 )
 notepeek_configure_project_target(notepeek_documentio_test)
@@ -34,7 +33,6 @@ add_executable(notepeek_editorfeatures_test
 )
 
 target_link_libraries(notepeek_editorfeatures_test PRIVATE
-    notepeek_core
     notepeek_widgets
     Qt6::Test
 )
@@ -60,12 +58,41 @@ set_tests_properties(notepeek_codeformatter_test PROPERTIES
     ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
 )
 
+add_executable(notepeek_settings_test
+    settings_test.cpp
+)
+
+target_link_libraries(notepeek_settings_test PRIVATE
+    notepeek_core
+    Qt6::Test
+)
+notepeek_configure_project_target(notepeek_settings_test)
+
+add_test(NAME notepeek_settings_test COMMAND notepeek_settings_test)
+set_tests_properties(notepeek_settings_test PROPERTIES
+    ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
+)
+
+add_executable(notepeek_documentsession_test
+    documentsession_test.cpp
+)
+
+target_link_libraries(notepeek_documentsession_test PRIVATE
+    notepeek_core
+    Qt6::Test
+)
+notepeek_configure_project_target(notepeek_documentsession_test)
+
+add_test(NAME notepeek_documentsession_test COMMAND notepeek_documentsession_test)
+set_tests_properties(notepeek_documentsession_test PROPERTIES
+    ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
+)
+
 add_executable(notepeek_performance_test
     performance_test.cpp
 )
 
 target_link_libraries(notepeek_performance_test PRIVATE
-    notepeek_core
     notepeek_widgets
     Qt6::Test
 )
@@ -83,7 +110,6 @@ add_executable(notepeek_newfeatures_test
 )
 
 target_link_libraries(notepeek_newfeatures_test PRIVATE
-    notepeek_core
     notepeek_widgets
     Qt6::Test
 )
@@ -93,3 +119,13 @@ add_test(NAME notepeek_newfeatures_test COMMAND notepeek_newfeatures_test)
 set_tests_properties(notepeek_newfeatures_test PROPERTIES
     ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
 )
+
+find_package(Python3 QUIET COMPONENTS Interpreter)
+if(Python3_Interpreter_FOUND)
+    add_test(
+        NAME notepeek_architecture_test
+        COMMAND ${Python3_EXECUTABLE}
+                ${CMAKE_SOURCE_DIR}/scripts/check_architecture.py
+                --root ${CMAKE_SOURCE_DIR}
+    )
+endif()

@@ -29,7 +29,7 @@
 #include "editor/customeditor.h"
 #include "editor/documentcontroller.h"
 #include "editor/documentformat.h"
-#include "editor/documentpath.h"
+#include "foundation/documentpath.h"
 #include "editor/documentsavecoordinator.h"
 #include "editor/editorpane.h"
 #include "editor/editormanager.h"
@@ -101,6 +101,25 @@ private:
     bool m_original;
 };
 
+class CurrentFileRevealPreferenceGuard
+{
+public:
+    explicit CurrentFileRevealPreferenceGuard(bool enabled)
+        : m_original(AppPreferences::instance().revealCurrentFileInTree())
+    {
+        AppPreferences::instance().setRevealCurrentFileInTree(enabled);
+    }
+
+    ~CurrentFileRevealPreferenceGuard()
+    {
+        AppPreferences::instance().setRevealCurrentFileInTree(m_original);
+        AppPreferences::instance().save();
+    }
+
+private:
+    bool m_original;
+};
+
 long scintillaColorValue(const QColor &color)
 {
     return (color.blue() << 16) | (color.green() << 8) | color.red();
@@ -152,6 +171,80 @@ private slots:
         fileWindow.show();
         QVERIFY(fileWindow.isVisible());
         QVERIFY(fileWindow.findChild<QMenu *>() != nullptr);
+    }
+
+    void currentFileTreeRevealIsOptIn()
+    {
+        CurrentFileRevealPreferenceGuard revealPreference(false);
+        QTemporaryDir dir;
+        QVERIFY(dir.isValid());
+        const QString firstPath = dir.filePath(QStringLiteral("first.txt"));
+        const QString secondPath = dir.filePath(QStringLiteral("second.txt"));
+        writeFile(firstPath, QByteArrayLiteral("first\n"));
+        writeFile(secondPath, QByteArrayLiteral("second\n"));
+        const QString normalizedFirstPath = DocumentPath::normalized(firstPath);
+        const QString normalizedSecondPath = DocumentPath::normalized(secondPath);
+
+        MainWindow window(nullptr, {normalizedFirstPath, normalizedSecondPath});
+        window.show();
+
+        EditorPane *pane = nullptr;
+        for (EditorPane *candidate : window.findChildren<EditorPane *>())
+        {
+            if (candidate->count() == 2)
+            {
+                pane = candidate;
+                break;
+            }
+        }
+        QVERIFY(pane);
+        QTRY_VERIFY_WITH_TIMEOUT(!pane->editorAt(0)->isReadOnly()
+                                     && !pane->editorAt(1)->isReadOnly(),
+                                 3000);
+
+        auto *dock = window.findChild<FileExplorerDock *>();
+        QVERIFY(dock);
+        auto *tree = qobject_cast<QTreeView *>(dock->dockWidget()->widget());
+        QVERIFY(tree);
+        auto *proxy = qobject_cast<FileTypeFilterProxyModel *>(tree->model());
+        QVERIFY(proxy);
+        auto *sourceModel = qobject_cast<QFileSystemModel *>(proxy->sourceModel());
+        QVERIFY(sourceModel);
+        dock->setRootDirectory(QFileInfo(normalizedFirstPath).absolutePath());
+        QTRY_VERIFY_WITH_TIMEOUT(
+            proxy->mapFromSource(sourceModel->index(normalizedSecondPath)).isValid(),
+                                 3000);
+        const auto selectedPath = [tree, proxy]() {
+            return proxy->filePath(tree->currentIndex());
+        };
+
+        QTRY_VERIFY_WITH_TIMEOUT(([&]() {
+            dock->selectFile(normalizedSecondPath);
+            return DocumentPath::equivalent(selectedPath(), normalizedSecondPath);
+        })(), 3000);
+
+        int firstIndex = -1;
+        int secondIndex = -1;
+        for (int index = 0; index < pane->count(); ++index)
+        {
+            const QString path = pane->editorAt(index)->filePath();
+            if (DocumentPath::equivalent(path, normalizedFirstPath))
+                firstIndex = index;
+            else if (DocumentPath::equivalent(path, normalizedSecondPath))
+                secondIndex = index;
+        }
+        QVERIFY(firstIndex >= 0);
+        QVERIFY(secondIndex >= 0);
+
+        pane->setCurrentIndex(firstIndex);
+        QCoreApplication::processEvents();
+        QVERIFY(DocumentPath::equivalent(selectedPath(), normalizedSecondPath));
+
+        AppPreferences::instance().setRevealCurrentFileInTree(true);
+        pane->setCurrentIndex(secondIndex);
+        pane->setCurrentIndex(firstIndex);
+        QTRY_VERIFY_WITH_TIMEOUT(
+            DocumentPath::equivalent(selectedPath(), normalizedFirstPath), 3000);
     }
 
     void saveAllActionSavesTheOpenDocument()
@@ -1269,8 +1362,11 @@ private slots:
             QStringLiteral("showStatusBarCheckBox"));
         auto *gitIntegrationCheckBox = dialog.findChild<QCheckBox *>(
             QStringLiteral("gitIntegrationEnabledCheckBox"));
+        auto *revealCurrentFileCheckBox = dialog.findChild<QCheckBox *>(
+            QStringLiteral("revealCurrentFileInTreeCheckBox"));
         QVERIFY(statusBarCheckBox);
         QVERIFY(gitIntegrationCheckBox);
+        QVERIFY(revealCurrentFileCheckBox);
         QSignalSpy appliedSpy(&dialog, &PreferencesDialog::applied);
 
         const bool previousGitIntegration = preferences.gitIntegrationEnabled();
@@ -1289,14 +1385,22 @@ private slots:
         QCOMPARE(preferences.showStatusBar(), previousStatusBar);
         QCOMPARE(appliedSpy.count(), 4);
 
+        const bool previousRevealCurrentFile = preferences.revealCurrentFileInTree();
+        revealCurrentFileCheckBox->setChecked(!previousRevealCurrentFile);
+        QCOMPARE(preferences.revealCurrentFileInTree(), !previousRevealCurrentFile);
+        QCOMPARE(appliedSpy.count(), 5);
+        revealCurrentFileCheckBox->setChecked(previousRevealCurrentFile);
+        QCOMPARE(preferences.revealCurrentFileInTree(), previousRevealCurrentFile);
+        QCOMPARE(appliedSpy.count(), 6);
+
         const QString previousDarkTheme = preferences.darkSyntaxThemeId();
         const int alternativeTheme = (darkCombo->currentIndex() + 1) % darkCombo->count();
         darkCombo->setCurrentIndex(alternativeTheme);
         QCOMPARE(preferences.darkSyntaxThemeId(), darkCombo->currentData().toString());
-        QCOMPARE(appliedSpy.count(), 5);
+        QCOMPARE(appliedSpy.count(), 7);
         darkCombo->setCurrentIndex(darkCombo->findData(previousDarkTheme));
         QCOMPARE(preferences.darkSyntaxThemeId(), previousDarkTheme);
-        QCOMPARE(appliedSpy.count(), 6);
+        QCOMPARE(appliedSpy.count(), 8);
 
         search->setText(QStringLiteral("Markdown"));
         QVERIFY(sections->item(0)->isHidden());

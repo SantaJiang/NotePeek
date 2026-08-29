@@ -1,8 +1,8 @@
 #include "editor/externalfilewatcher.h"
 
-#include "editor/performanceconstants.h"
-#include "editor/backgroundworkscheduler.h"
-#include "editor/documentpath.h"
+#include "foundation/performanceconstants.h"
+#include "foundation/backgroundworkscheduler.h"
+#include "foundation/documentpath.h"
 
 #include <QCryptographicHash>
 #include <QDir>

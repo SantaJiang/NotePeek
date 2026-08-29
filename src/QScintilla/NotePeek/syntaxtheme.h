@@ -15,7 +15,7 @@
 
 namespace NotePeek {
 
-class QSCINTILLA_EXPORT SyntaxTheme
+class SyntaxTheme
 {
 public:
     QString id;
@@ -33,7 +33,7 @@ public:
     QColor editorColor(const QString &key, const QColor &fallback = QColor()) const;
 };
 
-class QSCINTILLA_EXPORT SyntaxThemeCatalog
+class SyntaxThemeCatalog
 {
 public:
     static SyntaxTheme fromJson(const QByteArray &json, QString *error = nullptr);

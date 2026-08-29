@@ -16,7 +16,7 @@
 #include <NotePeek/lexerfactory.h>
 #include <NotePeek/syntaxstyler.h>
 #include <NotePeek/syntaxtheme.h>
-#include "editor/performanceconstants.h"
+#include "foundation/performanceconstants.h"
 
 namespace {
 NotePeek::SyntaxTheme currentSyntaxTheme()

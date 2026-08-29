@@ -1,5 +1,5 @@
-#ifndef DOCUMENTPATH_H
-#define DOCUMENTPATH_H
+#ifndef NOTEPEEK_FOUNDATION_DOCUMENTPATH_H
+#define NOTEPEEK_FOUNDATION_DOCUMENTPATH_H
 
 #include <QString>
 
@@ -12,4 +12,4 @@ bool isInsideDirectory(const QString &path, const QString &directory);
 
 } // namespace DocumentPath
 
-#endif // DOCUMENTPATH_H
+#endif // NOTEPEEK_FOUNDATION_DOCUMENTPATH_H

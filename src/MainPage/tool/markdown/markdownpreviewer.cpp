@@ -1,7 +1,7 @@
 #include "tool/markdown/markdownpreviewer.h"
-#include "editor/backgroundworkscheduler.h"
+#include "foundation/backgroundworkscheduler.h"
 #include "apppreferences.h"
-#include "editor/documentpath.h"
+#include "foundation/documentpath.h"
 #include "themecolors.h"
 
 #include <QByteArray>
