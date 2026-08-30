@@ -8,6 +8,12 @@ const char InvalidUtf8Message[] = "The file contains invalid UTF-8 data.";
 const char IncompleteUtf16Message[] = "The UTF-16 file has an incomplete code unit.";
 const char InvalidSurrogateMessage[] = "The UTF-16 file contains an invalid surrogate pair.";
 
+// Upper bound on how much input is buffered before the encoding is committed.
+// Mirrors the whole-file auto-detection window; a prefix this large contains
+// non-ASCII bytes for any realistic text file, so CJK detection is reliable
+// while streaming memory stays bounded.
+constexpr qsizetype DetectionWindowBytes = 64 * 1024;
+
 qsizetype appendUtf8CodePoint(quint32 codePoint, QByteArray *output)
 {
     if (codePoint < 0x80)
@@ -103,52 +109,39 @@ void DocumentStreamDecoder::emitCodePoint(quint32 codePoint, QByteArray *output)
     m_metadata.outputUtf8Bytes += appendUtf8CodePoint(codePoint, output);
 }
 
-// Resolve the encoding from the buffered prefix. On success sets m_mode and
+// Feeds a decoded UTF-16 string through emitCodePoint so line-ending
+// normalization and statistics stay identical to the whole-file path.
+void DocumentStreamDecoder::emitDecodedText(const QString &decoded, QByteArray *output)
+{
+    const QChar *units = decoded.constData();
+    const qsizetype count = decoded.size();
+    qsizetype index = 0;
+    while (index < count)
+    {
+        const QChar current = units[index];
+        if (current.isHighSurrogate() && index + 1 < count && units[index + 1].isLowSurrogate())
+        {
+            emitCodePoint(QChar::surrogateToUcs4(current, units[index + 1]), output);
+            index += 2;
+        }
+        else if (current.isSurrogate())
+        {
+            emitCodePoint(0xfffd, output); // lone surrogate: replacement character
+            ++index;
+        }
+        else
+        {
+            emitCodePoint(current.unicode(), output);
+            ++index;
+        }
+    }
+}
+
+// Resolve the encoding from an explicit override. Sets m_mode and
 // m_metadata.format.encoding and returns the number of BOM bytes to skip. A
-// negative return means "need more bytes".
+// negative return means "need more bytes" (an ambiguous BOM prefix).
 qsizetype DocumentStreamDecoder::detectEncoding(const char *data, qsizetype size)
 {
-    if (!m_overrideSet)
-    {
-        if (size >= 3 && static_cast<unsigned char>(data[0]) == 0xef
-            && static_cast<unsigned char>(data[1]) == 0xbb
-            && static_cast<unsigned char>(data[2]) == 0xbf)
-        {
-            m_mode = Mode::Utf8;
-            recordEncoding(DocumentEncoding::Utf8Bom);
-            m_metadata.hadBom = true;
-            return 3;
-        }
-        if (size >= 2 && static_cast<unsigned char>(data[0]) == 0xff
-            && static_cast<unsigned char>(data[1]) == 0xfe)
-        {
-            m_mode = Mode::Utf16LittleEndian;
-            recordEncoding(DocumentEncoding::Utf16LittleEndian);
-            m_metadata.hadBom = true;
-            return 2;
-        }
-        if (size >= 2 && static_cast<unsigned char>(data[0]) == 0xfe
-            && static_cast<unsigned char>(data[1]) == 0xff)
-        {
-            m_mode = Mode::Utf16BigEndian;
-            recordEncoding(DocumentEncoding::Utf16BigEndian);
-            m_metadata.hadBom = true;
-            return 2;
-        }
-
-        // No matching BOM so far; decide whether one is still possible.
-        if (size == 0)
-            return -1;
-        const unsigned char first = static_cast<unsigned char>(data[0]);
-        if (first == 0xef && size < 3)
-            return -1;
-        if ((first == 0xff || first == 0xfe) && size < 2)
-            return -1;
-        m_mode = Mode::Utf8;
-        recordEncoding(DocumentEncoding::Utf8);
-        return 0;
-    }
-
     switch (m_override)
     {
     case DocumentEncoding::Utf8:
@@ -199,6 +192,15 @@ qsizetype DocumentStreamDecoder::detectEncoding(const char *data, qsizetype size
         m_mode = Mode::Latin1;
         recordEncoding(DocumentEncoding::Latin1);
         return 0;
+    default:
+        break;
+    }
+    if (DocumentFormatCodec::isLegacyEncoding(m_override))
+    {
+        m_mode = Mode::Legacy;
+        recordEncoding(m_override);
+        m_legacyDecoder = std::make_unique<LegacyTextCodec::Decoder>(m_override);
+        return 0;
     }
     m_mode = Mode::Utf8;
     recordEncoding(DocumentEncoding::Utf8);
@@ -224,31 +226,29 @@ bool DocumentStreamDecoder::accept(const char *data, qsizetype size, QByteArray 
 
     if (m_mode == Mode::Detect)
     {
-        const qsizetype prefix = detectEncoding(p, n);
-        if (prefix < 0)
+        if (m_overrideSet)
         {
-            m_carry = QByteArray(p, n);
-            return true;
+            const qsizetype prefix = detectEncoding(p, n);
+            if (prefix < 0)
+            {
+                m_carry = QByteArray(p, n);
+                return true;
+            }
+            p += prefix;
+            n -= prefix;
+            if (n == 0)
+                return true;
         }
-        p += prefix;
-        n -= prefix;
-        if (n == 0)
-            return true;
+        else
+        {
+            m_detectBuffer.append(p, n);
+            if (m_detectBuffer.size() < DetectionWindowBytes)
+                return true;
+            return commitAutoDetect(output, errorMessage, false);
+        }
     }
 
-    switch (m_mode)
-    {
-    case Mode::Utf8:
-        return processUtf8(p, n, output, errorMessage);
-    case Mode::Utf16LittleEndian:
-    case Mode::Utf16BigEndian:
-        return processUtf16(p, n, output, errorMessage);
-    case Mode::Latin1:
-        return processLatin1(p, n, output);
-    default:
-        break;
-    }
-    return true;
+    return processMode(p, n, output, errorMessage);
 }
 
 bool DocumentStreamDecoder::processUtf8(const char *data, qsizetype size, QByteArray *output, QString *errorMessage)
@@ -388,16 +388,87 @@ bool DocumentStreamDecoder::processLatin1(const char *data, qsizetype size, QByt
     return true;
 }
 
+bool DocumentStreamDecoder::processLegacy(const char *data, qsizetype size, QByteArray *output, QString *errorMessage)
+{
+    QString decoded;
+    if (!m_legacyDecoder || !m_legacyDecoder->accept(data, size, &decoded, errorMessage))
+        return false;
+    emitDecodedText(decoded, output);
+    return true;
+}
+
+bool DocumentStreamDecoder::processMode(const char *data, qsizetype size, QByteArray *output, QString *errorMessage)
+{
+    switch (m_mode)
+    {
+    case Mode::Utf8:
+        return processUtf8(data, size, output, errorMessage);
+    case Mode::Utf16LittleEndian:
+    case Mode::Utf16BigEndian:
+        return processUtf16(data, size, output, errorMessage);
+    case Mode::Latin1:
+        return processLatin1(data, size, output);
+    case Mode::Legacy:
+        return processLegacy(data, size, output, errorMessage);
+    default:
+        break;
+    }
+    return true;
+}
+
+// Commits the auto-detected encoding and decodes the buffered prefix. Called
+// once the detect buffer reaches the detection window, or at end-of-input
+// (atEnd). A trailing incomplete UTF-8 sequence is only tolerated when more
+// input may still arrive.
+bool DocumentStreamDecoder::commitAutoDetect(QByteArray *output, QString *errorMessage, bool atEnd)
+{
+    const QByteArray buffered = std::move(m_detectBuffer);
+    m_detectBuffer.clear();
+
+    DocumentEncoding encoding = DocumentEncoding::Utf8;
+    const qsizetype prefix = DocumentFormatCodec::detectAutoEncoding(buffered, &encoding, !atEnd);
+
+    switch (encoding)
+    {
+    case DocumentEncoding::Utf8:
+        m_mode = Mode::Utf8;
+        break;
+    case DocumentEncoding::Utf8Bom:
+        m_mode = Mode::Utf8;
+        m_metadata.hadBom = true;
+        break;
+    case DocumentEncoding::Utf16LittleEndian:
+        m_mode = Mode::Utf16LittleEndian;
+        m_metadata.hadBom = true;
+        break;
+    case DocumentEncoding::Utf16BigEndian:
+        m_mode = Mode::Utf16BigEndian;
+        m_metadata.hadBom = true;
+        break;
+    default:
+        m_mode = Mode::Legacy;
+        m_legacyDecoder = std::make_unique<LegacyTextCodec::Decoder>(encoding);
+        break;
+    }
+    recordEncoding(encoding);
+
+    const char *data = buffered.constData() + prefix;
+    const qsizetype size = buffered.size() - prefix;
+    if (size == 0)
+        return true;
+    return processMode(data, size, output, errorMessage);
+}
+
 bool DocumentStreamDecoder::finish(QByteArray *output, QString *errorMessage)
 {
     if (m_mode == Mode::Detect)
     {
-        // No bytes were ever seen (or only an ambiguous prefix remained): the
-        // whole-file decoder treats this as plain UTF-8.
         if (!m_overrideSet)
         {
-            m_mode = Mode::Utf8;
-            recordEncoding(DocumentEncoding::Utf8);
+            // End-of-input with an undecided encoding: run auto-detection on
+            // whatever was buffered (possibly nothing, which resolves to UTF-8).
+            if (!commitAutoDetect(output, errorMessage, true))
+                return false;
         }
         else
         {
@@ -427,6 +498,14 @@ bool DocumentStreamDecoder::finish(QByteArray *output, QString *errorMessage)
         if (errorMessage)
             *errorMessage = QString::fromLatin1(InvalidSurrogateMessage);
         return false;
+    }
+
+    if (m_mode == Mode::Legacy)
+    {
+        QString tail;
+        if (!m_legacyDecoder || !m_legacyDecoder->finish(&tail, errorMessage))
+            return false;
+        emitDecodedText(tail, output);
     }
 
     flushPendingCr(output);

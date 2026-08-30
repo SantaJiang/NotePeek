@@ -12,6 +12,8 @@ add_library(notepeek_core STATIC
     editor/projectpathfilter.h
     editor/documentformat.cpp
     editor/documentformat.h
+    editor/legacytextcodec.cpp
+    editor/legacytextcodec.h
     editor/documentsavecoordinator.cpp
     editor/documentsavecoordinator.h
     editor/documentsession.h
@@ -61,6 +63,21 @@ target_link_libraries(notepeek_core PUBLIC
     libcmark-gfm_static
     ${NOTEPEEK_QT_LIBS}
 )
+
+# The legacy text codec (editor/legacytextcodec.cpp) uses iconv on Unix. On
+# glibc iconv is part of libc (the imported target links nothing); on macOS it
+# needs -liconv.
+if(NOT WIN32)
+    find_package(Iconv QUIET)
+    if(TARGET Iconv::Iconv)
+        target_link_libraries(notepeek_core PUBLIC Iconv::Iconv)
+    else()
+        find_library(NOTEPEEK_ICONV_LIBRARY NAMES iconv)
+        if(NOTEPEEK_ICONV_LIBRARY)
+            target_link_libraries(notepeek_core PUBLIC ${NOTEPEEK_ICONV_LIBRARY})
+        endif()
+    endif()
+endif()
 
 target_include_directories(notepeek_core PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}

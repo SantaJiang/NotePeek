@@ -2,10 +2,13 @@
 #define DOCUMENTSTREAMDECODER_H
 
 #include "editor/documentformat.h"
+#include "editor/legacytextcodec.h"
 
 #include <QByteArray>
 #include <QMetaType>
 #include <QString>
+
+#include <memory>
 
 // Metadata gathered while streaming a document. `format` carries the same
 // encoding/line-ending classification the whole-file DocumentFormatCodec
@@ -58,15 +61,20 @@ private:
         Utf8,
         Utf16LittleEndian,
         Utf16BigEndian,
-        Latin1
+        Latin1,
+        Legacy
     };
 
     bool processUtf8(const char *data, qsizetype size, QByteArray *output, QString *errorMessage);
     bool processUtf16(const char *data, qsizetype size, QByteArray *output, QString *errorMessage);
     bool processLatin1(const char *data, qsizetype size, QByteArray *output);
+    bool processLegacy(const char *data, qsizetype size, QByteArray *output, QString *errorMessage);
+    bool processMode(const char *data, qsizetype size, QByteArray *output, QString *errorMessage);
+    bool commitAutoDetect(QByteArray *output, QString *errorMessage, bool atEnd);
     qsizetype detectEncoding(const char *data, qsizetype size);
 
     void emitCodePoint(quint32 codePoint, QByteArray *output);
+    void emitDecodedText(const QString &decoded, QByteArray *output);
     void appendOutput(QByteArray *output, char byte);
     void appendOutput(QByteArray *output, const char *data, qsizetype size);
     void flushPendingCr(QByteArray *output);
@@ -76,6 +84,8 @@ private:
     bool m_overrideSet = false;
     DocumentEncoding m_override = DocumentEncoding::Utf8;
 
+    QByteArray m_detectBuffer;          // Buffered prefix while auto-detecting.
+    std::unique_ptr<LegacyTextCodec::Decoder> m_legacyDecoder;
     QByteArray m_carry;             // BOM prefix / incomplete UTF-8 / odd UTF-16 byte.
     bool m_pendingCr = false;       // Last decoded character was a bare '\r'.
     bool m_highSurrogate = false;   // A UTF-16 high surrogate is pending.

@@ -1,4 +1,5 @@
 #include "editor/documentformat.h"
+#include "editor/legacytextcodec.h"
 
 #include <QtEndian>
 #include <QVector>
@@ -68,6 +69,132 @@ bool isValidUtf8(const char *rawData, qsizetype size)
 bool isValidUtf8(const QByteArray &bytes)
 {
     return isValidUtf8(bytes.constData(), bytes.size());
+}
+
+// Like isValidUtf8, but tolerates a single incomplete multi-byte sequence at
+// the very end. Used when detecting on a fixed-size prefix of a larger file,
+// where the prefix may cut a UTF-8 character in half.
+bool isValidUtf8Prefix(const char *rawData, qsizetype size)
+{
+    const auto *data = reinterpret_cast<const unsigned char *>(rawData);
+    qsizetype index = 0;
+    while (index < size)
+    {
+        const unsigned char first = data[index++];
+        if (first <= 0x7f)
+        {
+            continue;
+        }
+
+        int trailing = 0;
+        if ((first & 0xe0) == 0xc0)
+        {
+            trailing = 1;
+        }
+        else if ((first & 0xf0) == 0xe0)
+        {
+            trailing = 2;
+        }
+        else if ((first & 0xf8) == 0xf0)
+        {
+            trailing = 3;
+        }
+        else
+        {
+            return false;
+        }
+
+        if (index + trailing > size)
+        {
+            // Truncated at the end of the prefix: accept only when every
+            // present continuation byte is valid.
+            while (index < size)
+            {
+                if ((data[index] & 0xc0) != 0x80)
+                    return false;
+                ++index;
+            }
+            return true;
+        }
+
+        for (int i = 0; i < trailing; ++i)
+        {
+            if ((data[index] & 0xc0) != 0x80)
+                return false;
+            ++index;
+        }
+    }
+    return true;
+}
+
+bool isCjkCharacter(ushort unit)
+{
+    return (unit >= 0x4E00 && unit <= 0x9FFF)    // CJK unified ideographs
+        || (unit >= 0x3400 && unit <= 0x4DBF)    // extension A
+        || (unit >= 0xF900 && unit <= 0xFAFF)    // compatibility ideographs
+        || (unit >= 0x3040 && unit <= 0x30FF)    // full-width hiragana + katakana
+        || (unit >= 0xAC00 && unit <= 0xD7AF)    // hangul syllables
+        || (unit >= 0x3000 && unit <= 0x303F)    // CJK punctuation
+        || (unit >= 0xFF00 && unit <= 0xFF60)    // full-width punctuation/Latin/digits
+        || (unit >= 0xFFE0 && unit <= 0xFFEF);   // full-width forms (excl. half-width kana FF61-FF9F)
+}
+
+int cjkPlausibilityScore(const QString &text)
+{
+    int score = 0;
+    for (QChar character : text)
+        if (isCjkCharacter(character.unicode()))
+            ++score;
+    return score;
+}
+
+// Best-matching legacy CJK encoding for bytes that are not valid UTF-8, or
+// Utf8 when none is plausible enough. Scoring (rather than "first that
+// decodes") keeps arbitrary binary or very short input from being silently
+// reinterpreted as CJK text. When `allowTrailingPartial` is set the input may
+// be a bounded prefix that cut a multi-byte character, so a trailing partial
+// sequence is trimmed and retried.
+DocumentEncoding detectLegacyEncoding(const QByteArray &bytes, bool allowTrailingPartial = false)
+{
+    // A NUL byte is a strong binary / UTF-16-without-BOM signal.
+    if (bytes.contains('\0'))
+        return DocumentEncoding::Utf8;
+
+    DocumentEncoding best = DocumentEncoding::Utf8;
+    int bestScore = 0;
+    for (DocumentEncoding candidate : DocumentFormatCodec::autoDetectEncodings())
+    {
+        QString text;
+        if (LegacyTextCodec::decode(bytes, candidate, &text, nullptr))
+        {
+            const int score = cjkPlausibilityScore(text);
+            if (score > bestScore)
+            {
+                bestScore = score;
+                best = candidate;
+            }
+            continue;
+        }
+        if (!allowTrailingPartial)
+            continue;
+        // The longest CJK sequence is four bytes (GB18030), so trimming up to
+        // three trailing bytes retries every possible split point.
+        for (int trim = 1; trim <= 3 && trim < bytes.size(); ++trim)
+        {
+            const QByteArray trimmed = bytes.left(bytes.size() - trim);
+            if (LegacyTextCodec::decode(trimmed, candidate, &text, nullptr))
+            {
+                const int score = cjkPlausibilityScore(text);
+                if (score > bestScore)
+                {
+                    bestScore = score;
+                    best = candidate;
+                }
+                break;
+            }
+        }
+    }
+    return bestScore >= 2 ? best : DocumentEncoding::Utf8;
 }
 
 DocumentLineEnding detectUtf8LineEnding(const char *data, qsizetype size,
@@ -241,7 +368,16 @@ QString withLineEnding(const QString &text, DocumentLineEnding lineEnding)
 
 bool DocumentFormatCodec::isLegacyEncoding(DocumentEncoding encoding)
 {
-    return encoding == DocumentEncoding::Latin1;
+    switch (encoding)
+    {
+    case DocumentEncoding::Utf8:
+    case DocumentEncoding::Utf8Bom:
+    case DocumentEncoding::Utf16LittleEndian:
+    case DocumentEncoding::Utf16BigEndian:
+        return false;
+    default:
+        return true;
+    }
 }
 
 QList<DocumentEncoding> DocumentFormatCodec::supportedEncodings()
@@ -252,8 +388,68 @@ QList<DocumentEncoding> DocumentFormatCodec::supportedEncodings()
         DocumentEncoding::Utf16LittleEndian,
         DocumentEncoding::Utf16BigEndian,
         DocumentEncoding::Latin1,
+        DocumentEncoding::Gb18030,
+        DocumentEncoding::Big5,
+        DocumentEncoding::ShiftJis,
+        DocumentEncoding::EucJp,
+        DocumentEncoding::EucKr,
+        DocumentEncoding::Windows1250,
+        DocumentEncoding::Windows1251,
+        DocumentEncoding::Windows1252,
+        DocumentEncoding::Windows1253,
+        DocumentEncoding::Windows1254,
+        DocumentEncoding::Windows1255,
+        DocumentEncoding::Windows1256,
+        DocumentEncoding::Windows1257,
+        DocumentEncoding::Windows1258,
+        DocumentEncoding::Iso88592,
+        DocumentEncoding::Iso88595,
+        DocumentEncoding::Iso88597,
+        DocumentEncoding::Iso885915,
+        DocumentEncoding::Koi8R,
+        DocumentEncoding::Koi8U,
+        DocumentEncoding::Tis620,
     };
     return encodings;
+}
+
+QList<DocumentEncoding> DocumentFormatCodec::autoDetectEncodings()
+{
+    return {
+        DocumentEncoding::Gb18030,
+        DocumentEncoding::Big5,
+        DocumentEncoding::ShiftJis,
+        DocumentEncoding::EucJp,
+        DocumentEncoding::EucKr,
+    };
+}
+
+qsizetype DocumentFormatCodec::detectAutoEncoding(const QByteArray &bytes,
+                                                  DocumentEncoding *encoding,
+                                                  bool allowTrailingPartial)
+{
+    if (bytes.startsWith("\xef\xbb\xbf"))
+    {
+        *encoding = DocumentEncoding::Utf8Bom;
+        return 3;
+    }
+    if (bytes.startsWith("\xff\xfe"))
+    {
+        *encoding = DocumentEncoding::Utf16LittleEndian;
+        return 2;
+    }
+    if (bytes.startsWith("\xfe\xff"))
+    {
+        *encoding = DocumentEncoding::Utf16BigEndian;
+        return 2;
+    }
+    if (isValidUtf8(bytes) || (allowTrailingPartial && isValidUtf8Prefix(bytes.constData(), bytes.size())))
+    {
+        *encoding = DocumentEncoding::Utf8;
+        return 0;
+    }
+    *encoding = detectLegacyEncoding(bytes, allowTrailingPartial);
+    return 0;
 }
 
 QString DocumentFormatCodec::encodingName(DocumentEncoding encoding)
@@ -270,19 +466,66 @@ QString DocumentFormatCodec::encodingName(DocumentEncoding encoding)
         return QStringLiteral("UTF-16 BE");
     case DocumentEncoding::Latin1:
         return QStringLiteral("ISO-8859-1");
+    case DocumentEncoding::Gb18030:
+        return QStringLiteral("GB18030");
+    case DocumentEncoding::Big5:
+        return QStringLiteral("Big5");
+    case DocumentEncoding::ShiftJis:
+        return QStringLiteral("Shift-JIS");
+    case DocumentEncoding::EucJp:
+        return QStringLiteral("EUC-JP");
+    case DocumentEncoding::EucKr:
+        return QStringLiteral("EUC-KR");
+    case DocumentEncoding::Windows1250:
+        return QStringLiteral("Windows-1250");
+    case DocumentEncoding::Windows1251:
+        return QStringLiteral("Windows-1251");
+    case DocumentEncoding::Windows1252:
+        return QStringLiteral("Windows-1252");
+    case DocumentEncoding::Windows1253:
+        return QStringLiteral("Windows-1253");
+    case DocumentEncoding::Windows1254:
+        return QStringLiteral("Windows-1254");
+    case DocumentEncoding::Windows1255:
+        return QStringLiteral("Windows-1255");
+    case DocumentEncoding::Windows1256:
+        return QStringLiteral("Windows-1256");
+    case DocumentEncoding::Windows1257:
+        return QStringLiteral("Windows-1257");
+    case DocumentEncoding::Windows1258:
+        return QStringLiteral("Windows-1258");
+    case DocumentEncoding::Iso88592:
+        return QStringLiteral("ISO-8859-2");
+    case DocumentEncoding::Iso88595:
+        return QStringLiteral("ISO-8859-5");
+    case DocumentEncoding::Iso88597:
+        return QStringLiteral("ISO-8859-7");
+    case DocumentEncoding::Iso885915:
+        return QStringLiteral("ISO-8859-15");
+    case DocumentEncoding::Koi8R:
+        return QStringLiteral("KOI8-R");
+    case DocumentEncoding::Koi8U:
+        return QStringLiteral("KOI8-U");
+    case DocumentEncoding::Tis620:
+        return QStringLiteral("TIS-620");
     }
     return QStringLiteral("UTF-8");
 }
 
 bool DocumentFormatCodec::canRepresent(const QString &text, DocumentEncoding encoding)
 {
-    if (encoding != DocumentEncoding::Latin1)
+    if (!isLegacyEncoding(encoding))
         return true;
 
-    for (QChar character : text)
-        if (character.unicode() > 0xff)
-            return false;
-    return true;
+    if (encoding == DocumentEncoding::Latin1)
+    {
+        for (QChar character : text)
+            if (character.unicode() > 0xff)
+                return false;
+        return true;
+    }
+
+    return LegacyTextCodec::canRepresent(text, encoding);
 }
 
 DocumentFormat DocumentFormatCodec::defaultFormat()
@@ -352,9 +595,19 @@ bool DocumentFormatCodec::decode(const QByteArray &bytes,
     }
     else
     {
-        if (errorMessage)
-            *errorMessage = QStringLiteral("The file is not valid UTF-8 or BOM-marked UTF-16 text.");
-        return false;
+        // Not BOM-marked and not valid UTF-8: try the legacy CJK codecs so
+        // GBK/GB18030/Big5/... files open without a manual re-open. Single-byte
+        // codecs are never auto-detected (every byte sequence is valid in them).
+        const DocumentEncoding legacy = detectLegacyEncoding(bytes);
+        if (legacy == DocumentEncoding::Utf8)
+        {
+            if (errorMessage)
+                *errorMessage = QStringLiteral("The file is not valid UTF-8 or BOM-marked UTF-16 text.");
+            return false;
+        }
+        detected.encoding = legacy;
+        if (!LegacyTextCodec::decode(bytes, legacy, &decoded, errorMessage))
+            return false;
     }
 
     detected.lineEnding = detectLineEnding(decoded, detected.lineEnding);
@@ -374,8 +627,22 @@ bool DocumentFormatCodec::decodeToEditorBytes(const QByteArray &bytes,
         return decodeUtf8ToEditorBytes(bytes, 3, DocumentEncoding::Utf8Bom,
                                        utf8Content, format, errorMessage);
     if (!bytes.startsWith("\xff\xfe") && !bytes.startsWith("\xfe\xff"))
-        return decodeUtf8ToEditorBytes(bytes, 0, DocumentEncoding::Utf8,
-                                       utf8Content, format, errorMessage);
+    {
+        if (decodeUtf8ToEditorBytes(bytes, 0, DocumentEncoding::Utf8,
+                                    utf8Content, format, errorMessage))
+            return true;
+
+        // Invalid UTF-8: fall back to the legacy CJK codecs before failing.
+        const DocumentEncoding legacy = detectLegacyEncoding(bytes);
+        if (legacy != DocumentEncoding::Utf8
+            && decodeToEditorBytesWithEncoding(bytes, legacy, utf8Content,
+                                               format, errorMessage))
+            return true;
+
+        if (errorMessage)
+            *errorMessage = QStringLiteral("The file contains invalid UTF-8 data.");
+        return false;
+    }
 
     QString text;
     if (!decode(bytes, &text, format, errorMessage))
@@ -417,7 +684,10 @@ bool DocumentFormatCodec::decodeWithEncoding(const QByteArray &bytes,
     }
     else if (isLegacyEncoding(encoding))
     {
-        decoded = QString::fromLatin1(bytes);
+        if (encoding == DocumentEncoding::Latin1)
+            decoded = QString::fromLatin1(bytes);
+        else if (!LegacyTextCodec::decode(bytes, encoding, &decoded, errorMessage))
+            return false;
     }
     else if (encoding == DocumentEncoding::Utf16LittleEndian
              || encoding == DocumentEncoding::Utf16BigEndian)
@@ -490,7 +760,11 @@ QByteArray DocumentFormatCodec::encode(const QString &text, const DocumentFormat
         return QByteArray("\xef\xbb\xbf", 3) + output.toUtf8();
 
     if (isLegacyEncoding(format.encoding))
-        return output.toLatin1();
+    {
+        if (format.encoding == DocumentEncoding::Latin1)
+            return output.toLatin1();
+        return LegacyTextCodec::encode(output, format.encoding);
+    }
 
     const bool littleEndian = format.encoding == DocumentEncoding::Utf16LittleEndian;
     const qsizetype unitCount = output.size();

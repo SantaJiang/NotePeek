@@ -215,6 +215,32 @@ private slots:
         QCOMPARE(outcome.format.encoding, DocumentEncoding::Utf16LittleEndian);
     }
 
+    void gb18030AutoDetectedAndSplitAcrossChunks()
+    {
+        // "感谢大家" in GBK (a GB18030 subset), two bytes per character.
+        const QByteArray input = QByteArray("\xb8\xd0\xd0\xbb\xb4\xf3\xbc\xd2", 8);
+        const QByteArray expected = QStringLiteral("感谢大家").toUtf8();
+        for (int chunkSize = 1; chunkSize <= 3; ++chunkSize)
+        {
+            const StreamOutcome outcome = streamDecode(input, {chunkSize});
+            QVERIFY2(outcome.success, qPrintable(outcome.error));
+            QCOMPARE(outcome.output, expected);
+            QCOMPARE(outcome.format.encoding, DocumentEncoding::Gb18030);
+        }
+    }
+
+    void legacyOverrideStreamsLikeWholeFile()
+    {
+        const QByteArray input = DocumentFormatCodec::encode(
+            QStringLiteral("a中文b\n"),
+            DocumentFormat{DocumentEncoding::Gb18030, DocumentLineEnding::Lf});
+        const QByteArray expected = QStringLiteral("a中文b\n").toUtf8();
+        const StreamOutcome outcome = streamDecode(input, {1, 2, 3}, true, DocumentEncoding::Gb18030);
+        QVERIFY2(outcome.success, qPrintable(outcome.error));
+        QCOMPARE(outcome.output, expected);
+        QCOMPARE(outcome.format.encoding, DocumentEncoding::Gb18030);
+    }
+
     void differentialAgainstWholeFileDecoder()
     {
         // Structured valid inputs covering every encoding.

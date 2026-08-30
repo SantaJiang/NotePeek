@@ -136,6 +136,89 @@ private slots:
         file.close();
     }
 
+    void autoDetectsAndRoundTripsGb18030()
+    {
+        // " 感谢大家 " encoded as GBK (a GB18030 subset).
+        const QByteArray gbkBytes("\x20\xb8\xd0\xd0\xbb\xb4\xf3\xbc\xd2\x20", 10);
+
+        QString text;
+        DocumentFormat format;
+        QString error;
+        QVERIFY2(DocumentFormatCodec::decode(gbkBytes, &text, &format, &error), qPrintable(error));
+        QCOMPARE(text, QStringLiteral(" 感谢大家 "));
+        QCOMPARE(format.encoding, DocumentEncoding::Gb18030);
+
+        // Encoding round-trips back to the original bytes.
+        QCOMPARE(DocumentFormatCodec::encode(text, format), gbkBytes);
+
+        // The editor-byte path (what actually loads into Scintilla) agrees.
+        QByteArray editorBytes;
+        DocumentFormat editorFormat;
+        QVERIFY2(DocumentFormatCodec::decodeToEditorBytes(gbkBytes, &editorBytes, &editorFormat, &error),
+                 qPrintable(error));
+        QCOMPARE(QString::fromUtf8(editorBytes), QStringLiteral(" 感谢大家 "));
+        QCOMPARE(editorFormat.encoding, DocumentEncoding::Gb18030);
+    }
+
+    void reopensWithForcedLegacyEncoding()
+    {
+        const QByteArray big5 = DocumentFormatCodec::encode(
+            QStringLiteral("中文"),
+            DocumentFormat{DocumentEncoding::Big5, DocumentLineEnding::Lf});
+
+        QString text;
+        DocumentFormat format;
+        QString error;
+        QVERIFY2(DocumentFormatCodec::decodeWithEncoding(big5, DocumentEncoding::Big5,
+                                                         &text, &format, &error),
+                 qPrintable(error));
+        QCOMPARE(text, QStringLiteral("中文"));
+        QCOMPARE(format.encoding, DocumentEncoding::Big5);
+    }
+
+    void legacyLineEndingsAreDetected()
+    {
+        // "你好\r\n" in GBK: C4 E3 BA C3 0D 0A.
+        const QByteArray gbk("\xc4\xe3\xba\xc3\r\n", 6);
+        QString text;
+        DocumentFormat format;
+        QString error;
+        QVERIFY2(DocumentFormatCodec::decode(gbk, &text, &format, &error), qPrintable(error));
+        QCOMPARE(text, QStringLiteral("你好\n"));
+        QCOMPARE(format.encoding, DocumentEncoding::Gb18030);
+        QCOMPARE(format.lineEnding, DocumentLineEnding::CrLf);
+    }
+
+    void legacyCodecRepresentability()
+    {
+        QVERIFY(DocumentFormatCodec::canRepresent(QStringLiteral("中文"), DocumentEncoding::Gb18030));
+        QVERIFY(DocumentFormatCodec::canRepresent(QStringLiteral("中文"), DocumentEncoding::Big5));
+        QVERIFY(!DocumentFormatCodec::canRepresent(QStringLiteral("简体"), DocumentEncoding::Big5));
+        QVERIFY(DocumentFormatCodec::canRepresent(QStringLiteral("café"), DocumentEncoding::Windows1252));
+        QVERIFY(!DocumentFormatCodec::canRepresent(QStringLiteral("中文"), DocumentEncoding::Windows1252));
+        QVERIFY(DocumentFormatCodec::canRepresent(QStringLiteral("Текст"), DocumentEncoding::Windows1251));
+        QVERIFY(!DocumentFormatCodec::canRepresent(QStringLiteral("中文😀"), DocumentEncoding::Windows1252));
+    }
+
+    void legacyEncodeSubstitutesUnrepresentableChars()
+    {
+        // Each unrepresentable character must become exactly one '?'.
+        const QByteArray encoded = DocumentFormatCodec::encode(
+            QStringLiteral("A中B"),
+            DocumentFormat{DocumentEncoding::Windows1252, DocumentLineEnding::Lf});
+        QCOMPARE(encoded, QByteArray("A?B"));
+    }
+
+    void autoDetectToleratesTruncatedPrefix()
+    {
+        // "感谢大家" in GBK, with the last character cut in half. Streaming
+        // detection runs on a bounded prefix that may split a CJK character.
+        const QByteArray truncated = QByteArray("\xb8\xd0\xd0\xbb\xb4\xf3\xbc", 7);
+        DocumentEncoding encoding = DocumentEncoding::Utf8;
+        QCOMPARE(DocumentFormatCodec::detectAutoEncoding(truncated, &encoding, true), qsizetype(0));
+        QCOMPARE(encoding, DocumentEncoding::Gb18030);
+    }
+
     void encodingReloadPreservesCallerRequestIdentity()
     {
         QTemporaryDir tempDir;
