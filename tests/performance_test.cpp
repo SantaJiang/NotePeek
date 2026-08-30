@@ -175,6 +175,34 @@ private slots:
         QCOMPARE(editor.SendScintilla(QsciScintillaBase::SCI_GETMODIFY), long(0));
     }
 
+    void streamsLargeFileOpenWithinBudget()
+    {
+        const QByteArray path = qgetenv("NOTEPEEK_STREAM_FILE");
+        if (path.isEmpty())
+            QSKIP("NOTEPEEK_STREAM_FILE not set; skipping real-file streaming measurement", 0);
+
+        EditorPane pane;
+        DocumentController controller(&pane, false);
+        QElapsedTimer timer;
+        timer.start();
+        controller.openFile(QString::fromLocal8Bit(path));
+        bool budgetIsValid = false;
+        const int configuredBudget = qEnvironmentVariableIntValue(
+            "NOTEPEEK_STREAM_OPEN_BUDGET_MS", &budgetIsValid);
+        const int budgetMs = budgetIsValid && configuredBudget > 0 ? configuredBudget : 10000;
+        QTRY_VERIFY_WITH_TIMEOUT(controller.currentEditor() && !controller.currentEditor()->isReadOnly(),
+                                 budgetMs + 15000);
+        const qint64 elapsedMs = timer.elapsed();
+        qInfo().nospace()
+            << "stream-open file=" << path
+            << " bytes=" << (controller.currentEditor() ? controller.currentEditor()->length() : -1)
+            << " lines=" << (controller.currentEditor() ? controller.currentEditor()->lines() : -1)
+            << " elapsedMs=" << elapsedMs;
+        QVERIFY2(elapsedMs < budgetMs,
+                 qPrintable(QStringLiteral("Streaming open of %1 exceeded %2 ms").arg(
+                     QString::fromLocal8Bit(path)).arg(budgetMs)));
+    }
+
     void decodesTenMegabytesWithinSmokeBudget()
     {
         QByteArray input;

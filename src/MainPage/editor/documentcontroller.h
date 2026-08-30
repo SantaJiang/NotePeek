@@ -115,6 +115,9 @@ private slots:
     void onFileLoaded(const DocumentLoadResult &result);
     void onFileSaved(const DocumentSaveResult &result);
     void onFileReloadedWithEncoding(const DocumentEncodingReloadResult &result);
+    void onStreamChunkReady(quint64 requestId, quint64 sequence, const QByteArray &utf8);
+    void onStreamFinished(quint64 requestId, const StreamDocumentMetadata &metadata);
+    void onStreamFailed(quint64 requestId, const QString &errorMessage);
 
 private:
     struct PendingLoad
@@ -123,6 +126,17 @@ private:
         QPointer<DocumentPage> page;
         QString filePath;
         bool activate = true;
+    };
+
+    struct PendingStream
+    {
+        QPointer<CustomEditor> editor;
+        QPointer<DocumentPage> page;
+        QString filePath;
+        bool activate = true;
+        bool replacementStarted = false;
+        quint64 expectedSequence = 0;
+        int beforeLines = 0;
     };
 
     struct PendingEncodingReload
@@ -135,6 +149,7 @@ private:
     };
 
     void connectEditorSignals(CustomEditor *editor);
+    void cancelPendingLoadsFor(CustomEditor *editor);
     void finalizeLoadedEditor(CustomEditor *editor,
                               DocumentPage *page,
                               const QString &filePath,
@@ -144,6 +159,7 @@ private:
                               bool activate,
                               bool recommendEmojiFont,
                               int beforeLines);
+    void failStreamingLoad(quint64 requestId, const QString &errorMessage);
     bool closeDefaultEditorIfUnused();
     void dispatchAsyncSave(CustomEditor *editor,
                            const QString &filePath,
@@ -181,6 +197,7 @@ private:
     quint64 m_nextLoadRequestId = 1;
     quint64 m_nextEncodingReloadRequestId = 1;
     QHash<quint64, PendingLoad> m_pendingLoads;
+    QHash<quint64, PendingStream> m_pendingStreams;
     QHash<quint64, PendingEncodingReload> m_pendingEncodingReloads;
     QSet<CustomEditor *> m_editorsLoading;
     QHash<CustomEditor *, quint64> m_editorContentRevisions;

@@ -18,6 +18,10 @@ add_library(notepeek_core STATIC
     editor/documentsession.cpp
     editor/documentio.cpp
     editor/documentio.h
+    editor/documentstreamdecoder.cpp
+    editor/documentstreamdecoder.h
+    editor/streamingdocumentloader.cpp
+    editor/streamingdocumentloader.h
     editor/documentpersistenceservice.cpp
     editor/documentpersistenceservice.h
     editor/documentencodingreloadservice.cpp

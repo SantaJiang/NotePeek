@@ -73,6 +73,36 @@ set_tests_properties(notepeek_documentoptions_test PROPERTIES
     ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
 )
 
+add_executable(notepeek_documentstreamdecoder_test
+    documentstreamdecoder_test.cpp
+)
+
+target_link_libraries(notepeek_documentstreamdecoder_test PRIVATE
+    notepeek_core
+    Qt6::Test
+)
+notepeek_configure_project_target(notepeek_documentstreamdecoder_test)
+
+add_test(NAME notepeek_documentstreamdecoder_test COMMAND notepeek_documentstreamdecoder_test)
+set_tests_properties(notepeek_documentstreamdecoder_test PROPERTIES
+    ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
+)
+
+add_executable(notepeek_streamingdocumentloader_test
+    streamingdocumentloader_test.cpp
+)
+
+target_link_libraries(notepeek_streamingdocumentloader_test PRIVATE
+    notepeek_widgets
+    Qt6::Test
+)
+notepeek_configure_project_target(notepeek_streamingdocumentloader_test)
+
+add_test(NAME notepeek_streamingdocumentloader_test COMMAND notepeek_streamingdocumentloader_test)
+set_tests_properties(notepeek_streamingdocumentloader_test PROPERTIES
+    ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
+)
+
 add_executable(notepeek_codeformatter_test
     codeformatter_test.cpp
 )

@@ -102,6 +102,12 @@ DocumentController::DocumentController(EditorPane *pane,
             this, &DocumentController::onFileLoaded);
     connect(m_persistence, &DocumentPersistenceService::fileSaved,
             this, &DocumentController::onFileSaved);
+    connect(m_persistence, &DocumentPersistenceService::streamChunkReady,
+            this, &DocumentController::onStreamChunkReady);
+    connect(m_persistence, &DocumentPersistenceService::streamFinished,
+            this, &DocumentController::onStreamFinished);
+    connect(m_persistence, &DocumentPersistenceService::streamFailed,
+            this, &DocumentController::onStreamFailed);
     connect(m_encodingReloadService, &DocumentEncodingReloadService::fileReloaded,
             this, &DocumentController::onFileReloadedWithEncoding);
     connect(m_pane, &EditorPane::pageCloseRequested,
@@ -204,7 +210,10 @@ void DocumentController::openFile(const QString &filePath, bool activate)
     connectEditorSignals(editor);
 
     const quint64 requestId = m_nextLoadRequestId++;
-    m_pendingLoads.insert(requestId, { editor, page, filePath, activate });
+    if (editor->isLargeFileMode())
+        m_pendingStreams.insert(requestId, { editor, page, filePath, activate });
+    else
+        m_pendingLoads.insert(requestId, { editor, page, filePath, activate });
     m_persistence->loadFileAsync({ requestId, filePath });
 }
 
@@ -523,6 +532,109 @@ void DocumentController::finalizeLoadedEditor(CustomEditor *editor,
         emit emojiFontInstallationRecommended(filePath);
     }
     emit fileOpened(editor, filePath);
+}
+
+void DocumentController::onStreamChunkReady(quint64 requestId, quint64 sequence, const QByteArray &utf8)
+{
+    const auto it = m_pendingStreams.find(requestId);
+    if (it == m_pendingStreams.end())
+        return;
+
+    CustomEditor *editor = it.value().editor.data();
+    if (!editor)
+        return;
+
+    PendingStream &pending = it.value();
+    if (!pending.replacementStarted)
+    {
+        pending.beforeLines = editor->lines();
+        m_contentReplacer->beginReplacement(editor);
+        pending.replacementStarted = true;
+    }
+
+    // Streamed chunks are strictly ordered; a gap indicates a loader bug, which
+    // debug builds surface and release builds tolerate by dropping the chunk.
+    Q_ASSERT(sequence == pending.expectedSequence);
+    if (sequence != pending.expectedSequence)
+        return;
+
+    m_contentReplacer->appendChunk(editor, utf8.constData(), utf8.size());
+    ++pending.expectedSequence;
+}
+
+void DocumentController::onStreamFinished(quint64 requestId, const StreamDocumentMetadata &metadata)
+{
+    const PendingStream pending = m_pendingStreams.take(requestId);
+    if (!pending.editor || !pending.page || pending.filePath.isEmpty())
+        return;
+
+    CustomEditor *editor = pending.editor.data();
+    DocumentPage *page = pending.page.data();
+    if (m_pane->indexOfEditor(editor) == -1)
+        return;
+
+    if (pending.replacementStarted)
+        m_contentReplacer->finishReplacement(editor);
+
+    finalizeLoadedEditor(editor, page, pending.filePath, metadata.format,
+                         /*largeFile=*/true, /*detectedLanguage=*/int(LexerFactory::Unknown),
+                         pending.activate, /*recommendEmojiFont=*/false, pending.beforeLines);
+}
+
+void DocumentController::failStreamingLoad(quint64 requestId, const QString &errorMessage)
+{
+    const PendingStream pending = m_pendingStreams.take(requestId);
+    CustomEditor *editor = pending.editor.data();
+    DocumentPage *page = pending.page.data();
+    if (!editor || !page)
+        return;
+
+    if (pending.replacementStarted)
+        m_contentReplacer->abortReplacement(editor);
+
+    const int tabIndex = m_pane->indexOfEditor(editor);
+    if (tabIndex == -1)
+        return;
+
+    m_editorsLoading.remove(editor);
+    editor->setReadOnly(false);
+    m_pane->removePage(tabIndex);
+    emit editorClosed(editor);
+    m_editorManager->forgetEditor(editor);
+    page->deleteLater();
+
+    if (m_createDefaultWhenEmpty && m_pane->count() == 0)
+        createDefaultDocument();
+
+    QMessageBox::warning(m_pane, tr("NotePeek"),
+                         tr("Cannot read file %1:\n%2.")
+                         .arg(pending.filePath)
+                         .arg(errorMessage));
+    emit fileOpenFailed(pending.filePath);
+}
+
+void DocumentController::onStreamFailed(quint64 requestId, const QString &errorMessage)
+{
+    failStreamingLoad(requestId, errorMessage);
+}
+
+void DocumentController::cancelPendingLoadsFor(CustomEditor *editor)
+{
+    if (!editor)
+        return;
+
+    for (auto it = m_pendingStreams.begin(); it != m_pendingStreams.end();)
+    {
+        if (it.value().editor == editor)
+        {
+            m_persistence->cancelLoad(it.key());
+            it = m_pendingStreams.erase(it);
+        }
+        else
+        {
+            ++it;
+        }
+    }
 }
 
 void DocumentController::onFileSaved(const DocumentSaveResult &result)
@@ -1343,6 +1455,7 @@ void DocumentController::connectEditorSignals(CustomEditor *editor)
         m_editorContentRevisions.remove(editor);
         m_editorsLoading.remove(editor);
         m_contentReplacer->forgetEditor(editor);
+        cancelPendingLoadsFor(editor);
     });
 }
 
