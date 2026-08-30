@@ -38,6 +38,12 @@ public:
     void completeWordFromDocument();
 
     quint64 documentRevision() const;
+    // Emits the aggregated textChanged() (and linesChanged() when the line
+    // count changed) once after a bulk replacement that suppressed per-chunk
+    // insert/delete notifications. Callers must invoke this exactly once per
+    // finished replacement so documentRevision() and downstream revision
+    // counters advance a single time.
+    void notifyDocumentReplaced(bool lineCountChanged);
     bool setSemanticTokens(quint64 revision, const QVector<SemanticToken> &tokens);
     bool applySemanticTokenDelta(quint64 revision, int firstLine, int lastLine,
                                  const QVector<SemanticToken> &tokens);

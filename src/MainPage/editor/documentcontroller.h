@@ -135,6 +135,15 @@ private:
     };
 
     void connectEditorSignals(CustomEditor *editor);
+    void finalizeLoadedEditor(CustomEditor *editor,
+                              DocumentPage *page,
+                              const QString &filePath,
+                              const DocumentFormat &format,
+                              bool largeFile,
+                              int detectedLanguage,
+                              bool activate,
+                              bool recommendEmojiFont,
+                              int beforeLines);
     bool closeDefaultEditorIfUnused();
     void dispatchAsyncSave(CustomEditor *editor,
                            const QString &filePath,

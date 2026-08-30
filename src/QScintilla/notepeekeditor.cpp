@@ -150,6 +150,15 @@ quint64 Editor::documentRevision() const
     return m_documentRevision;
 }
 
+void Editor::notifyDocumentReplaced(bool lineCountChanged)
+{
+    // The constructor connection increments m_documentRevision on textChanged,
+    // so emitting once here advances the revision a single time.
+    emit textChanged();
+    if (lineCountChanged)
+        emit linesChanged();
+}
+
 bool Editor::setSemanticTokens(quint64 revision, const QVector<SemanticToken> &tokens)
 {
     if (revision != m_documentRevision)

@@ -3,6 +3,7 @@
 #include "editor/documentformat.h"
 #include "editor/editorsnapshotencoder.h"
 #include "editor/documentcontroller.h"
+#include "editor/editorcontentreplacer.h"
 #include "editor/editormanager.h"
 #include "editor/editorpane.h"
 #include "foundation/performanceconstants.h"
@@ -131,6 +132,47 @@ private slots:
     void initTestCase()
     {
         qRegisterMetaType<FileSearchOutcome>("FileSearchOutcome");
+    }
+
+    void bulkReplacementMeetsInteractiveBudget()
+    {
+        bool sizeIsValid = false;
+        const int configuredMegabytes = qEnvironmentVariableIntValue(
+            "NOTEPEEK_BULK_INSERT_MB", &sizeIsValid);
+        const int megabytes = sizeIsValid && configuredMegabytes > 0 ? configuredMegabytes : 32;
+
+        CustomEditor editor;
+        editor.setReadOnly(true);
+        const QByteArray line("0123456789 abcdefghijklmnopqrstuvwxyz\n");
+        QByteArray content;
+        const qsizetype targetSize = qsizetype(megabytes) * 1024 * 1024;
+        content.reserve(targetSize + line.size());
+        while (content.size() < targetSize)
+            content.append(line);
+        content.truncate(targetSize);
+
+        EditorContentReplacer replacer;
+        QElapsedTimer timer;
+        timer.start();
+        bool finished = false;
+        replacer.insertInChunks(&editor, content, [&finished]() { finished = true; });
+        QTRY_VERIFY_WITH_TIMEOUT(finished, 30000);
+        const qint64 elapsedMs = timer.elapsed();
+
+        bool budgetIsValid = false;
+        const int configuredBudget = qEnvironmentVariableIntValue(
+            "NOTEPEEK_BULK_INSERT_BUDGET_MS", &budgetIsValid);
+        const int budgetMs = budgetIsValid && configuredBudget > 0 ? configuredBudget : 5000;
+
+        qInfo().nospace()
+            << "bulk-insert bytes=" << content.size()
+            << " elapsedMs=" << elapsedMs;
+        QVERIFY2(elapsedMs < budgetMs,
+                 qPrintable(QStringLiteral("Bulk insertion of %1 MB exceeded %2 ms")
+                                .arg(megabytes)
+                                .arg(budgetMs)));
+        QCOMPARE(editor.length(), content.size());
+        QCOMPARE(editor.SendScintilla(QsciScintillaBase::SCI_GETMODIFY), long(0));
     }
 
     void decodesTenMegabytesWithinSmokeBudget()

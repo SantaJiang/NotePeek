@@ -23,6 +23,8 @@
 #include "find/findreplacemanager.h"
 #include "tool/markdown/emojifontsupport.h"
 
+#include <QAccessible>
+#include <QAccessibleEvent>
 #include <QApplication>
 #include <QEventLoop>
 #include <QFileInfo>
@@ -53,6 +55,20 @@ void applyDocumentLineEnding(CustomEditor *editor, DocumentLineEnding ending)
         editor->setEolMode(CustomEditor::EolMac);
     else
         editor->setEolMode(CustomEditor::EolUnix);
+}
+
+// A lightweight accessibility completion event after a bulk replacement. It
+// deliberately carries no text, so it cannot copy a 100 MB document into the
+// accessibility bridge.
+void notifyAccessibilityDocumentReplaced(CustomEditor *editor, bool reload)
+{
+    if (!editor)
+        return;
+#if !defined(QT_NO_ACCESSIBILITY)
+    QAccessibleEvent event(editor, reload ? QAccessible::DocumentReload
+                                          : QAccessible::DocumentLoadComplete);
+    QAccessible::updateAccessibility(&event);
+#endif
 }
 
 } // namespace
@@ -451,41 +467,62 @@ void DocumentController::onFileLoaded(const DocumentLoadResult &result)
                                         EmojiFontSupport::hasSystemEmojiFont());
     if (largeFile)
         m_editorManager->promoteToLargeFileMode(editor);
+    const int beforeLines = editor->lines();
     m_contentReplacer->insertInChunks(editor, result.content,
-                          [this, editorGuard, pageGuard, format, filePath, largeFile, detectedLanguage, activate, recommendEmojiFont]() {
+                          [this, editorGuard, pageGuard, format, filePath, largeFile, detectedLanguage, activate, recommendEmojiFont, beforeLines]() {
         if (!editorGuard)
             return;
 
         CustomEditor *editor = editorGuard.data();
-        editor->setDocumentFormat(format);
-        applyDocumentLineEnding(editor, format.lineEnding);
-        m_editorManager->updateEditorSyntax(editor, filePath, detectedLanguage);
-        editor->setUpdatesEnabled(true);
-        editor->setReadOnly(false);
-
-        if (!largeFile && AppPreferences::instance().markdownDefaultPreview() && m_markdownPreviewer)
-        {
-            if (auto *markdownPage = qobject_cast<MarkdownDocumentPage *>(pageGuard.data()))
-            {
-                markdownPage->setInitialViewMode(true, m_markdownPreviewer, activate);
-            }
-        }
-
-        setCurrentFile(editor, filePath);
-        m_editorManager->updateLineNumberMarginWidth(editor);
-        closeDefaultEditorIfUnused();
-        if (activate)
-        {
-            m_pane->focusEditor(editor);
-        }
-
-        m_editorsLoading.remove(editor);
-        if (recommendEmojiFont)
-        {
-            emit emojiFontInstallationRecommended(filePath);
-        }
-        emit fileOpened(editor, filePath);
+        finalizeLoadedEditor(editor, pageGuard.data(), filePath, format, largeFile,
+                             int(detectedLanguage), activate, recommendEmojiFont, beforeLines);
     });
+}
+
+void DocumentController::finalizeLoadedEditor(CustomEditor *editor,
+                                              DocumentPage *page,
+                                              const QString &filePath,
+                                              const DocumentFormat &format,
+                                              bool largeFile,
+                                              int detectedLanguage,
+                                              bool activate,
+                                              bool recommendEmojiFont,
+                                              int beforeLines)
+{
+    if (!editor)
+        return;
+
+    editor->notifyDocumentReplaced(editor->lines() != beforeLines);
+    editor->setDocumentFormat(format);
+    applyDocumentLineEnding(editor, format.lineEnding);
+    m_editorManager->updateEditorSyntax(
+        editor, filePath, static_cast<LexerFactory::Language>(detectedLanguage));
+    editor->setUpdatesEnabled(true);
+    editor->setReadOnly(false);
+
+    if (!largeFile && AppPreferences::instance().markdownDefaultPreview() && m_markdownPreviewer)
+    {
+        if (auto *markdownPage = qobject_cast<MarkdownDocumentPage *>(page))
+        {
+            markdownPage->setInitialViewMode(true, m_markdownPreviewer, activate);
+        }
+    }
+
+    setCurrentFile(editor, filePath);
+    m_editorManager->updateLineNumberMarginWidth(editor);
+    closeDefaultEditorIfUnused();
+    if (activate)
+    {
+        m_pane->focusEditor(editor);
+    }
+
+    m_editorsLoading.remove(editor);
+    notifyAccessibilityDocumentReplaced(editor, false);
+    if (recommendEmojiFont)
+    {
+        emit emojiFontInstallationRecommended(filePath);
+    }
+    emit fileOpened(editor, filePath);
 }
 
 void DocumentController::onFileSaved(const DocumentSaveResult &result)
@@ -954,34 +991,46 @@ bool DocumentController::applyReloadedContent(const QString &filePath,
         editor->getCursorPosition(&line, &index);
         const int firstVisibleLine = editor->SendScintilla(QsciScintillaBase::SCI_GETFIRSTVISIBLELINE);
         const int xOffset = editor->SendScintilla(QsciScintillaBase::SCI_GETXOFFSET);
+        const int beforeLines = editor->lines();
 
         const bool largeFileContent = performanceDegraded
                                       || utf8Content.size() > PerformanceConstants::LargeFileSize;
         if (largeFileContent)
             m_editorManager->promoteToLargeFileMode(editor);
-        const QSignalBlocker blocker(editor);
-        if (!m_contentReplacer->replaceWithEventLoopYield(editor, utf8Content))
+        bool replaced = false;
+        {
+            const QSignalBlocker blocker(editor);
+            replaced = m_contentReplacer->replaceWithEventLoopYield(editor, utf8Content);
+            if (replaced)
+            {
+                editor->setDocumentFormat(format);
+                applyDocumentLineEnding(editor, format.lineEnding);
+                editor->setExternalConflict(false);
+                editor->setModified(false);
+                m_editorManager->updateEditorSyntax(
+                    editor, normalizedPath, static_cast<LexerFactory::Language>(detectedLanguage));
+
+                const int targetLine = qBound(0, line, qMax(0, editor->lines() - 1));
+                const int targetIndex = qBound(0, index, editor->lineLength(targetLine));
+                editor->setCursorPosition(targetLine, targetIndex);
+                editor->SendScintilla(QsciScintillaBase::SCI_SETFIRSTVISIBLELINE, firstVisibleLine);
+                editor->SendScintilla(QsciScintillaBase::SCI_SETXOFFSET, xOffset);
+                m_editorManager->updateLineNumberMarginWidth(editor);
+            }
+        }
+        if (!replaced)
         {
             continue;
         }
-        editor->setDocumentFormat(format);
-        applyDocumentLineEnding(editor, format.lineEnding);
-        editor->setExternalConflict(false);
-        editor->setModified(false);
-        m_editorManager->updateEditorSyntax(
-            editor, normalizedPath, static_cast<LexerFactory::Language>(detectedLanguage));
 
-        const int targetLine = qBound(0, line, qMax(0, editor->lines() - 1));
-        const int targetIndex = qBound(0, index, editor->lineLength(targetLine));
-        editor->setCursorPosition(targetLine, targetIndex);
-        editor->SendScintilla(QsciScintillaBase::SCI_SETFIRSTVISIBLELINE, firstVisibleLine);
-        editor->SendScintilla(QsciScintillaBase::SCI_SETXOFFSET, xOffset);
-        m_editorManager->updateLineNumberMarginWidth(editor);
+        editor->notifyDocumentReplaced(editor->lines() != beforeLines);
 
         if (DocumentPage *page = m_pane->pageForEditor(editor))
         {
             page->refreshPreview();
         }
+
+        notifyAccessibilityDocumentReplaced(editor, true);
 
         emit editorModificationChanged(editor, false);
         if (editor == currentEditor())
@@ -1087,36 +1136,45 @@ void DocumentController::onFileReloadedWithEncoding(const DocumentEncodingReload
     editor->getCursorPosition(&line, &index);
     const int firstVisibleLine = editor->SendScintilla(
         QsciScintillaBase::SCI_GETFIRSTVISIBLELINE);
+    const int beforeLines = editor->lines();
 
     const bool largeFileContent = result.performanceDegraded
                                   || result.content.size() > PerformanceConstants::LargeFileSize;
     if (largeFileContent)
         m_editorManager->promoteToLargeFileMode(editor);
+    bool replaced = false;
     {
         const QSignalBlocker blocker(editor);
-        if (!m_contentReplacer->replaceWithEventLoopYield(editor, result.content))
-            return;
-        editor->setDocumentFormat(result.format);
-        applyDocumentLineEnding(editor, result.format.lineEnding);
-        editor->setExternalConflict(false);
-        editor->setModified(false);
-        editor->markClean();
-        m_editorManager->updateEditorSyntax(
-            editor,
-            pending.filePath,
-            static_cast<LexerFactory::Language>(result.detectedLanguage));
+        replaced = m_contentReplacer->replaceWithEventLoopYield(editor, result.content);
+        if (replaced)
+        {
+            editor->setDocumentFormat(result.format);
+            applyDocumentLineEnding(editor, result.format.lineEnding);
+            editor->setExternalConflict(false);
+            editor->setModified(false);
+            editor->markClean();
+            m_editorManager->updateEditorSyntax(
+                editor,
+                pending.filePath,
+                static_cast<LexerFactory::Language>(result.detectedLanguage));
 
-        const int targetLine = qBound(0, line, qMax(0, editor->lines() - 1));
-        editor->setCursorPosition(targetLine,
-                                  qBound(0, index, editor->lineLength(targetLine)));
-        editor->SendScintilla(QsciScintillaBase::SCI_SETFIRSTVISIBLELINE,
-                              firstVisibleLine);
-        m_editorManager->updateLineNumberMarginWidth(editor);
+            const int targetLine = qBound(0, line, qMax(0, editor->lines() - 1));
+            editor->setCursorPosition(targetLine,
+                                      qBound(0, index, editor->lineLength(targetLine)));
+            editor->SendScintilla(QsciScintillaBase::SCI_SETFIRSTVISIBLELINE,
+                                  firstVisibleLine);
+            m_editorManager->updateLineNumberMarginWidth(editor);
+        }
     }
+    if (!replaced)
+        return;
+
+    editor->notifyDocumentReplaced(editor->lines() != beforeLines);
 
     if (DocumentPage *page = m_pane->pageForEditor(editor))
         page->refreshPreview();
     recordFileState(pending.filePath);
+    notifyAccessibilityDocumentReplaced(editor, true);
     emit editorModificationChanged(editor, false);
     if (editor == currentEditor())
     {
