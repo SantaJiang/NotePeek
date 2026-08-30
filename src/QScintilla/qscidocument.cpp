@@ -1,19 +1,19 @@
 // This module implements the QsciDocument class.
 //
 // Copyright (c) 2023 Riverbank Computing Limited <info@riverbankcomputing.com>
-// 
+//
 // This file is part of QScintilla.
-// 
+//
 // This file may be used under the terms of the GNU General Public License
 // version 3.0 as published by the Free Software Foundation and appearing in
 // the file LICENSE included in the packaging of this file.  Please review the
 // following information to ensure the GNU General Public License version 3.0
 // requirements will be met: http://www.gnu.org/copyleft/gpl.html.
-// 
+//
 // If you do not wish to use this file under the terms of the GPL version 3.0
 // then you may purchase a commercial license.  For more information contact
 // info@riverbankcomputing.com.
-// 
+//
 // This file is provided AS IS with NO WARRANTY OF ANY KIND, INCLUDING THE
 // WARRANTY OF DESIGN, MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE.
 
@@ -27,12 +27,17 @@
 class QsciDocumentP
 {
 public:
-    QsciDocumentP() : doc(0), nr_displays(0), nr_attaches(1), modified(false) {}
+    QsciDocumentP() : doc(0), nr_displays(0), nr_attaches(1), modified(false),
+            documentOptions(QsciScintillaBase::SC_DOCUMENTOPTION_DEFAULT) {}
+
+    QsciDocumentP(int options) : doc(0), nr_displays(0), nr_attaches(1),
+            modified(false), documentOptions(options) {}
 
     void *doc;              // The Scintilla document.
     int nr_displays;        // The number of displays.
     int nr_attaches;        // The number of attaches.
     bool modified;          // Set if not at a save point.
+    int documentOptions;    // SC_DOCUMENTOPTION_* used when first created.
 };
 
 
@@ -40,6 +45,13 @@ public:
 QsciDocument::QsciDocument()
 {
     pdoc = new QsciDocumentP();
+}
+
+
+// The ctor with document options.
+QsciDocument::QsciDocument(int documentOptions)
+{
+    pdoc = new QsciDocumentP(documentOptions);
 }
 
 
@@ -127,8 +139,24 @@ void QsciDocument::display(QsciScintillaBase *qsb, const QsciDocument *from)
     // SCI_SETDOCPOINTER appears to reset the EOL mode so save and restore it.
     int eol_mode = qsb->SendScintilla(QsciScintillaBase::SCI_GETEOLMODE);
 
-    qsb->SendScintilla(QsciScintillaBase::SCI_SETDOCPOINTER, 0, ndoc);
-    ndoc = qsb->SendScintillaPtrResult(QsciScintillaBase::SCI_GETDOCPOINTER);
+    if (ndoc == 0 && pdoc->documentOptions != QsciScintillaBase::SC_DOCUMENTOPTION_DEFAULT)
+    {
+        // The document has not been materialised yet; create it with the
+        // requested options. SCI_CREATEDOCUMENT returns a document carrying one
+        // explicit reference and SCI_SETDOCPOINTER adds another, so the
+        // explicit reference is released again to keep the count balanced.
+        void *created = reinterpret_cast<void *>(
+            qsb->SendScintilla(QsciScintillaBase::SCI_CREATEDOCUMENT, 0UL,
+                    pdoc->documentOptions));
+        qsb->SendScintilla(QsciScintillaBase::SCI_SETDOCPOINTER, 0UL, created);
+        qsb->SendScintilla(QsciScintillaBase::SCI_RELEASEDOCUMENT, 0UL, created);
+        ndoc = qsb->SendScintillaPtrResult(QsciScintillaBase::SCI_GETDOCPOINTER);
+    }
+    else
+    {
+        qsb->SendScintilla(QsciScintillaBase::SCI_SETDOCPOINTER, 0, ndoc);
+        ndoc = qsb->SendScintillaPtrResult(QsciScintillaBase::SCI_GETDOCPOINTER);
+    }
 
     qsb->SendScintilla(QsciScintillaBase::SCI_SETEOLMODE, eol_mode);
 

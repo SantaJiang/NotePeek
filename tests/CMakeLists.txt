@@ -58,6 +58,21 @@ set_tests_properties(notepeek_editorbulkload_test PROPERTIES
     ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
 )
 
+add_executable(notepeek_documentoptions_test
+    documentoptions_test.cpp
+)
+
+target_link_libraries(notepeek_documentoptions_test PRIVATE
+    notepeek_widgets
+    Qt6::Test
+)
+notepeek_configure_project_target(notepeek_documentoptions_test)
+
+add_test(NAME notepeek_documentoptions_test COMMAND notepeek_documentoptions_test)
+set_tests_properties(notepeek_documentoptions_test PROPERTIES
+    ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
+)
+
 add_executable(notepeek_codeformatter_test
     codeformatter_test.cpp
 )

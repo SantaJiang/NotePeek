@@ -7,6 +7,7 @@
 #include <QPalette>
 #include <QSet>
 #include <QTimer>
+#include <Qsci/qscidocument.h>
 #include <Qsci/qscilexer.h>
 #include <memory>
 
@@ -118,6 +119,15 @@ bool insertedTextContainsAbnormallyLongLine(const char *text, int length)
     return false;
 }
 
+// A styleless Scintilla document (SC_DOCUMENTOPTION_STYLES_NONE) must never be
+// given a lexer, regardless of how the large-file mode flag evolved.
+bool editorHasStylelessDocument(CustomEditor *editor)
+{
+    return editor
+           && (editor->SendScintilla(QsciScintillaBase::SCI_GETDOCUMENTOPTIONS)
+               & QsciScintillaBase::SC_DOCUMENTOPTION_STYLES_NONE);
+}
+
 qsizetype editorLineContentLength(CustomEditor *editor, int line)
 {
     if (!editor || line < 0 || line >= editor->lines())
@@ -203,6 +213,10 @@ CustomEditor *EditorManager::createEditorForFile(const QString &filePath, bool t
 
     if (isLargeFile)
     {
+        // Create the Scintilla document without style bytes before the first
+        // byte of content is written. This is a document-creation property and
+        // cannot be switched after styled content has been inserted.
+        editor->setDocument(QsciDocument(QsciScintillaBase::SC_DOCUMENTOPTION_STYLES_NONE));
         editor->setLexer(nullptr);
         editor->setWrapMode(CustomEditor::WrapNone);
         editor->setMarginWidth(1, 0);
@@ -443,7 +457,7 @@ void EditorManager::updateEditorSyntax(CustomEditor *editor,
     else
         editor->setProperty("notepeekContentLanguage", QVariant());
     QsciLexer *oldLexer = editor->lexer();
-    if (editor->isLargeFileMode())
+    if (editor->isLargeFileMode() || editorHasStylelessDocument(editor))
     {
         editor->setProperty("semanticFilePath", filePath);
         editor->setProperty("notepeekLexerLanguage", -1);
