@@ -211,7 +211,8 @@ bool LegacyTextCodec::decode(const QByteArray &input, DocumentEncoding encoding,
     }
     QString result(needed, QChar(0));
     MultiByteToWideChar(codePage, MB_ERR_INVALID_CHARS, input.constData(),
-                        int(input.size()), result.data(), needed);
+                        int(input.size()), reinterpret_cast<LPWSTR>(result.data()),
+                        needed);
     if (output)
         *output = result;
     return true;
@@ -245,11 +246,12 @@ QByteArray LegacyTextCodec::encode(const QString &input, DocumentEncoding encodi
     const unsigned codePage = windowsCodePage(encoding);
     if (codePage == 0 || input.isEmpty())
         return QByteArray();
-    const int needed = WideCharToMultiByte(codePage, 0, input.utf16(), int(input.size()),
-                                           nullptr, 0, nullptr, nullptr);
+    const int needed = WideCharToMultiByte(
+        codePage, 0, reinterpret_cast<LPCWCH>(input.utf16()), int(input.size()),
+        nullptr, 0, nullptr, nullptr);
     QByteArray result(needed, Qt::Uninitialized);
-    WideCharToMultiByte(codePage, 0, input.utf16(), int(input.size()),
-                        result.data(), needed, nullptr, nullptr);
+    WideCharToMultiByte(codePage, 0, reinterpret_cast<LPCWCH>(input.utf16()),
+                        int(input.size()), result.data(), needed, nullptr, nullptr);
     return result;
 #else
     const iconv_t cd = openIconv(encoding, false);
@@ -361,7 +363,7 @@ bool LegacyTextCodec::Decoder::accept(const char *data, qsizetype size,
 
     QString result(needed, QChar(0));
     MultiByteToWideChar(codePage, MB_ERR_INVALID_CHARS, p, int(n) - hold,
-                        result.data(), needed);
+                        reinterpret_cast<LPWSTR>(result.data()), needed);
     if (output)
         *output = result;
     return true;
