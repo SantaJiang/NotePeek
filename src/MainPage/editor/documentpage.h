@@ -37,6 +37,10 @@ public:
 
 signals:
     void copyAvailableChanged(bool available);
+    // Emitted after the user changes the Markdown preview layout (toolbar
+    // toggle or splitter collapse).  Programmatic initial layout does not
+    // emit this, so opening a file does not overwrite the remembered choice.
+    void previewLayoutChanged();
 
 protected:
     CustomEditor *m_editor;
@@ -56,16 +60,19 @@ class MarkdownDocumentPage : public DocumentPage
 
 public:
     // How a Markdown page is laid out.  SourceOnly shows just the editor,
-    // Split shows the editor with the rendered preview beside it.
+    // Split shows the editor with the rendered preview beside it, and
+    // PreviewOnly hides the source so only the preview remains.
     enum ViewMode
     {
         SourceOnly,
-        Split
+        Split,
+        PreviewOnly
     };
 
     explicit MarkdownDocumentPage(CustomEditor *editor, QWidget *parent = nullptr);
 
     bool isPreviewVisible() const override;
+    bool isEditorHidden() const override;
     CustomEditor *takeEditor() override;
     bool togglePreview(MarkdownPreviewer *previewer) override;
     void hidePreview() override;
@@ -73,17 +80,24 @@ public:
     void copyCurrentSelection() override;
     bool hasCopySelection() const override;
 
-    // Choose whether a freshly opened Markdown file starts with the side
-    // preview showing (Split) or just the source (SourceOnly).  giveFocus is
-    // false for background opens so the file being activated elsewhere keeps
-    // keyboard focus.
-    void setInitialViewMode(bool preview, MarkdownPreviewer *previewer, bool giveFocus = true);
+    ViewMode viewMode() const { return m_mode; }
+
+    // Choose the layout a freshly opened Markdown file starts in.  giveFocus
+    // is false for background opens so the file being activated elsewhere
+    // keeps keyboard focus.  Does not record the layout as the user's last
+    // choice; that happens only on toggle or splitter collapse.
+    void setInitialViewMode(ViewMode mode, MarkdownPreviewer *previewer, bool giveFocus = true);
+
+    // Hide the source pane when the user has dragged it narrower than the
+    // collapse threshold.  Exposed so tests can drive the same decision the
+    // splitter uses without synthesizing a mouse drag.
+    void considerCollapsingSource(int sourceWidth, int totalWidth);
 
 protected:
     bool eventFilter(QObject *watched, QEvent *event) override;
 
 private:
-    void setViewMode(ViewMode mode, MarkdownPreviewer *previewer, bool giveFocus = true);
+    void setViewMode(ViewMode mode, MarkdownPreviewer *previewer, bool giveFocus, bool remember);
     void ensurePreview(MarkdownPreviewer *previewer);
     void updatePreview();
     void schedulePreviewUpdate();
@@ -92,6 +106,7 @@ private:
     void onPreviewRendered(const MarkdownRenderResult &result);
     void rebuildPreviewScrollMap();
     void schedulePreviewScrollMapRebuild();
+    void onSplitterMoved(int pos, int index);
     void onEditorCursorMoved(int line, int index);
     void updatePreviewLineMarker();
     int sourceLineAtEditorCenter() const;
@@ -115,6 +130,7 @@ private:
     int m_currentSourceLine;
     int m_pendingScrollMapSourceLine;
     bool m_syncingScroll;
+    bool m_applyingViewMode;
     quint64 m_latestPreviewRequestId;
     ViewMode m_mode;
 };

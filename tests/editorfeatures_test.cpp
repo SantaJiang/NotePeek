@@ -28,6 +28,7 @@
 #include <QLabel>
 #include <QMainWindow>
 #include <QPaintEvent>
+#include <QScopeGuard>
 #include <QScrollBar>
 #include <QTemporaryDir>
 #include <QThreadPool>
@@ -1115,6 +1116,189 @@ private slots:
         QTRY_VERIFY_WITH_TIMEOUT(!renderedHtml.isEmpty(), 3000);
         QVERIFY(!renderedHtml.contains(QStringLiteral("<script"), Qt::CaseInsensitive));
         QVERIFY(!renderedHtml.contains(QStringLiteral("javascript:"), Qt::CaseInsensitive));
+    }
+
+    void markdownPreviewToggleRestoresSplitAfterPreviewOnly()
+    {
+        auto *editor = new CustomEditor;
+        MarkdownDocumentPage page(editor);
+        MarkdownPreviewer previewer;
+        QSignalSpy layoutSpy(&page, &DocumentPage::previewLayoutChanged);
+
+        QVERIFY(!page.isPreviewVisible());
+        QVERIFY(!page.isEditorHidden());
+        QCOMPARE(page.viewMode(), MarkdownDocumentPage::SourceOnly);
+
+        QVERIFY(page.togglePreview(&previewer));
+        QCOMPARE(page.viewMode(), MarkdownDocumentPage::Split);
+        QVERIFY(page.isPreviewVisible());
+        QVERIFY(!page.isEditorHidden());
+        QCOMPARE(page.focusProxy(), editor);
+        QCOMPARE(layoutSpy.count(), 1);
+
+        page.considerCollapsingSource(40, 800);
+        QCOMPARE(page.viewMode(), MarkdownDocumentPage::PreviewOnly);
+        QVERIFY(page.isPreviewVisible());
+        QVERIFY(page.isEditorHidden());
+        QVERIFY(page.focusProxy() != nullptr);
+        QVERIFY(page.focusProxy() != editor);
+        QCOMPARE(layoutSpy.count(), 2);
+
+        page.considerCollapsingSource(40, 800);
+        QCOMPARE(layoutSpy.count(), 2);
+
+        page.considerCollapsingSource(200, 800);
+        QCOMPARE(page.viewMode(), MarkdownDocumentPage::PreviewOnly);
+
+        QVERIFY(!page.togglePreview(&previewer));
+        QCOMPARE(page.viewMode(), MarkdownDocumentPage::SourceOnly);
+        QVERIFY(!page.isPreviewVisible());
+        QVERIFY(!page.isEditorHidden());
+        QCOMPARE(page.focusProxy(), editor);
+        QCOMPARE(layoutSpy.count(), 3);
+
+        QVERIFY(page.togglePreview(&previewer));
+        QCOMPARE(page.viewMode(), MarkdownDocumentPage::Split);
+        QVERIFY(page.isPreviewVisible());
+        QVERIFY(!page.isEditorHidden());
+        QCOMPARE(layoutSpy.count(), 4);
+
+        page.considerCollapsingSource(40, 800);
+        QCOMPARE(page.viewMode(), MarkdownDocumentPage::PreviewOnly);
+        page.hidePreview();
+        QCOMPARE(page.viewMode(), MarkdownDocumentPage::SourceOnly);
+        QCOMPARE(page.focusProxy(), editor);
+        QCOMPARE(layoutSpy.count(), 5);
+    }
+
+    void markdownPreviewDoesNotCollapseUntilSourceIsNarrow()
+    {
+        auto *editor = new CustomEditor;
+        MarkdownDocumentPage page(editor);
+        MarkdownPreviewer previewer;
+        page.setInitialViewMode(MarkdownDocumentPage::Split, &previewer);
+        QCOMPARE(page.viewMode(), MarkdownDocumentPage::Split);
+
+        page.considerCollapsingSource(200, 800);
+        QCOMPARE(page.viewMode(), MarkdownDocumentPage::Split);
+        page.considerCollapsingSource(40, 200);
+        QCOMPARE(page.viewMode(), MarkdownDocumentPage::Split);
+    }
+
+    void opensMarkdownUsingRememberedPreviewOnlyLayout()
+    {
+        AppPreferences &prefs = AppPreferences::instance();
+        const auto previousMode = prefs.markdownPreviewOpenMode();
+        const bool previousVisible = prefs.markdownLastPreviewVisible();
+        const bool previousOnly = prefs.markdownLastPreviewOnly();
+        const auto restorePreviewPrefs = qScopeGuard([&prefs, previousMode, previousVisible, previousOnly]() {
+            prefs.setMarkdownPreviewOpenMode(previousMode);
+            prefs.setMarkdownLastPreviewVisible(previousVisible);
+            prefs.setMarkdownLastPreviewOnly(previousOnly);
+        });
+        prefs.setMarkdownPreviewOpenMode(AppPreferences::MarkdownPreviewOpenMode::RememberLast);
+        prefs.setMarkdownLastPreviewVisible(true);
+        prefs.setMarkdownLastPreviewOnly(true);
+
+        QTemporaryDir tempDir;
+        QVERIFY(tempDir.isValid());
+        const QString path = tempDir.filePath(QStringLiteral("note.md"));
+        QFile file(path);
+        QVERIFY(file.open(QIODevice::WriteOnly));
+        QCOMPARE(file.write("# hi\n"), qint64(5));
+        file.close();
+
+        EditorPane pane;
+        DocumentController controller(&pane, false);
+        MarkdownPreviewer previewer;
+        controller.setMarkdownPreviewer(&previewer);
+        QSignalSpy opened(&controller, &DocumentController::fileOpened);
+        controller.openFile(path);
+        QTRY_COMPARE_WITH_TIMEOUT(opened.count(), 1, 3000);
+
+        auto *page = qobject_cast<MarkdownDocumentPage *>(pane.currentPage());
+        QVERIFY(page);
+        QCOMPARE(page->viewMode(), MarkdownDocumentPage::PreviewOnly);
+        QVERIFY(page->isEditorHidden());
+    }
+
+    void savingMarkdownAsAnotherMarkdownKeepsPreviewOnly()
+    {
+        AppPreferences &prefs = AppPreferences::instance();
+        const auto previousMode = prefs.markdownPreviewOpenMode();
+        const bool previousVisible = prefs.markdownLastPreviewVisible();
+        const bool previousOnly = prefs.markdownLastPreviewOnly();
+        const auto restorePreviewPrefs = qScopeGuard([&prefs, previousMode, previousVisible, previousOnly]() {
+            prefs.setMarkdownPreviewOpenMode(previousMode);
+            prefs.setMarkdownLastPreviewVisible(previousVisible);
+            prefs.setMarkdownLastPreviewOnly(previousOnly);
+        });
+        prefs.setMarkdownPreviewOpenMode(AppPreferences::MarkdownPreviewOpenMode::RememberLast);
+        prefs.setMarkdownLastPreviewVisible(true);
+        prefs.setMarkdownLastPreviewOnly(true);
+
+        QTemporaryDir tempDir;
+        QVERIFY(tempDir.isValid());
+        const QString path = tempDir.filePath(QStringLiteral("note.md"));
+        QFile file(path);
+        QVERIFY(file.open(QIODevice::WriteOnly));
+        QCOMPARE(file.write("# hi\n"), qint64(5));
+        file.close();
+
+        EditorPane pane;
+        DocumentController controller(&pane, false);
+        MarkdownPreviewer previewer;
+        controller.setMarkdownPreviewer(&previewer);
+        QSignalSpy opened(&controller, &DocumentController::fileOpened);
+        controller.openFile(path);
+        QTRY_COMPARE_WITH_TIMEOUT(opened.count(), 1, 3000);
+
+        auto *page = qobject_cast<MarkdownDocumentPage *>(pane.currentPage());
+        QVERIFY(page);
+        QCOMPARE(page->viewMode(), MarkdownDocumentPage::PreviewOnly);
+
+        const QString renamed = tempDir.filePath(QStringLiteral("renamed.md"));
+        QVERIFY(controller.saveFile(controller.currentEditor(), renamed));
+        QCOMPARE(qobject_cast<MarkdownDocumentPage *>(pane.currentPage())->viewMode(),
+                 MarkdownDocumentPage::PreviewOnly);
+        QVERIFY(pane.currentPage()->isEditorHidden());
+    }
+
+    void opensMarkdownWithoutPreviewWhenPreferenceIsAlwaysOff()
+    {
+        AppPreferences &prefs = AppPreferences::instance();
+        const auto previousMode = prefs.markdownPreviewOpenMode();
+        const bool previousVisible = prefs.markdownLastPreviewVisible();
+        const bool previousOnly = prefs.markdownLastPreviewOnly();
+        const auto restorePreviewPrefs = qScopeGuard([&prefs, previousMode, previousVisible, previousOnly]() {
+            prefs.setMarkdownPreviewOpenMode(previousMode);
+            prefs.setMarkdownLastPreviewVisible(previousVisible);
+            prefs.setMarkdownLastPreviewOnly(previousOnly);
+        });
+        prefs.setMarkdownPreviewOpenMode(AppPreferences::MarkdownPreviewOpenMode::AlwaysOff);
+        prefs.setMarkdownLastPreviewVisible(true);
+        prefs.setMarkdownLastPreviewOnly(true);
+
+        QTemporaryDir tempDir;
+        QVERIFY(tempDir.isValid());
+        const QString path = tempDir.filePath(QStringLiteral("note.md"));
+        QFile file(path);
+        QVERIFY(file.open(QIODevice::WriteOnly));
+        QCOMPARE(file.write("# hi\n"), qint64(5));
+        file.close();
+
+        EditorPane pane;
+        DocumentController controller(&pane, false);
+        MarkdownPreviewer previewer;
+        controller.setMarkdownPreviewer(&previewer);
+        QSignalSpy opened(&controller, &DocumentController::fileOpened);
+        controller.openFile(path);
+        QTRY_COMPARE_WITH_TIMEOUT(opened.count(), 1, 3000);
+
+        auto *page = qobject_cast<MarkdownDocumentPage *>(pane.currentPage());
+        QVERIFY(page);
+        QCOMPARE(page->viewMode(), MarkdownDocumentPage::SourceOnly);
+        QVERIFY(!page->isPreviewVisible());
     }
 
     void rendersSemanticTokensAtUtf16PositionsAndRejectsStaleResults()

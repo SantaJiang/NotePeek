@@ -52,6 +52,65 @@ private slots:
         QVERIFY(!preferences.revealCurrentFileInTree());
         QVERIFY(preferences.semanticHighlightingEnabled());
         QVERIFY(preferences.smartIndentationEnabled());
+        QCOMPARE(preferences.markdownPreviewOpenMode(),
+                 AppPreferences::MarkdownPreviewOpenMode::RememberLast);
+        QVERIFY(!preferences.markdownLastPreviewVisible());
+        QVERIFY(!preferences.markdownLastPreviewOnly());
+        QVERIFY(!preferences.shouldOpenMarkdownPreview());
+        QVERIFY(!preferences.shouldOpenMarkdownPreviewOnly());
+    }
+
+    void markdownPreviewOpenModeMigratesLegacyCheckboxAndRemembersLayout()
+    {
+        auto repository = std::make_unique<RecordingSettingsRepository>();
+        repository->loadedValues.insert(QStringLiteral("markdownDefaultPreview"), true);
+        AppPreferences preferences(std::move(repository));
+
+        preferences.load();
+
+        QCOMPARE(preferences.markdownPreviewOpenMode(),
+                 AppPreferences::MarkdownPreviewOpenMode::AlwaysOn);
+        QVERIFY(preferences.markdownLastPreviewVisible());
+        QVERIFY(preferences.shouldOpenMarkdownPreview());
+        QVERIFY(!preferences.shouldOpenMarkdownPreviewOnly());
+
+        preferences.rememberMarkdownPreviewState(true, true);
+        QVERIFY(preferences.shouldOpenMarkdownPreviewOnly());
+
+        preferences.setMarkdownPreviewOpenMode(AppPreferences::MarkdownPreviewOpenMode::RememberLast);
+        preferences.rememberMarkdownPreviewState(false, true);
+        QVERIFY(!preferences.shouldOpenMarkdownPreview());
+        QVERIFY(!preferences.shouldOpenMarkdownPreviewOnly());
+
+        preferences.rememberMarkdownPreviewState(true, false);
+        QVERIFY(preferences.shouldOpenMarkdownPreview());
+        QVERIFY(!preferences.shouldOpenMarkdownPreviewOnly());
+    }
+
+    void markdownPreviewOpenModePersistsCanonicalValuesAndDropsLegacyKey()
+    {
+        auto repository = std::make_unique<RecordingSettingsRepository>();
+        RecordingSettingsRepository *recording = repository.get();
+        AppPreferences preferences(std::move(repository));
+
+        preferences.setMarkdownPreviewOpenMode(AppPreferences::MarkdownPreviewOpenMode::AlwaysOff);
+        preferences.rememberMarkdownPreviewState(true, true);
+        QCOMPARE(recording->savedValues.value(QStringLiteral("markdownPreviewOpenMode")).toString(),
+                 QStringLiteral("off"));
+        QCOMPARE(recording->savedValues.value(QStringLiteral("markdownLastPreviewVisible")).toBool(),
+                 true);
+        QCOMPARE(recording->savedValues.value(QStringLiteral("markdownLastPreviewOnly")).toBool(),
+                 true);
+        QVERIFY(recording->removedOnSave.contains(QStringLiteral("markdownDefaultPreview")));
+
+        auto loadedRepository = std::make_unique<RecordingSettingsRepository>();
+        loadedRepository->loadedValues = recording->savedValues;
+        AppPreferences loaded(std::move(loadedRepository));
+        loaded.load();
+        QCOMPARE(loaded.markdownPreviewOpenMode(),
+                 AppPreferences::MarkdownPreviewOpenMode::AlwaysOff);
+        QVERIFY(!loaded.shouldOpenMarkdownPreview());
+        QVERIFY(!loaded.shouldOpenMarkdownPreviewOnly());
     }
 
     void savesCanonicalValuesAndRemovesLegacyThemeKeys()

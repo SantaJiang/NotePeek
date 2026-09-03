@@ -108,6 +108,7 @@ signals:
     void modificationChanged(bool modified);
     void copyAvailable(bool available);
     void filesDropped(const QList<QUrl> &urls);
+    void previewLayoutChanged();
 
 private slots:
     void onCurrentPageChanged(int index);

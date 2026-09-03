@@ -366,7 +366,7 @@ PreferencesDialog::PreferencesDialog(QWidget *parent)
     , m_revealCurrentFileInTree(
           new QCheckBox(tr("Reveal current file in file tree"), this))
     , m_gitIntegrationEnabled(new QCheckBox(tr("Enable Git integration"), this))
-    , m_markdownSidePreview(new QCheckBox(tr("Open with side preview"), this))
+    , m_markdownPreviewOpenMode(new QComboBox(this))
     , m_untitledModeCombo(new QComboBox(this))
     , m_overtypeMode(new QComboBox(this))
     , m_codeFolding(new QCheckBox(tr("Show folding controls"), this))
@@ -452,6 +452,19 @@ PreferencesDialog::PreferencesDialog(QWidget *parent)
     m_untitledModeCombo->addItem(tr("Code (line numbers, no wrapping)"), true);
     m_untitledModeCombo->setToolTip(tr("Applies to untitled documents that have not been saved yet."));
 
+    m_markdownPreviewOpenMode->setObjectName(QStringLiteral("markdownPreviewOpenModeCombo"));
+    m_markdownPreviewOpenMode->addItem(
+        tr("Remember last choice"),
+        int(AppPreferences::MarkdownPreviewOpenMode::RememberLast));
+    m_markdownPreviewOpenMode->addItem(
+        tr("Always on"),
+        int(AppPreferences::MarkdownPreviewOpenMode::AlwaysOn));
+    m_markdownPreviewOpenMode->addItem(
+        tr("Always off"),
+        int(AppPreferences::MarkdownPreviewOpenMode::AlwaysOff));
+    m_markdownPreviewOpenMode->setToolTip(
+        tr("When opening a Markdown file: show the preview, hide it, or reuse the last layout."));
+
     // Overtype mode selection (the keyboard INS/OVR toggle).  Insert is the
     // normal typing behaviour; Overwrite replaces the character ahead of the
     // caret instead.
@@ -468,7 +481,7 @@ PreferencesDialog::PreferencesDialog(QWidget *parent)
         makeSettingsRow(tr("File tree"), m_revealCurrentFileInTree, generalSection));
     generalLayout->addLayout(makeSettingsRow(tr("New document"), m_untitledModeCombo, generalSection));
     generalLayout->addLayout(makeSettingsRow(tr("Typing"), m_overtypeMode, generalSection));
-    generalLayout->addLayout(makeSettingsRow(tr("Markdown"), m_markdownSidePreview, generalSection));
+    generalLayout->addLayout(makeSettingsRow(tr("Markdown preview"), m_markdownPreviewOpenMode, generalSection));
     generalLayout->addStretch();
 
     auto *codeSection = makeSection(tr("Code Editing"), this);
@@ -602,6 +615,20 @@ void PreferencesDialog::filterSections(const QString &query)
                 page->findChildren<QAbstractButton *>();
             for (const QAbstractButton *control : controls)
                 searchableText += QLatin1Char(' ') + control->text();
+            const QList<QComboBox *> combos = page->findChildren<QComboBox *>();
+            for (const QComboBox *combo : combos)
+            {
+                // Font and theme pickers have dozens of family/size/name
+                // entries that would make unrelated searches match Editor.
+                if (combo == m_textFontCombo || combo == m_codeFontCombo
+                    || combo == m_textFontSize || combo == m_codeFontSize
+                    || combo == m_darkSyntaxThemeCombo || combo == m_lightSyntaxThemeCombo)
+                {
+                    continue;
+                }
+                for (int i = 0; i < combo->count(); ++i)
+                    searchableText += QLatin1Char(' ') + combo->itemText(i);
+            }
         }
         const bool matches = needle.isEmpty()
             || searchableText.contains(needle, Qt::CaseInsensitive);
@@ -683,7 +710,6 @@ void PreferencesDialog::connectLiveUpdates()
         m_showStatusBar,
         m_revealCurrentFileInTree,
         m_gitIntegrationEnabled,
-        m_markdownSidePreview,
         m_codeFolding,
         m_bracketAssistance,
         m_smartIndentation,
@@ -699,6 +725,7 @@ void PreferencesDialog::connectLiveUpdates()
     const QList<QComboBox *> combos = {
         m_untitledModeCombo,
         m_overtypeMode,
+        m_markdownPreviewOpenMode,
         m_languageCombo,
     };
     for (QComboBox *combo : combos)
@@ -794,7 +821,10 @@ void PreferencesDialog::loadFromPreferences()
     m_showStatusBar->setChecked(prefs.showStatusBar());
     m_revealCurrentFileInTree->setChecked(prefs.revealCurrentFileInTree());
     m_gitIntegrationEnabled->setChecked(prefs.gitIntegrationEnabled());
-    m_markdownSidePreview->setChecked(prefs.markdownDefaultPreview());
+    const int markdownPreviewIndex =
+        m_markdownPreviewOpenMode->findData(int(prefs.markdownPreviewOpenMode()));
+    m_markdownPreviewOpenMode->setCurrentIndex(
+        markdownPreviewIndex >= 0 ? markdownPreviewIndex : 0);
     const int untitledModeIndex = m_untitledModeCombo->findData(prefs.untitledUsesCodeMode());
     m_untitledModeCombo->setCurrentIndex(untitledModeIndex >= 0 ? untitledModeIndex : 0);
     const int overtypeIndex = m_overtypeMode->findData(prefs.overwriteMode());
@@ -821,7 +851,9 @@ void PreferencesDialog::commit()
     prefs.setShowStatusBar(m_showStatusBar->isChecked());
     prefs.setRevealCurrentFileInTree(m_revealCurrentFileInTree->isChecked());
     prefs.setGitIntegrationEnabled(m_gitIntegrationEnabled->isChecked());
-    prefs.setMarkdownDefaultPreview(m_markdownSidePreview->isChecked());
+    prefs.setMarkdownPreviewOpenMode(
+        static_cast<AppPreferences::MarkdownPreviewOpenMode>(
+            m_markdownPreviewOpenMode->currentData().toInt()));
     prefs.setUntitledUsesCodeMode(m_untitledModeCombo->currentData().toBool());
     prefs.setOverwriteMode(m_overtypeMode->currentData().toBool());
     prefs.setCodeFoldingEnabled(m_codeFolding->isChecked());

@@ -83,7 +83,9 @@ AppPreferences::AppPreferences(std::unique_ptr<SettingsRepository> repository)
     , m_showStatusBar(true)
     , m_revealCurrentFileInTree(false)
     , m_gitIntegrationEnabled(true)
-    , m_markdownDefaultPreview(false)
+    , m_markdownPreviewOpenMode(MarkdownPreviewOpenMode::RememberLast)
+    , m_markdownLastPreviewVisible(false)
+    , m_markdownLastPreviewOnly(false)
     , m_untitledUsesCodeMode(false)
     , m_overwriteMode(false)
     , m_codeFoldingEnabled(false)
@@ -251,8 +253,32 @@ void AppPreferences::load()
         settings.value(QStringLiteral("revealCurrentFileInTree"), false).toBool();
     m_gitIntegrationEnabled =
         settings.value(QStringLiteral("gitIntegrationEnabled"), true).toBool();
-    m_markdownDefaultPreview =
-        settings.value(QStringLiteral("markdownDefaultPreview"), false).toBool();
+    bool lastVisibleDefault = false;
+    if (settings.contains(QStringLiteral("markdownPreviewOpenMode")))
+    {
+        const QString mode =
+            settings.value(QStringLiteral("markdownPreviewOpenMode")).toString();
+        if (mode == QLatin1String("on"))
+            m_markdownPreviewOpenMode = MarkdownPreviewOpenMode::AlwaysOn;
+        else if (mode == QLatin1String("off"))
+            m_markdownPreviewOpenMode = MarkdownPreviewOpenMode::AlwaysOff;
+        else
+            m_markdownPreviewOpenMode = MarkdownPreviewOpenMode::RememberLast;
+    }
+    else if (settings.value(QStringLiteral("markdownDefaultPreview"), false).toBool())
+    {
+        // The old checkbox meant "always open with the side preview".
+        m_markdownPreviewOpenMode = MarkdownPreviewOpenMode::AlwaysOn;
+        lastVisibleDefault = true;
+    }
+    else
+    {
+        m_markdownPreviewOpenMode = MarkdownPreviewOpenMode::RememberLast;
+    }
+    m_markdownLastPreviewVisible =
+        settings.value(QStringLiteral("markdownLastPreviewVisible"), lastVisibleDefault).toBool();
+    m_markdownLastPreviewOnly =
+        settings.value(QStringLiteral("markdownLastPreviewOnly"), false).toBool();
     // Stored as a readable mode name; anything other than "code" (including a
     // missing value) keeps the plain-text default.
     m_untitledUsesCodeMode =
@@ -288,7 +314,14 @@ void AppPreferences::save() const
     settings.insert(QStringLiteral("showStatusBar"), m_showStatusBar);
     settings.insert(QStringLiteral("revealCurrentFileInTree"), m_revealCurrentFileInTree);
     settings.insert(QStringLiteral("gitIntegrationEnabled"), m_gitIntegrationEnabled);
-    settings.insert(QStringLiteral("markdownDefaultPreview"), m_markdownDefaultPreview);
+    QString previewOpenMode = QStringLiteral("remember");
+    if (m_markdownPreviewOpenMode == MarkdownPreviewOpenMode::AlwaysOn)
+        previewOpenMode = QStringLiteral("on");
+    else if (m_markdownPreviewOpenMode == MarkdownPreviewOpenMode::AlwaysOff)
+        previewOpenMode = QStringLiteral("off");
+    settings.insert(QStringLiteral("markdownPreviewOpenMode"), previewOpenMode);
+    settings.insert(QStringLiteral("markdownLastPreviewVisible"), m_markdownLastPreviewVisible);
+    settings.insert(QStringLiteral("markdownLastPreviewOnly"), m_markdownLastPreviewOnly);
     settings.insert(QStringLiteral("untitledDocumentMode"),
                     m_untitledUsesCodeMode ? QStringLiteral("code") : QStringLiteral("text"));
     settings.insert(QStringLiteral("overwriteMode"), m_overwriteMode);
@@ -302,7 +335,34 @@ void AppPreferences::save() const
     m_repository->save(settings,
                        {QStringLiteral("syntaxTheme"),
                         QStringLiteral("fixedSyntaxTheme"),
-                        QStringLiteral("syntaxThemeFollowsSystem")});
+                        QStringLiteral("syntaxThemeFollowsSystem"),
+                        QStringLiteral("markdownDefaultPreview")});
+}
+
+void AppPreferences::rememberMarkdownPreviewState(bool visible, bool previewOnly)
+{
+    m_markdownLastPreviewVisible = visible;
+    m_markdownLastPreviewOnly = visible && previewOnly;
+    save();
+}
+
+bool AppPreferences::shouldOpenMarkdownPreview() const
+{
+    switch (m_markdownPreviewOpenMode)
+    {
+    case MarkdownPreviewOpenMode::AlwaysOn:
+        return true;
+    case MarkdownPreviewOpenMode::AlwaysOff:
+        return false;
+    case MarkdownPreviewOpenMode::RememberLast:
+        break;
+    }
+    return m_markdownLastPreviewVisible;
+}
+
+bool AppPreferences::shouldOpenMarkdownPreviewOnly() const
+{
+    return shouldOpenMarkdownPreview() && m_markdownLastPreviewOnly;
 }
 
 QFont AppPreferences::textFont() const

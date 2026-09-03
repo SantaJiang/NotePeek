@@ -1367,6 +1367,10 @@ private slots:
         QVERIFY(statusBarCheckBox);
         QVERIFY(gitIntegrationCheckBox);
         QVERIFY(revealCurrentFileCheckBox);
+        auto *markdownPreviewCombo = dialog.findChild<QComboBox *>(
+            QStringLiteral("markdownPreviewOpenModeCombo"));
+        QVERIFY(markdownPreviewCombo);
+        QCOMPARE(markdownPreviewCombo->count(), 3);
         QSignalSpy appliedSpy(&dialog, &PreferencesDialog::applied);
 
         const bool previousGitIntegration = preferences.gitIntegrationEnabled();
@@ -1408,6 +1412,15 @@ private slots:
         QVERIFY(sections->item(2)->isHidden());
         QVERIFY(sections->item(3)->isHidden());
         QCOMPARE(sections->currentItem(), sections->item(1));
+
+        search->setText(QStringLiteral("Remember last"));
+        QVERIFY(sections->item(0)->isHidden());
+        QVERIFY(!sections->item(1)->isHidden());
+        QVERIFY(sections->item(2)->isHidden());
+        QVERIFY(sections->item(3)->isHidden());
+
+        search->setText(QStringLiteral("288"));
+        QVERIFY(dialog.findChild<QStackedWidget *>()->isHidden());
 
         search->setText(QStringLiteral("Brackets"));
         QVERIFY(sections->item(0)->isHidden());

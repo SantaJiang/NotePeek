@@ -59,7 +59,7 @@ private:
     QCheckBox *m_showStatusBar;
     QCheckBox *m_revealCurrentFileInTree;
     QCheckBox *m_gitIntegrationEnabled;
-    QCheckBox *m_markdownSidePreview;
+    QComboBox *m_markdownPreviewOpenMode;
     QComboBox *m_untitledModeCombo;
     QComboBox *m_overtypeMode;
     QCheckBox *m_codeFolding;

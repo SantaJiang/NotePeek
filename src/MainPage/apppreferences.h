@@ -69,10 +69,30 @@ public:
     bool gitIntegrationEnabled() const { return m_gitIntegrationEnabled; }
     void setGitIntegrationEnabled(bool enabled) { m_gitIntegrationEnabled = enabled; }
 
-    // When true, freshly opened Markdown files start in preview mode instead
-    // of source mode.
-    bool markdownDefaultPreview() const { return m_markdownDefaultPreview; }
-    void setMarkdownDefaultPreview(bool preview) { m_markdownDefaultPreview = preview; }
+    // How a newly opened Markdown file chooses its preview layout.
+    // RememberLast (the default) reuses the last user-chosen layout; AlwaysOn
+    // and AlwaysOff ignore that history for visibility, though AlwaysOn still
+    // honours a remembered preview-only collapse.
+    enum class MarkdownPreviewOpenMode
+    {
+        RememberLast,
+        AlwaysOn,
+        AlwaysOff
+    };
+
+    MarkdownPreviewOpenMode markdownPreviewOpenMode() const { return m_markdownPreviewOpenMode; }
+    void setMarkdownPreviewOpenMode(MarkdownPreviewOpenMode mode) { m_markdownPreviewOpenMode = mode; }
+
+    bool markdownLastPreviewVisible() const { return m_markdownLastPreviewVisible; }
+    bool markdownLastPreviewOnly() const { return m_markdownLastPreviewOnly; }
+    void setMarkdownLastPreviewVisible(bool visible) { m_markdownLastPreviewVisible = visible; }
+    void setMarkdownLastPreviewOnly(bool previewOnly) { m_markdownLastPreviewOnly = previewOnly; }
+    // Persist the layout the user just chose (toolbar toggle or splitter
+    // collapse) so RememberLast / AlwaysOn can restore it on the next open.
+    void rememberMarkdownPreviewState(bool visible, bool previewOnly);
+
+    bool shouldOpenMarkdownPreview() const;
+    bool shouldOpenMarkdownPreviewOnly() const;
 
     // Presentation used by the "untitled" document that has no file path yet.
     // Text mode wraps long lines and hides the line-number margin (the plain
@@ -129,7 +149,9 @@ private:
     bool m_showStatusBar;
     bool m_revealCurrentFileInTree;
     bool m_gitIntegrationEnabled;
-    bool m_markdownDefaultPreview;
+    MarkdownPreviewOpenMode m_markdownPreviewOpenMode;
+    bool m_markdownLastPreviewVisible;
+    bool m_markdownLastPreviewOnly;
     bool m_untitledUsesCodeMode;
     bool m_overwriteMode;
     bool m_codeFoldingEnabled;

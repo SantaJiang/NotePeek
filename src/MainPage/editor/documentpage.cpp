@@ -11,6 +11,7 @@
 #include <QEvent>
 #include <QGuiApplication>
 #include <QPainter>
+#include <QScopedValueRollback>
 #include <QScrollBar>
 #include <QSplitter>
 #include <QTimer>
@@ -126,6 +127,7 @@ MarkdownDocumentPage::MarkdownDocumentPage(CustomEditor *editor, QWidget *parent
     , m_currentSourceLine(1)
     , m_pendingScrollMapSourceLine(1)
     , m_syncingScroll(false)
+    , m_applyingViewMode(false)
     , m_latestPreviewRequestId(0)
     , m_mode(SourceOnly)
 {
@@ -134,8 +136,13 @@ MarkdownDocumentPage::MarkdownDocumentPage(CustomEditor *editor, QWidget *parent
     layout->setSpacing(0);
     layout->addWidget(m_splitter);
 
+    editor->setMinimumWidth(0);
     m_splitter->addWidget(editor);
+    setFocusProxy(editor);
+    // Keep the preview from collapsing; the source pane is allowed to shrink
+    // so the user can drag it past the threshold that snaps to PreviewOnly.
     m_splitter->setChildrenCollapsible(false);
+    m_splitter->setCollapsible(0, true);
 
     m_updateTimer->setSingleShot(true);
     m_updateTimer->setInterval(PerformanceConstants::MarkdownPreviewDelayMs);
@@ -168,16 +175,23 @@ MarkdownDocumentPage::MarkdownDocumentPage(CustomEditor *editor, QWidget *parent
     connect(editor->verticalScrollBar(), &QScrollBar::valueChanged,
             this, &MarkdownDocumentPage::syncPreviewScrollFromEditor);
     connect(m_splitter, &QSplitter::splitterMoved,
-            this, &MarkdownDocumentPage::schedulePreviewScrollMapRebuild);
+            this, &MarkdownDocumentPage::onSplitterMoved);
 }
 
 bool MarkdownDocumentPage::isPreviewVisible() const
 {
-    return m_mode == Split;
+    return m_mode != SourceOnly;
+}
+
+bool MarkdownDocumentPage::isEditorHidden() const
+{
+    return m_mode == PreviewOnly;
 }
 
 CustomEditor *MarkdownDocumentPage::takeEditor()
 {
+    if (focusProxy() == m_editor)
+        setFocusProxy(nullptr);
     if (m_editor)
     {
         m_editor->setParent(nullptr);
@@ -189,23 +203,52 @@ CustomEditor *MarkdownDocumentPage::takeEditor()
 
 bool MarkdownDocumentPage::togglePreview(MarkdownPreviewer *previewer)
 {
-    // Flip the side preview on or off beside the source editor.
-    setViewMode(m_mode == Split ? SourceOnly : Split, previewer);
+    // Preview-only collapses back to source, and turning preview on from
+    // source always restores the side-by-side split rather than preview-only.
+    const ViewMode next = (m_mode == SourceOnly) ? Split : SourceOnly;
+    setViewMode(next, previewer, true, true);
     return isPreviewVisible();
 }
 
 void MarkdownDocumentPage::hidePreview()
 {
-    setViewMode(SourceOnly, nullptr);
+    // Programmatic resets (file-type refresh) must not steal keyboard focus
+    // from whatever the user is currently editing.
+    setViewMode(SourceOnly, nullptr, false, false);
 }
 
-void MarkdownDocumentPage::setInitialViewMode(bool preview, MarkdownPreviewer *previewer, bool giveFocus)
+void MarkdownDocumentPage::setInitialViewMode(ViewMode mode, MarkdownPreviewer *previewer, bool giveFocus)
 {
-    setViewMode(preview ? Split : SourceOnly, previewer, giveFocus);
+    setViewMode(mode, previewer, giveFocus, false);
 }
 
-void MarkdownDocumentPage::setViewMode(ViewMode mode, MarkdownPreviewer *previewer, bool giveFocus)
+void MarkdownDocumentPage::considerCollapsingSource(int sourceWidth, int totalWidth)
 {
+    if (m_applyingViewMode || m_mode != Split)
+        return;
+
+    // Ignore tiny panes (for example a page that has not been laid out yet)
+    // so an initial 50/50 split cannot snap to preview-only.
+    constexpr int kSourceCollapseWidth = 96;
+    constexpr int kMinTotalWidthForSourceCollapse = 280;
+    if (totalWidth < kMinTotalWidthForSourceCollapse || sourceWidth > kSourceCollapseWidth)
+        return;
+
+    setViewMode(PreviewOnly, m_previewer, true, true);
+}
+
+void MarkdownDocumentPage::onSplitterMoved(int /*pos*/, int /*index*/)
+{
+    schedulePreviewScrollMapRebuild();
+    const QList<int> sizes = m_splitter->sizes();
+    if (sizes.size() == 2)
+        considerCollapsingSource(sizes.at(0), sizes.at(0) + sizes.at(1));
+}
+
+void MarkdownDocumentPage::setViewMode(ViewMode mode, MarkdownPreviewer *previewer, bool giveFocus, bool remember)
+{
+    QScopedValueRollback applying(m_applyingViewMode, true);
+
     if (mode != SourceOnly)
     {
         ensurePreview(previewer);
@@ -216,6 +259,9 @@ void MarkdownDocumentPage::setViewMode(ViewMode mode, MarkdownPreviewer *preview
             mode = SourceOnly;
         }
     }
+
+    if (mode == m_mode)
+        return;
 
     m_mode = mode;
 
@@ -234,6 +280,10 @@ void MarkdownDocumentPage::setViewMode(ViewMode mode, MarkdownPreviewer *preview
         {
             m_previewLineMarker->hide();
         }
+        if (m_editor)
+        {
+            setFocusProxy(m_editor);
+        }
         break;
     case Split:
         if (m_editor)
@@ -246,21 +296,42 @@ void MarkdownDocumentPage::setViewMode(ViewMode mode, MarkdownPreviewer *preview
             const int width = qMax(1, m_splitter->width());
             m_splitter->setSizes({width / 2, width / 2});
         }
+        if (m_editor)
+        {
+            setFocusProxy(m_editor);
+        }
+        break;
+    case PreviewOnly:
+        m_preview->show();
+        setFocusProxy(m_preview);
+        // Focus the preview before hiding the editor so Qt does not pick a
+        // random widget when the focused source disappears.
+        if (giveFocus || (m_editor && m_editor->hasFocus()))
+        {
+            m_preview->setFocus();
+        }
+        if (m_editor)
+        {
+            m_editor->hide();
+        }
         break;
     }
 
-    if (mode == Split)
+    if (mode != SourceOnly)
     {
         updatePreview();
     }
 
-    // The source editor is always visible now, so keep keyboard focus there.
-    if (m_editor && giveFocus)
+    if (mode != PreviewOnly && m_editor && giveFocus)
     {
         m_editor->setFocus();
     }
 
     emit copyAvailableChanged(hasCopySelection());
+    if (remember)
+    {
+        emit previewLayoutChanged();
+    }
 }
 
 void MarkdownDocumentPage::refreshPreview()
@@ -358,6 +429,8 @@ void MarkdownDocumentPage::ensurePreview(MarkdownPreviewer *previewer)
             Qt::UniqueConnection);
     m_preview->installEventFilter(this);
     m_splitter->addWidget(m_preview);
+    m_splitter->setCollapsible(0, true);
+    m_splitter->setCollapsible(1, false);
     m_preview->hide();
 
     m_previewLineMarker = new PreviewLineMarker(m_preview->viewport());

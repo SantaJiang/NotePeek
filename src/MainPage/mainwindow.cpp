@@ -163,6 +163,14 @@ MainWindow::MainWindow(QWidget *parent,
         // Every pane needs the previewer so the "open Markdown in preview"
         // preference can render on open.
         controller->setMarkdownPreviewer(m_markdownTools->previewer());
+        connect(controller, &DocumentController::previewLayoutChanged,
+                this, [this, controller]() {
+                    if (controller != activeController())
+                        return;
+                    CustomEditor *editor = controller->currentEditor();
+                    updateEditActions(editor && editor->hasSelectedText());
+                    updateToolActions();
+                });
         // Each pane's side-preview toolbar button toggles the preview for its
         // own pane, mirroring the Tools ▸ Markdown ▸ Side Preview action.
         connect(controller->pane(), &EditorPane::sidePreviewToggleRequested,

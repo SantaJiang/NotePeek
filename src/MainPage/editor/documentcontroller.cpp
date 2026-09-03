@@ -509,11 +509,20 @@ void DocumentController::finalizeLoadedEditor(CustomEditor *editor,
     editor->setUpdatesEnabled(true);
     editor->setReadOnly(false);
 
-    if (!largeFile && AppPreferences::instance().markdownDefaultPreview() && m_markdownPreviewer)
+    if (!largeFile && m_markdownPreviewer)
     {
         if (auto *markdownPage = qobject_cast<MarkdownDocumentPage *>(page))
         {
-            markdownPage->setInitialViewMode(true, m_markdownPreviewer, activate);
+            const AppPreferences &prefs = AppPreferences::instance();
+            if (prefs.shouldOpenMarkdownPreview())
+            {
+                markdownPage->setInitialViewMode(
+                    prefs.shouldOpenMarkdownPreviewOnly()
+                        ? MarkdownDocumentPage::PreviewOnly
+                        : MarkdownDocumentPage::Split,
+                    m_markdownPreviewer,
+                    activate);
+            }
         }
     }
 
@@ -1499,6 +1508,13 @@ DocumentPage *DocumentController::createPage(CustomEditor *editor, const QString
                              ? static_cast<DocumentPage *>(new MarkdownDocumentPage(editor, m_pane))
                              : static_cast<DocumentPage *>(new PlainDocumentPage(editor, m_pane));
     connect(page, &DocumentPage::copyAvailableChanged, this, &DocumentController::copyAvailable);
+    connect(page, &DocumentPage::previewLayoutChanged, this, [this, page = QPointer<DocumentPage>(page)]() {
+        if (!page)
+            return;
+        AppPreferences::instance().rememberMarkdownPreviewState(
+            page->isPreviewVisible(), page->isEditorHidden());
+        emit previewLayoutChanged();
+    });
     return page;
 }
 
@@ -1514,7 +1530,11 @@ void DocumentController::refreshPageTypeForFile(CustomEditor *editor, const QStr
     const bool hasMarkdownPage = qobject_cast<MarkdownDocumentPage *>(oldPage) != nullptr;
     if (needsMarkdownPage == hasMarkdownPage)
     {
-        oldPage->hidePreview();
+        // Keep the current Markdown layout (including preview-only).  A path
+        // change can invalidate relative links, so rebuild the preview in
+        // place instead of forcing source-only.
+        if (needsMarkdownPage)
+            oldPage->refreshPreview();
         return;
     }
 
