@@ -145,9 +145,11 @@ void QsciDocument::display(QsciScintillaBase *qsb, const QsciDocument *from)
         // requested options. SCI_CREATEDOCUMENT returns a document carrying one
         // explicit reference and SCI_SETDOCPOINTER adds another, so the
         // explicit reference is released again to keep the count balanced.
-        void *created = reinterpret_cast<void *>(
-            qsb->SendScintilla(QsciScintillaBase::SCI_CREATEDOCUMENT, 0UL,
-                    pdoc->documentOptions));
+        // SendScintillaPtrResult is required: SendScintilla() returns long and
+        // would truncate the document pointer on Win64 (LLP64).
+        void *created = qsb->SendScintillaPtrResult(
+                QsciScintillaBase::SCI_CREATEDOCUMENT, 0UL,
+                static_cast<long>(pdoc->documentOptions));
         qsb->SendScintilla(QsciScintillaBase::SCI_SETDOCPOINTER, 0UL, created);
         qsb->SendScintilla(QsciScintillaBase::SCI_RELEASEDOCUMENT, 0UL, created);
         ndoc = qsb->SendScintillaPtrResult(QsciScintillaBase::SCI_GETDOCPOINTER);

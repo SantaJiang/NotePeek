@@ -17,7 +17,7 @@ every job below, so treat a one-line version edit as a full-CI event, not a
 trivial safe change.
 
 **CI matrix** (`build-and-test`): Ubuntu x86_64, Ubuntu arm64, Windows, macOS
-arm64, macOS Intel — all on Qt 6.8.3.
+arm64 — all on Qt 6.8.3. macOS Intel is not in the matrix.
 
 Before declaring work done, reason about — and where possible build — the
 following. Do not limit verification to the files you touched.
@@ -33,7 +33,7 @@ following. Do not limit verification to the files you touched.
   machine does not prove it passes on CI.
 - **Performance budgets.** Some tests assert wall-clock budgets (e.g.
   "2 MB highlight < 5 s", "viewport semantic worker < 2 ms"). These are tight
-  on the slow macOS Intel runner. Flag any change that touches editor rendering
+  on the macOS arm64 runner. Flag any change that touches editor rendering
   (`src/QScintilla/scintilla/src/*`, `src/MainPage/editor/*`,
   `src/MainPage/decorators/*`) as a potential perf regression and run
   `notepeek_performance_test` locally.

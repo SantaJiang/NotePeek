@@ -3539,6 +3539,14 @@ public:
     //! Send the Scintilla message \a msg and return a pointer result.
     void *SendScintillaPtrResult(unsigned int msg) const;
 
+    //! \overload
+    //!
+    //! Use this overload for pointer-returning messages that take parameters
+    //! (for example SCI_CREATEDOCUMENT).  SendScintilla() returns long, which
+    //! truncates pointers on Win64 where long is 32-bit.
+    void *SendScintillaPtrResult(unsigned int msg, unsigned long wParam,
+            long lParam) const;
+
     //! \internal
     static int commandKey(int qt_key, int &modifiers);
 

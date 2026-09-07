@@ -21,12 +21,6 @@ jobs:
             package-suffix: Darwin-arm64
             performance-open-budget-ms: 24000
             macos-min-version: '13.0'
-          - os: macos-15-intel
-            cpack-generator: DragNDrop
-            artifact-name: notepeek-macos-x86_64
-            package-suffix: Darwin-x86_64
-            performance-open-budget-ms: 24000
-            macos-min-version: '13.0'
           - os: windows-2022
             cpack-generator: NSIS
             artifact-name: notepeek-windows

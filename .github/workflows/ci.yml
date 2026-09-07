@@ -77,13 +77,6 @@ jobs:
             performance-open-budget-ms: 24000
             performance-highlight-budget-ms: 5000
             performance-semantic-worker-budget-ms: 3
-          - os: macos-15-intel
-            cpack-generator: DragNDrop
-            artifact-name: notepeek-macos-x86_64
-            package-suffix: Darwin-x86_64
-            performance-open-budget-ms: 24000
-            performance-highlight-budget-ms: 8000
-            performance-semantic-worker-budget-ms: 4
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v6

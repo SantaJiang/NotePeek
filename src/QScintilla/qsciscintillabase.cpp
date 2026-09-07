@@ -282,8 +282,14 @@ long QsciScintillaBase::SendScintilla(unsigned int msg, unsigned long wParam,
 // API that returns a pointer result.
 void *QsciScintillaBase::SendScintillaPtrResult(unsigned int msg) const
 {
-    return reinterpret_cast<void *>(sci->WndProc(msg, static_cast<uptr_t>(0),
-            static_cast<sptr_t>(0)));
+    return SendScintillaPtrResult(msg, 0UL, 0L);
+}
+
+
+void *QsciScintillaBase::SendScintillaPtrResult(unsigned int msg,
+        unsigned long wParam, long lParam) const
+{
+    return reinterpret_cast<void *>(sci->WndProc(msg, wParam, lParam));
 }
 
 

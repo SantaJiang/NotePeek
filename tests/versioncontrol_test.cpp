@@ -5,6 +5,7 @@
 
 #include <QDir>
 #include <QFile>
+#include <QFileInfo>
 #include <QProcess>
 #include <QSignalSpy>
 #include <QTemporaryDir>
@@ -71,6 +72,13 @@ bool initializeRepository(const QString &gitExecutable, const QString &path)
     return runGit(gitExecutable, path, {QStringLiteral("init"), QStringLiteral("--quiet")}).exitCode == 0;
 }
 
+QString cleanedCanonicalPath(const QString &path)
+{
+    const QFileInfo info(path);
+    const QString canonical = info.canonicalFilePath();
+    return QDir::cleanPath(canonical.isEmpty() ? info.absoluteFilePath() : canonical);
+}
+
 } // namespace
 
 class VersionControlTest : public QObject
@@ -98,7 +106,7 @@ private slots:
             return;
         }
 
-        QCOMPARE(GitExecutable::find(git), QFileInfo(git).canonicalFilePath());
+        QCOMPARE(GitExecutable::find(git), cleanedCanonicalPath(git));
         QVERIFY(GitExecutable::find(QStringLiteral("/definitely/missing/git")).isEmpty());
     }
 
@@ -235,7 +243,7 @@ private slots:
         service.setDirectory(directory.path());
         QTRY_COMPARE_WITH_TIMEOUT(service.state(), GitRepositoryState::Ready, 5000);
         QTRY_COMPARE_WITH_TIMEOUT(snapshots.count(), 1, 5000);
-        QCOMPARE(service.repositoryRoot(), QFileInfo(directory.path()).canonicalFilePath());
+        QCOMPARE(service.repositoryRoot(), cleanedCanonicalPath(directory.path()));
     }
 
     void ignoresAmbientRepositoryDiscoveryOverrides()
@@ -260,7 +268,7 @@ private slots:
         GitRepositoryService service(git);
         service.setDirectory(repository.filePath(QStringLiteral("nested")));
         QTRY_COMPARE_WITH_TIMEOUT(service.state(), GitRepositoryState::Ready, 5000);
-        QCOMPARE(service.repositoryRoot(), QFileInfo(repository.path()).canonicalFilePath());
+        QCOMPARE(service.repositoryRoot(), cleanedCanonicalPath(repository.path()));
     }
 
     void discoversRepositoryAndRefreshesStatus()
@@ -285,7 +293,7 @@ private slots:
         QTRY_COMPARE_WITH_TIMEOUT(service.state(), GitRepositoryState::Ready, 5000);
         QTRY_COMPARE_WITH_TIMEOUT(snapshots.count(), 1, 5000);
         QVERIFY2(errors.isEmpty(), qPrintable(errors.isEmpty() ? QString() : errors.first().first().toString()));
-        QCOMPARE(service.repositoryRoot(), QFileInfo(repository.path()).canonicalFilePath());
+        QCOMPARE(service.repositoryRoot(), cleanedCanonicalPath(repository.path()));
         QCOMPARE(service.snapshot().repositoryRoot, service.repositoryRoot());
         QCOMPARE(service.snapshot().revision, quint64(1));
         QCOMPARE(service.snapshot().files.size(), 1);
