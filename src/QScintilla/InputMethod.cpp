@@ -8,6 +8,7 @@
 
 #include <qglobal.h>
 
+#include <QByteArray>
 #include <QColor>
 #include <QFont>
 #include <QInputMethodEvent>
@@ -28,6 +29,58 @@
 #define SC_INDICATOR_TARGET INDIC_IME+1
 #define SC_INDICATOR_CONVERTED INDIC_IME+2
 #define SC_INDICATOR_UNKNOWN INDIC_IME_MAX
+
+// How much document text Qt::ImTextBeforeCursor and Qt::ImTextAfterCursor
+// report.  Matches the default QWidgetTextControl uses, which is what the
+// platform plugins are written against.
+static const int ImeContextLength = 1024;
+
+
+// Number of UTF-16 code units a UTF-8 byte range decodes to.  Every lead byte
+// starts one scalar and therefore one code unit, except four-byte sequences,
+// which encode a non-BMP scalar and need a surrogate pair.  Counting avoids
+// building a QString, which matters because these queries run while an input
+// method is composing.
+static int Utf16Length(const char *bytes, int length)
+{
+    int units = 0;
+    for (int i = 0; i < length; ++i) {
+        const unsigned char c = static_cast<unsigned char>(bytes[i]);
+        if ((c & 0xC0) == 0x80)
+            continue; // continuation byte
+        units += (c & 0xF8) == 0xF0 ? 2 : 1;
+    }
+    return units;
+}
+
+// Signed count of UTF-16 code units between two Scintilla byte positions,
+// which is the unit every positional Qt::InputMethodQuery value is documented
+// to use.  Read in bounded chunks so a caret at the end of a large document
+// does not need one buffer the size of the document.
+static int Utf16LengthBetween(const QsciScintillaBase *base, int from, int to,
+        bool utf8)
+{
+    if (from == to)
+        return 0;
+
+    if (to < from)
+        return -Utf16LengthBetween(base, to, from, utf8);
+
+    if (!utf8)
+        return to - from; // one byte per character, so the units already agree
+
+    enum { ChunkSize = 64 * 1024 };
+    QByteArray chunk(ChunkSize, '\0');
+
+    int units = 0;
+    for (int start = from; start < to; ) {
+        const int end = qMin(start + ChunkSize, to);
+        base->SendScintilla(SCI_GETTEXTRANGE, start, end, chunk.data());
+        units += Utf16Length(chunk.constData(), end - start);
+        start = end;
+    }
+    return units;
+}
 
 
 static bool IsHangul(const QChar qchar)
@@ -148,6 +201,11 @@ void QsciScintillaBase::inputMethodEvent(QInputMethodEvent *event)
 
     sci->view.imeCaretBlockOverride = false;
 
+    // Whatever arrives here ends the previous composition, so its start position
+    // must stop overriding the reported caret rectangle; the preedit branch
+    // below re-arms it when a new composition begins.
+    preeditPos = -1;
+
     if (!event->commitString().isEmpty()) {
         const QString commitStr = event->commitString();
         const int commitStrLen = commitStr.length();
@@ -208,15 +266,23 @@ void QsciScintillaBase::inputMethodEvent(QInputMethodEvent *event)
         // Set candidate box position for Qt::ImCursorRectangle.
         preeditPos = sci->CurrentPosition();
         sci->EnsureCaretVisible();
-        updateMicroFocus();
     }
     sci->ShowCaretAtCurrentPosition();
+
+    // A commit or a cancelled composition moves the caret without entering the
+    // preedit branch, so refresh the input context for every event.  Otherwise
+    // the platform keeps the rectangle of the previous composition and an IME
+    // that tracks the caret through it resets its own state -- visibly as
+    // punctuation that never alternates, e.g. a Chinese quotation mark stuck on
+    // its opening form.
+    updateMicroFocus();
 }
 
 QVariant QsciScintillaBase::inputMethodQuery(Qt::InputMethodQuery query) const
 {
     int pos = SendScintilla(SCI_GETCURRENTPOS);
     int line = SendScintilla(SCI_LINEFROMPOSITION, pos);
+    const bool utf8 = sci->IsUnicodeMode();
 
     switch (query) {
         case Qt::ImHints:
@@ -243,9 +309,51 @@ QVariant QsciScintillaBase::inputMethodQuery(Qt::InputMethodQuery query) const
         }
 
         case Qt::ImCursorPosition:
+        case Qt::ImAnchorPosition:
         {
-            int paraStart = sci->pdoc->ParaUp(pos);
-            return pos - paraStart;
+            // Both are UTF-16 indices into the ImSurroundingText string counted
+            // from the start of the caret's paragraph; Scintilla positions are
+            // UTF-8 byte offsets, so they only agree for pure ASCII.  A caret
+            // reported outside its own surrounding text is worse than no answer
+            // at all: on macOS the platform derives its absolute selectedRange
+            // from these two plus ImAbsolutePosition, and the negative offset
+            // wrapped into a huge unsigned location.
+            const int paraStart = sci->pdoc->ParaUp(pos);
+            const int target = query == Qt::ImCursorPosition
+                               ? pos
+                               : int(SendScintilla(SCI_GETANCHOR));
+
+            return Utf16LengthBetween(this, paraStart, target, utf8);
+        }
+
+        case Qt::ImAbsolutePosition:
+            // The caret's UTF-16 offset from the start of the document.  Every
+            // absolute range the platform reports to an input method is derived
+            // from this, so leaving it unsupported made the values above
+            // untranslatable rather than merely imprecise.
+            return Utf16LengthBetween(this, 0, pos, utf8);
+
+        case Qt::ImTextBeforeCursor:
+        case Qt::ImTextAfterCursor:
+        {
+            // macOS builds the text it shows an input method from this pair, so
+            // without them an IME is handed an empty document: it cannot see
+            // what precedes the caret and falls back to always emitting the
+            // opening form of context-sensitive punctuation, e.g. the Chinese
+            // quotation mark that never becomes the closing one.
+            const bool before = query == Qt::ImTextBeforeCursor;
+            int edge = sci->pdoc->GetRelativePositionUTF16(
+                    pos, before ? -ImeContextLength : ImeContextLength);
+            if (edge < 0)
+                edge = before ? 0 : int(SendScintilla(SCI_GETLENGTH));
+
+            const int from = before ? edge : pos;
+            const int to = before ? pos : edge;
+            QVarLengthArray<char,1024> buffer(to - from + 1);
+
+            SendScintilla(SCI_GETTEXTRANGE, from, to, buffer.data());
+
+            return bytesAsText(buffer.constData(), to - from);
         }
 
         case Qt::ImSurroundingText:
@@ -256,7 +364,10 @@ QVariant QsciScintillaBase::inputMethodQuery(Qt::InputMethodQuery query) const
 
             SendScintilla(SCI_GETTEXTRANGE, paraStart, paraEnd, buffer.data());
 
-            return bytesAsText(buffer.constData(), buffer.size());
+            // SCI_GETTEXTRANGE writes paraEnd - paraStart bytes; the buffer is
+            // one byte larger only to satisfy the API, so decoding buffer.size()
+            // appended a NUL to the paragraph handed to the input method.
+            return bytesAsText(buffer.constData(), paraEnd - paraStart);
         }
 
         case Qt::ImCurrentSelection:

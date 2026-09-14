@@ -74,6 +74,36 @@ These rendering changes predate the formal fork interface.  They will be
 converted into opt-in public configuration while the NotePeek editor API is
 introduced, so non-NotePeek QScintilla behavior is not changed globally.
 
+## Input method
+
+`inputMethodQuery()` only answered `Qt::ImCursorRectangle`, `Qt::ImFont`,
+`Qt::ImCursorPosition`, `Qt::ImSurroundingText` and `Qt::ImCurrentSelection`, and
+answered the first of those two positional queries in Scintilla's UTF-8 byte
+offsets rather than the UTF-16 code units Qt specifies.  Platform plugins build
+everything else from those answers, so an input method was handed a caret outside
+its own surrounding text, an empty context window and a selection range whose
+location had wrapped negative.  On macOS that made `attributedSubstringForProposedRange:`
+return `nil` and `selectedRange` return garbage, so the Pinyin IME — which does
+its smart replacement of quotes from exactly that context — could not see what
+preceded the caret and emitted an opening `“` on every keystroke.
+
+- `Qt::ImCursorPosition` reports a UTF-16 index into `Qt::ImSurroundingText`.
+- `Qt::ImAbsolutePosition` and `Qt::ImAnchorPosition` are now supported, in the
+  same UTF-16 units and, for the anchor, the same paragraph origin Qt uses.
+- `Qt::ImTextBeforeCursor` and `Qt::ImTextAfterCursor` report up to the 1024
+  characters QWidgetTextControl defaults to, windowed with
+  `Document::GetRelativePositionUTF16()` so the cost stays bounded.
+- `Qt::ImSurroundingText` no longer appends the buffer's padding NUL byte.
+- `preeditPos` is cleared as soon as a composition commits, is replaced or is
+  cancelled, and every input method event refreshes the micro focus.  Previously
+  the first composition pinned `Qt::ImCursorRectangle` to a stale document
+  position for the rest of the session, so the platform was told the caret never
+  moved.
+- UTF-16 offsets are counted from lead bytes instead of decoded into a `QString`,
+  and `Qt::ImAbsolutePosition` reads the document in 64 KiB chunks.  That query
+  is O(bytes before the caret); it is the one input method query whose cost still
+  scales with the document.
+
 ## Performance contract
 
 - Semantic results update only their requested line range; edits shift or

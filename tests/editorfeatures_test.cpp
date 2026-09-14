@@ -24,10 +24,12 @@
 #include <QDateTime>
 #include <QFocusEvent>
 #include <QImage>
+#include <QInputMethodEvent>
 #include <QKeyEvent>
 #include <QLabel>
 #include <QMainWindow>
 #include <QPaintEvent>
+#include <QPair>
 #include <QScopeGuard>
 #include <QScrollBar>
 #include <QTemporaryDir>
@@ -56,6 +58,82 @@ public:
     QMargins configuredViewportMargins() const
     {
         return viewportMargins();
+    }
+};
+
+// QsciScintillaBase declares the input-method overrides protected, so tests
+// need a derived class to drive and observe them directly.
+class InputMethodProbeEditor final : public CustomEditor
+{
+public:
+    QString surroundingText() const
+    {
+        return inputMethodQuery(Qt::ImSurroundingText).toString();
+    }
+
+    int cursorPosition() const
+    {
+        return inputMethodQuery(Qt::ImCursorPosition).toInt();
+    }
+
+    int anchorPosition() const
+    {
+        return inputMethodQuery(Qt::ImAnchorPosition).toInt();
+    }
+
+    int absolutePosition() const
+    {
+        return inputMethodQuery(Qt::ImAbsolutePosition).toInt();
+    }
+
+    QString textBeforeCursor() const
+    {
+        return inputMethodQuery(Qt::ImTextBeforeCursor).toString();
+    }
+
+    QString textAfterCursor() const
+    {
+        return inputMethodQuery(Qt::ImTextAfterCursor).toString();
+    }
+
+    // The absolute selection range qnsview_complextext.mm derives from the
+    // three positional queries above and reports to AppKit as selectedRange.
+    // Expressed as a QPair so the test also builds off macOS.
+    QPair<qint64, qint64> selectedRange() const
+    {
+        const int absolute = absolutePosition();
+        const int offset = absolute - cursorPosition();
+        const int anchor = offset + anchorPosition();
+        const qint64 start = anchor >= absolute ? absolute : anchor;
+        const qint64 end = start == anchor ? absolute : anchor;
+        return {start, end - start};
+    }
+
+    // The text window the same file offers an input method through
+    // attributedSubstringForProposedRange:; its location must not be negative
+    // or the intersection AppKit computes comes out empty and the input method
+    // is told the document is blank.
+    qint64 availableTextLocation() const
+    {
+        return static_cast<qint64>(absolutePosition()) - textBeforeCursor().size();
+    }
+
+    QRect cursorRectangle() const
+    {
+        return inputMethodQuery(Qt::ImCursorRectangle).toRect();
+    }
+
+    void compose(const QString &preedit)
+    {
+        QInputMethodEvent event(preedit, {});
+        inputMethodEvent(&event);
+    }
+
+    void commit(const QString &text)
+    {
+        QInputMethodEvent event;
+        event.setCommitString(text);
+        inputMethodEvent(&event);
     }
 };
 }
@@ -209,6 +287,119 @@ private slots:
 
         QCOMPARE(editor.text(), QStringLiteral("{值abc}"));
         QCOMPARE(editor.selectedText(), QStringLiteral("值abc"));
+    }
+
+    void reportsInputMethodCursorInCharactersNotBytes()
+    {
+        InputMethodProbeEditor editor;
+        editor.setText(QStringLiteral("中文ab"));
+        editor.setCursorPosition(0, 2);
+
+        const QString surrounding = editor.surroundingText();
+
+        // Scintilla tracks the caret as a UTF-8 byte offset (6 here), while Qt
+        // defines ImCursorPosition as an index into the ImSurroundingText
+        // string.  Reporting the byte offset put the caret past the end of the
+        // paragraph, so an input method could not tell what preceded it and,
+        // among other things, kept emitting an opening Chinese quotation mark.
+        QCOMPARE(editor.cursorPosition(), 2);
+        QCOMPARE(surrounding, QStringLiteral("中文ab"));
+        QVERIFY(editor.cursorPosition() <= surrounding.size());
+        QVERIFY(!surrounding.contains(QChar(0)));
+    }
+
+    void reportsTheContextAnInputMethodNeedsForSmartPunctuation()
+    {
+        InputMethodProbeEditor editor;
+        editor.setText(QStringLiteral("第一行\n他说：中文ab\n\n第二段"));
+
+        // The window AppKit can offer an input method, plus the absolute caret
+        // offset both of its endpoints are measured against.  An input method
+        // that cannot read what precedes the caret cannot apply context
+        // sensitive punctuation, which is how a Chinese quotation mark ended up
+        // stuck on its opening form on every keystroke.  Scintilla's paragraph
+        // is a run of non-blank lines, which is also what ImSurroundingText
+        // reports, so ImCursorPosition is counted from there.
+        const auto checkContract = [&editor]() {
+            const QString surrounding = editor.surroundingText();
+            QVERIFY(!surrounding.contains(QChar(0)));
+            QVERIFY(editor.cursorPosition() >= 0);
+            QVERIFY(editor.anchorPosition() >= 0);
+            QVERIFY(editor.cursorPosition() <= surrounding.size());
+            // A negative location wraps into a huge unsigned offset once the
+            // platform turns it into a range, and every intersection it then
+            // computes comes out empty.
+            QVERIFY(editor.availableTextLocation() >= 0);
+            QVERIFY(editor.selectedRange().first >= 0);
+            QVERIFY(editor.selectedRange().second >= 0);
+            QCOMPARE(surrounding.left(editor.cursorPosition()),
+                     editor.textBeforeCursor());
+            QVERIFY(editor.textAfterCursor().startsWith(
+                surrounding.mid(editor.cursorPosition())));
+        };
+
+        editor.setCursorPosition(1, 3);
+        checkContract();
+        QCOMPARE(editor.textBeforeCursor(), QStringLiteral("第一行\n他说："));
+        QCOMPARE(editor.textAfterCursor(), QStringLiteral("中文ab\n\n第二段"));
+        QCOMPARE(editor.surroundingText(), QStringLiteral("第一行\n他说：中文ab\n\n"));
+        QCOMPARE(editor.absolutePosition(), 7);
+        QCOMPARE(editor.cursorPosition(), 7);
+        QCOMPARE(editor.selectedRange(), qMakePair(qint64(7), qint64(0)));
+
+        editor.setSelection(1, 3, 1, 5);
+        checkContract();
+        QCOMPARE(editor.textBeforeCursor(), QStringLiteral("第一行\n他说：中文"));
+        QCOMPARE(editor.textAfterCursor(), QStringLiteral("ab\n\n第二段"));
+        QCOMPARE(editor.absolutePosition(), 9);
+        QCOMPARE(editor.cursorPosition(), 9);
+        QCOMPARE(editor.anchorPosition(), 7);
+        QCOMPARE(editor.selectedRange(), qMakePair(qint64(7), qint64(2)));
+
+        editor.setSelection(0, 0, 0, 0);
+        checkContract();
+        QCOMPARE(editor.textBeforeCursor(), QString());
+        QCOMPARE(editor.absolutePosition(), 0);
+        QCOMPARE(editor.selectedRange(), qMakePair(qint64(0), qint64(0)));
+
+        editor.setCursorPosition(3, 3);
+        checkContract();
+        QCOMPARE(editor.textAfterCursor(), QString());
+        QCOMPARE(editor.textBeforeCursor(),
+                 QStringLiteral("第一行\n他说：中文ab\n\n第二段"));
+        QCOMPARE(editor.absolutePosition(), 16);
+        QCOMPARE(editor.cursorPosition(), 16);
+        QCOMPARE(editor.selectedRange(), qMakePair(qint64(16), qint64(0)));
+    }
+
+    void inputMethodCursorRectangleFollowsCaretAfterComposition()
+    {
+        InputMethodProbeEditor editor;
+        editor.resize(320, 160);
+        editor.setText(QStringLiteral("hello world"));
+        editor.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&editor));
+        QApplication::processEvents();
+
+        editor.setCursorPosition(0, 0);
+        const QRect caretAtStart = editor.cursorRectangle();
+        editor.setCursorPosition(0, 6);
+        QVERIFY(caretAtStart != editor.cursorRectangle());
+
+        editor.setCursorPosition(0, 0);
+        editor.compose(QStringLiteral("ab"));
+        editor.commit(QStringLiteral("ab"));
+        QCOMPARE(editor.text(), QStringLiteral("abhello world"));
+
+        // A finished composition must stop pinning ImCursorRectangle to the
+        // position its preedit last reported.  Left stale, every later query
+        // answered with that one rectangle, so the platform was told the caret
+        // never moved and the input method kept resetting its own state.
+        editor.setCursorPosition(0, 0);
+        const QRect caretAfterComposition = editor.cursorRectangle();
+        QCOMPARE(caretAfterComposition, caretAtStart);
+        editor.setCursorPosition(0, 6);
+        QVERIFY(caretAfterComposition != editor.cursorRectangle());
     }
 
     void editorHasNoTopPadding()
