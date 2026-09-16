@@ -7,17 +7,18 @@ adds the guardrails an AI agent must self-enforce.
 
 ## 1. Verify CI compatibility after every change
 
-CI only runs the full matrix when `scripts/ci_version_gate.py` says so — and
-that now happens **only on a minor (middle) version bump or an
+GitHub Actions only runs the packaging matrix when `scripts/ci_version_gate.py`
+says so — and that happens **only on a minor (middle) version bump or an
 unpublished-release retry**. Patch-only version bumps, edits to CI
 infrastructure files, and pushes whose history cannot be compared are skipped
-to preserve GitHub Actions quota; trigger them manually via
-`workflow_dispatch` when needed. A minor version bump therefore triggers
-every job below, so treat a one-line version edit as a full-CI event, not a
-trivial safe change.
+to preserve GitHub Actions quota; trigger the workflow manually when needed.
+Automated GitHub jobs compile and package with `BUILD_TESTING=OFF`; all tests
+must pass locally before pushing. A minor version bump still triggers every
+packaging job below, so treat a one-line version edit as a multi-platform build
+event, not a trivial safe change.
 
-**CI matrix** (`build-and-test`): Ubuntu x86_64, Ubuntu arm64, Windows, macOS
-arm64 — all on Qt 6.8.3. macOS Intel is not in the matrix.
+**Packaging matrix** (`build-and-package`): Ubuntu x86_64, Ubuntu arm64,
+Windows, macOS arm64 — all on Qt 6.8.3. macOS Intel is not in the matrix.
 
 Before declaring work done, reason about — and where possible build — the
 following. Do not limit verification to the files you touched.
@@ -31,7 +32,7 @@ following. Do not limit verification to the files you touched.
 - **Platform-specific behavior.** Font availability and timing-based tests
   differ across the Linux/macOS/Windows runners. A test passing on your
   machine does not prove it passes on CI.
-- **Performance budgets.** Some tests assert wall-clock budgets (e.g.
+- **Performance budgets.** Local tests assert wall-clock budgets (e.g.
   "2 MB highlight < 5 s", "viewport semantic worker < 2 ms"). These are tight
   on the macOS arm64 runner. Flag any change that touches editor rendering
   (`src/QScintilla/scintilla/src/*`, `src/MainPage/editor/*`,
@@ -104,11 +105,13 @@ would expect:
 
 ## CI reference (quick)
 
-- Workflows: `.github/workflows/ci.yml` (build + test), `release.yml`.
-- Version gate: `scripts/ci_version_gate.py` — the expensive `build-and-test`
-  matrix runs only when the minor (middle) version number increases or an
-  unpublished release is retried; on every other push only the lightweight
-  gate job runs. `quality.yml` is `workflow_dispatch`-only (no schedule).
+- Workflow: `.github/workflows/ci.yml` (version-gated build + package +
+  release). Automated Actions do not run CTest; local validation is mandatory.
+- Version gate: `scripts/ci_version_gate.py` — the expensive
+  `build-and-package` matrix runs only when the minor (middle) version number
+  increases or an unpublished release is retried; on every other push only the
+  lightweight gate job runs. `quality.yml` is `workflow_dispatch`-only (no
+  schedule) and is the only GitHub workflow that runs tests.
 - Translation tooling: `NotePeek_lupdate` target → regenerates
   `i18n/notepeek_zh_CN.ts`; the app build then `lrelease`s it into the bundled
   `.qm` resource.
