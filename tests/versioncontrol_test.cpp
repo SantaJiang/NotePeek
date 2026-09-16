@@ -7,6 +7,7 @@
 #include <QFile>
 #include <QFileInfo>
 #include <QProcess>
+#include <QProcessEnvironment>
 #include <QSignalSpy>
 #include <QTemporaryDir>
 #include <QtTest>
@@ -61,8 +62,24 @@ ProcessResult runGit(const QString &gitExecutable, const QString &workingDirecto
 {
     QProcess process;
     process.setWorkingDirectory(workingDirectory);
-    process.start(gitExecutable, arguments);
-    if (!process.waitForStarted(3000) || !process.waitForFinished(10000))
+    QProcessEnvironment environment = QProcessEnvironment::systemEnvironment();
+    for (const QByteArray &variable : {QByteArrayLiteral("GIT_DIR"), QByteArrayLiteral("GIT_WORK_TREE"),
+                                       QByteArrayLiteral("GIT_INDEX_FILE"),
+                                       QByteArrayLiteral("GIT_CEILING_DIRECTORIES"),
+                                       QByteArrayLiteral("GIT_CONFIG_COUNT"),
+                                       QByteArrayLiteral("GIT_CONFIG_PARAMETERS")})
+        environment.remove(QString::fromLatin1(variable));
+    environment.insert(QStringLiteral("LC_ALL"), QStringLiteral("C"));
+    environment.insert(QStringLiteral("GIT_PAGER"), QStringLiteral("cat"));
+    environment.insert(QStringLiteral("GIT_TERMINAL_PROMPT"), QStringLiteral("0"));
+    process.setProcessEnvironment(environment);
+    const QStringList isolated = QStringList{QStringLiteral("-c"), QStringLiteral("core.fsmonitor=false"),
+                                             QStringLiteral("-c"), QStringLiteral("core.untrackedCache=false"),
+                                             QStringLiteral("-c"), QStringLiteral("core.autocrlf=false"),
+                                             QStringLiteral("-c"), QStringLiteral("safe.directory=*")}
+                                 + arguments;
+    process.start(gitExecutable, isolated);
+    if (!process.waitForStarted(3000) || !process.waitForFinished(20000))
         return {};
     return {process.exitCode(), process.readAllStandardOutput(), process.readAllStandardError()};
 }
@@ -79,6 +96,19 @@ QString cleanedCanonicalPath(const QString &path)
     return QDir::cleanPath(canonical.isEmpty() ? info.absoluteFilePath() : canonical);
 }
 
+bool sameFilesystemPath(const QString &left, const QString &right)
+{
+    const QString a = cleanedCanonicalPath(left);
+    const QString b = cleanedCanonicalPath(right);
+#ifdef Q_OS_WIN
+    return QString::compare(a, b, Qt::CaseInsensitive) == 0;
+#else
+    return a == b;
+#endif
+}
+
+constexpr int GitWaitMs = 20000;
+
 } // namespace
 
 class VersionControlTest : public QObject
@@ -86,6 +116,16 @@ class VersionControlTest : public QObject
     Q_OBJECT
 
 private slots:
+    void initTestCase()
+    {
+        const QString git = GitExecutable::find();
+        if (git.isEmpty())
+            return;
+        // First git.exe invocation on Windows CI can pay Defender / filesystem
+        // scanner cost. Warm it here so later discovery is not racing a short QTRY.
+        runGit(git, QDir::tempPath(), {QStringLiteral("--version")});
+    }
+
     void parsesGitVersions()
     {
         QCOMPARE(GitExecutable::parseVersion(QByteArray("git version 2.50.1 (Apple Git-155)")),
@@ -106,7 +146,9 @@ private slots:
             return;
         }
 
-        QCOMPARE(GitExecutable::find(git), cleanedCanonicalPath(git));
+        QVERIFY2(sameFilesystemPath(GitExecutable::find(git), git),
+                 qPrintable(QStringLiteral("%1 vs %2").arg(GitExecutable::find(git),
+                                                          cleanedCanonicalPath(git))));
         QVERIFY(GitExecutable::find(QStringLiteral("/definitely/missing/git")).isEmpty());
     }
 
@@ -202,9 +244,15 @@ private slots:
         GitCommandRunner runner(git);
         QSignalSpy finished(&runner, &GitCommandRunner::commandFinished);
         runner.start(QDir::tempPath(), {QStringLiteral("--version")});
-        QTRY_COMPARE_WITH_TIMEOUT(finished.count(), 1, 5000);
+        QTRY_COMPARE_WITH_TIMEOUT(finished.count(), 1, GitWaitMs);
         const GitCommandResult result = finished.takeFirst().at(0).value<GitCommandResult>();
-        QVERIFY2(result.succeeded(), qPrintable(result.processError));
+        QVERIFY2(result.succeeded(),
+                 qPrintable(QStringLiteral("exit=%1 timedOut=%2 started=%3 error=%4 stderr=%5")
+                                .arg(result.exitCode)
+                                .arg(result.timedOut)
+                                .arg(result.started)
+                                .arg(result.processError)
+                                .arg(QString::fromUtf8(result.standardError))));
         QVERIFY(result.standardOutput.startsWith("git version"));
         QCOMPARE(result.arguments, QStringList{QStringLiteral("--version")});
     }
@@ -216,7 +264,7 @@ private slots:
         GitRepositoryService service(QStringLiteral("/definitely/missing/git"));
         QSignalSpy states(&service, &GitRepositoryService::stateChanged);
         service.setDirectory(directory.path());
-        QTRY_COMPARE_WITH_TIMEOUT(service.state(), GitRepositoryState::GitUnavailable, 5000);
+        QTRY_COMPARE_WITH_TIMEOUT(service.state(), GitRepositoryState::GitUnavailable, GitWaitMs);
         QVERIFY(!states.isEmpty());
         QVERIFY(!service.installation().isAvailable());
         QVERIFY(!service.installation().error.isEmpty());
@@ -235,15 +283,17 @@ private slots:
         QVERIFY(directory.isValid());
         GitRepositoryService service;
         service.setDirectory(directory.path());
-        QTRY_COMPARE_WITH_TIMEOUT(service.state(), GitRepositoryState::NotRepository, 5000);
+        QTRY_COMPARE_WITH_TIMEOUT(service.state(), GitRepositoryState::NotRepository, GitWaitMs);
         QVERIFY(service.repositoryRoot().isEmpty());
 
         QVERIFY(initializeRepository(git, directory.path()));
         QSignalSpy snapshots(&service, &GitRepositoryService::snapshotChanged);
         service.setDirectory(directory.path());
-        QTRY_COMPARE_WITH_TIMEOUT(service.state(), GitRepositoryState::Ready, 5000);
-        QTRY_COMPARE_WITH_TIMEOUT(snapshots.count(), 1, 5000);
-        QCOMPARE(service.repositoryRoot(), cleanedCanonicalPath(directory.path()));
+        QTRY_COMPARE_WITH_TIMEOUT(service.state(), GitRepositoryState::Ready, GitWaitMs);
+        QTRY_COMPARE_WITH_TIMEOUT(snapshots.count(), 1, GitWaitMs);
+        QVERIFY2(sameFilesystemPath(service.repositoryRoot(), directory.path()),
+                 qPrintable(QStringLiteral("%1 vs %2").arg(service.repositoryRoot(),
+                                                          cleanedCanonicalPath(directory.path()))));
     }
 
     void ignoresAmbientRepositoryDiscoveryOverrides()
@@ -267,8 +317,10 @@ private slots:
 
         GitRepositoryService service(git);
         service.setDirectory(repository.filePath(QStringLiteral("nested")));
-        QTRY_COMPARE_WITH_TIMEOUT(service.state(), GitRepositoryState::Ready, 5000);
-        QCOMPARE(service.repositoryRoot(), cleanedCanonicalPath(repository.path()));
+        QTRY_COMPARE_WITH_TIMEOUT(service.state(), GitRepositoryState::Ready, GitWaitMs);
+        QVERIFY2(sameFilesystemPath(service.repositoryRoot(), repository.path()),
+                 qPrintable(QStringLiteral("%1 vs %2").arg(service.repositoryRoot(),
+                                                          cleanedCanonicalPath(repository.path()))));
     }
 
     void discoversRepositoryAndRefreshesStatus()
@@ -290,10 +342,12 @@ private slots:
         QSignalSpy snapshots(&service, &GitRepositoryService::snapshotChanged);
         QSignalSpy errors(&service, &GitRepositoryService::errorOccurred);
         service.setDirectory(repository.filePath(QStringLiteral("nested/child")));
-        QTRY_COMPARE_WITH_TIMEOUT(service.state(), GitRepositoryState::Ready, 5000);
-        QTRY_COMPARE_WITH_TIMEOUT(snapshots.count(), 1, 5000);
+        QTRY_COMPARE_WITH_TIMEOUT(service.state(), GitRepositoryState::Ready, GitWaitMs);
+        QTRY_COMPARE_WITH_TIMEOUT(snapshots.count(), 1, GitWaitMs);
         QVERIFY2(errors.isEmpty(), qPrintable(errors.isEmpty() ? QString() : errors.first().first().toString()));
-        QCOMPARE(service.repositoryRoot(), cleanedCanonicalPath(repository.path()));
+        QVERIFY2(sameFilesystemPath(service.repositoryRoot(), repository.path()),
+                 qPrintable(QStringLiteral("%1 vs %2").arg(service.repositoryRoot(),
+                                                          cleanedCanonicalPath(repository.path()))));
         QCOMPARE(service.snapshot().repositoryRoot, service.repositoryRoot());
         QCOMPARE(service.snapshot().revision, quint64(1));
         QCOMPARE(service.snapshot().files.size(), 1);
@@ -304,7 +358,7 @@ private slots:
         service.requestRefresh();
         service.requestRefresh();
         service.requestRefresh();
-        QTRY_COMPARE_WITH_TIMEOUT(snapshots.count(), 1, 5000);
+        QTRY_COMPARE_WITH_TIMEOUT(snapshots.count(), 1, GitWaitMs);
         QCOMPARE(service.snapshot().revision, quint64(2));
         QCOMPARE(service.snapshot().files.size(), 2);
     }
@@ -367,12 +421,12 @@ private slots:
 
         GitRepositoryService service(git);
         service.setDirectory(repository.path());
-        QTRY_COMPARE_WITH_TIMEOUT(service.state(), GitRepositoryState::Ready, 5000);
-        QTRY_COMPARE_WITH_TIMEOUT(service.snapshot().files.size(), 1, 5000);
+        QTRY_COMPARE_WITH_TIMEOUT(service.state(), GitRepositoryState::Ready, GitWaitMs);
+        QTRY_COMPARE_WITH_TIMEOUT(service.snapshot().files.size(), 1, GitWaitMs);
 
         QVERIFY(QDir(repository.path()).rename(QStringLiteral(".git"), QStringLiteral("git-metadata-removed")));
         service.refreshNow();
-        QTRY_COMPARE_WITH_TIMEOUT(service.state(), GitRepositoryState::NotRepository, 5000);
+        QTRY_COMPARE_WITH_TIMEOUT(service.state(), GitRepositoryState::NotRepository, GitWaitMs);
         QVERIFY(service.repositoryRoot().isEmpty());
         QVERIFY(service.snapshot().files.isEmpty());
     }

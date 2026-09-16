@@ -70,11 +70,15 @@ quint64 GitCommandRunner::start(const QString &workingDirectory, const QStringLi
                                                         QStringLiteral("GIT_DISCOVERY_ACROSS_FILESYSTEM"),
                                                         QStringLiteral("GIT_NAMESPACE"),
                                                         QStringLiteral("GIT_SHALLOW_FILE"),
-                                                        QStringLiteral("GIT_QUARANTINE_PATH")};
+                                                        QStringLiteral("GIT_QUARANTINE_PATH"),
+                                                        QStringLiteral("GIT_CONFIG_COUNT"),
+                                                        QStringLiteral("GIT_CONFIG_PARAMETERS")};
     for (const QString &variable : repositoryEnvironmentVariables)
         environment.remove(variable);
     environment.insert(QStringLiteral("LC_ALL"), QStringLiteral("C"));
     environment.insert(QStringLiteral("LANG"), QStringLiteral("C"));
+    environment.insert(QStringLiteral("GIT_PAGER"), QStringLiteral("cat"));
+    environment.insert(QStringLiteral("GCM_INTERACTIVE"), QStringLiteral("never"));
     if (options.readOnly)
         environment.insert(QStringLiteral("GIT_OPTIONAL_LOCKS"), QStringLiteral("0"));
     if (options.disableTerminalPrompts)
@@ -90,9 +94,12 @@ quint64 GitCommandRunner::start(const QString &workingDirectory, const QStringLi
     connect(process, &QProcess::errorOccurred, this,
             [this, process](QProcess::ProcessError error)
             {
+                // WriteError/ReadError also fire on Windows when stdin is closed
+                // after start; those must not mark a successful git command as failed.
+                if (error != QProcess::FailedToStart)
+                    return;
                 process->setProperty(ProcessErrorProperty, process->errorString());
-                if (error == QProcess::FailedToStart)
-                    finalize(process, -1, false);
+                finalize(process, -1, false);
             });
     connect(process, qOverload<int, QProcess::ExitStatus>(&QProcess::finished), this,
             [this, process](int exitCode, QProcess::ExitStatus exitStatus)
@@ -121,7 +128,17 @@ quint64 GitCommandRunner::start(const QString &workingDirectory, const QStringLi
         return requestId;
     }
 
-    process->start(m_gitExecutable, arguments);
+    // Isolate this invocation from ambient gitconfig that can hang CI (fsmonitor,
+    // credential UI) or reject a temporary work tree (safe.directory). Original
+    // arguments stay on the result so callers can assert on the requested command.
+    const QStringList gitArguments = QStringList{QStringLiteral("-c"),
+                                                 QStringLiteral("core.fsmonitor=false"),
+                                                 QStringLiteral("-c"),
+                                                 QStringLiteral("core.untrackedCache=false"),
+                                                 QStringLiteral("-c"),
+                                                 QStringLiteral("safe.directory=*")}
+                                     + arguments;
+    process->start(m_gitExecutable, gitArguments);
     return requestId;
 }
 

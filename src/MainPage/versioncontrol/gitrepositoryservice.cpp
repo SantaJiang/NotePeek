@@ -12,7 +12,7 @@ namespace
 {
 
 constexpr int RefreshDebounceMs = 300;
-constexpr int DiscoveryTimeoutMs = 5000;
+constexpr int DiscoveryTimeoutMs = 15000;
 constexpr int StatusTimeoutMs = 15000;
 
 QString normalizedDirectory(const QString &path)

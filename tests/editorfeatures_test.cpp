@@ -23,6 +23,7 @@
 #include <QComboBox>
 #include <QDateTime>
 #include <QFocusEvent>
+#include <QFont>
 #include <QImage>
 #include <QInputMethodEvent>
 #include <QKeyEvent>
@@ -292,7 +293,9 @@ private slots:
     void reportsInputMethodCursorInCharactersNotBytes()
     {
         InputMethodProbeEditor editor;
+        editor.setEolMode(CustomEditor::EolUnix);
         editor.setText(QStringLiteral("中文ab"));
+        editor.convertEols(CustomEditor::EolUnix);
         editor.setCursorPosition(0, 2);
 
         const QString surrounding = editor.surroundingText();
@@ -311,7 +314,9 @@ private slots:
     void reportsTheContextAnInputMethodNeedsForSmartPunctuation()
     {
         InputMethodProbeEditor editor;
+        editor.setEolMode(CustomEditor::EolUnix);
         editor.setText(QStringLiteral("第一行\n他说：中文ab\n\n第二段"));
+        editor.convertEols(CustomEditor::EolUnix);
 
         // The window AppKit can offer an input method, plus the absolute caret
         // offset both of its endpoints are measured against.  An input method
@@ -334,8 +339,14 @@ private slots:
             QVERIFY(editor.selectedRange().second >= 0);
             QCOMPARE(surrounding.left(editor.cursorPosition()),
                      editor.textBeforeCursor());
-            QVERIFY(editor.textAfterCursor().startsWith(
-                surrounding.mid(editor.cursorPosition())));
+            const QString after = editor.textAfterCursor();
+            const QString restOfParagraph = surrounding.mid(editor.cursorPosition());
+            QVERIFY2(after.startsWith(restOfParagraph),
+                     qPrintable(QStringLiteral("after=%1 rest=%2 cursor=%3 surrounding=%4")
+                                    .arg(after.size())
+                                    .arg(restOfParagraph.size())
+                                    .arg(editor.cursorPosition())
+                                    .arg(surrounding.size())));
         };
 
         editor.setCursorPosition(1, 3);
@@ -375,6 +386,12 @@ private slots:
     void inputMethodCursorRectangleFollowsCaretAfterComposition()
     {
         InputMethodProbeEditor editor;
+        editor.setEolMode(CustomEditor::EolUnix);
+        QFont font;
+        font.setFamily(QStringLiteral("Courier New"));
+        font.setStyleHint(QFont::Monospace);
+        font.setPixelSize(16);
+        editor.setFont(font);
         editor.resize(320, 160);
         editor.setText(QStringLiteral("hello world"));
         editor.show();
@@ -384,7 +401,12 @@ private slots:
         editor.setCursorPosition(0, 0);
         const QRect caretAtStart = editor.cursorRectangle();
         editor.setCursorPosition(0, 6);
-        QVERIFY(caretAtStart != editor.cursorRectangle());
+        QVERIFY2(caretAtStart.x() != editor.cursorRectangle().x(),
+                 qPrintable(QStringLiteral("start=%1,%2 later=%3,%4")
+                                .arg(caretAtStart.x())
+                                .arg(caretAtStart.y())
+                                .arg(editor.cursorRectangle().x())
+                                .arg(editor.cursorRectangle().y())));
 
         editor.setCursorPosition(0, 0);
         editor.compose(QStringLiteral("ab"));
@@ -399,7 +421,12 @@ private slots:
         const QRect caretAfterComposition = editor.cursorRectangle();
         QCOMPARE(caretAfterComposition, caretAtStart);
         editor.setCursorPosition(0, 6);
-        QVERIFY(caretAfterComposition != editor.cursorRectangle());
+        QVERIFY2(caretAfterComposition.x() != editor.cursorRectangle().x(),
+                 qPrintable(QStringLiteral("afterComposition=%1,%2 later=%3,%4")
+                                .arg(caretAfterComposition.x())
+                                .arg(caretAfterComposition.y())
+                                .arg(editor.cursorRectangle().x())
+                                .arg(editor.cursorRectangle().y())));
     }
 
     void editorHasNoTopPadding()
