@@ -12,8 +12,6 @@
 #include <QPageLayout>
 #include <QPageSize>
 #include <QPrinter>
-#include <QRegularExpression>
-#include <QSet>
 #include <QFutureWatcher>
 #include <QUuid>
 #include <QUrl>
@@ -140,6 +138,7 @@ blockquote {
     padding-left: 1em;
 }
 table {
+    width: 100%;
     border-collapse: collapse;
 }
 th, td {
@@ -191,54 +190,143 @@ void ensureCmarkExtensionsRegistered()
     });
 }
 
-QString addSourceLineAnchors(const QString &html,
-                             QVector<int> *sourceLines,
-                             const std::shared_ptr<std::atomic_bool> &cancellation = {})
+bool isTableCellWrapBreak(QChar character)
 {
-    static const QRegularExpression sourceposPattern(
-        QStringLiteral("<([A-Za-z][A-Za-z0-9]*)\\b([^>]*)\\sdata-sourcepos=\"((\\d+):\\d+-(\\d+):\\d+)\""));
+    switch (character.unicode()) {
+    case '/':
+    case '\\':
+    case '-':
+    case '_':
+    case '.':
+    case '?':
+    case '#':
+    case '=':
+    case '%':
+    case ':':
+        return true;
+    default:
+        return false;
+    }
+}
 
-    QString anchored;
-    anchored.reserve(html.size() + 1024);
+QString tagNameFromMarkup(const QString &markup)
+{
+    int start = 0;
+    if (markup.startsWith(QLatin1Char('/')))
+        start = 1;
+    else if (markup.startsWith(QLatin1Char('!')))
+        return {};
 
-    QSet<int> anchoredLines;
-    qsizetype lastEnd = 0;
-    QRegularExpressionMatchIterator it = sourceposPattern.globalMatch(html);
-    while (it.hasNext())
-    {
-        if (cancellation && cancellation->load(std::memory_order_relaxed))
-        {
-            return {};
+    int end = start;
+    while (end < markup.size()) {
+        const QChar character = markup.at(end);
+        if (character.isSpace() || character == QLatin1Char('/') || character == QLatin1Char('>'))
+            break;
+        ++end;
+    }
+    return markup.mid(start, end - start).toLower();
+}
+
+// litehtml will not break a table cell below its longest word, so a URL or
+// path keeps the whole table wider than the preview. Insert U+200B after
+// punctuation and along very long runs. The preview's text splitter treats
+// that character as a wrap opportunity and does not draw it.
+QString softenTableCellWrapping(const QString &html)
+{
+    constexpr int kBreakAfter = 8;
+    constexpr int kForceBreak = 12;
+    const QChar softBreak(0x200B);
+
+    QString softened;
+    softened.reserve(html.size() + html.size() / 16);
+
+    int cellDepth = 0;
+    int preDepth = 0;
+    bool inTag = false;
+    bool inEntity = false;
+    int entityLength = 0;
+    int run = 0;
+    QString markup;
+
+    auto appendText = [&](QChar character) {
+        softened += character;
+        if (cellDepth <= 0 || preDepth > 0) {
+            run = 0;
+            return;
         }
-        const QRegularExpressionMatch match = it.next();
-        const int line = match.captured(4).toInt();
-        anchored += html.mid(lastEnd, match.capturedStart() - lastEnd);
-        if (!anchoredLines.contains(line))
-        {
-            anchored += QStringLiteral("<%1 id=\"np-src-line-%2\"%3 data-sourcepos=\"%4\"")
-                            .arg(match.captured(1))
-                            .arg(line)
-                            .arg(match.captured(2))
-                            .arg(match.captured(3));
-            anchoredLines.insert(line);
-            if (sourceLines)
-            {
-                sourceLines->append(line);
+        if (character.isSpace()) {
+            run = 0;
+            return;
+        }
+        ++run;
+        if ((isTableCellWrapBreak(character) && run >= kBreakAfter) || run >= kForceBreak) {
+            softened += softBreak;
+            run = 0;
+        }
+    };
+
+    for (int index = 0; index < html.size(); ++index) {
+        const QChar character = html.at(index);
+        if (inTag) {
+            softened += character;
+            if (character == QLatin1Char('>')) {
+                inTag = false;
+                const bool closing = markup.startsWith(QLatin1Char('/'));
+                const bool selfClosing = markup.endsWith(QLatin1Char('/'))
+                                         || markup.startsWith(QLatin1Char('!'));
+                const QString name = tagNameFromMarkup(markup);
+                markup.clear();
+                run = 0;
+                if (name == QLatin1String("td") || name == QLatin1String("th")) {
+                    if (closing)
+                        cellDepth = qMax(0, cellDepth - 1);
+                    else if (!selfClosing)
+                        ++cellDepth;
+                } else if (name == QLatin1String("pre")) {
+                    if (closing)
+                        preDepth = qMax(0, preDepth - 1);
+                    else if (!selfClosing)
+                        ++preDepth;
+                }
+            } else {
+                markup += character;
             }
+            continue;
         }
-        else
-        {
-            anchored += match.captured(0);
+
+        if (character == QLatin1Char('<')) {
+            inTag = true;
+            markup.clear();
+            run = 0;
+            softened += character;
+            continue;
         }
-        lastEnd = match.capturedEnd();
+
+        if (inEntity) {
+            softened += character;
+            ++entityLength;
+            if (character == QLatin1Char(';') || entityLength > 32) {
+                inEntity = false;
+                if (cellDepth > 0 && preDepth <= 0)
+                    ++run;
+            }
+            continue;
+        }
+
+        if (character == QLatin1Char('&') && cellDepth > 0 && preDepth <= 0) {
+            inEntity = true;
+            entityLength = 0;
+            softened += character;
+            continue;
+        }
+
+        appendText(character);
     }
 
-    anchored += html.mid(lastEnd);
-    return anchored;
+    return softened;
 }
 
 QString markdownToHtmlBody(const QString &markdown,
-                           QVector<int> *sourceLines,
                            const std::shared_ptr<std::atomic_bool> &cancellation = {})
 {
     const QByteArray input = markdown.toUtf8();
@@ -274,7 +362,7 @@ QString markdownToHtmlBody(const QString &markdown,
     {
         if (!cancellation || !cancellation->load(std::memory_order_relaxed))
         {
-            rendered = addSourceLineAnchors(QString::fromUtf8(html), sourceLines, cancellation);
+            rendered = softenTableCellWrapping(QString::fromUtf8(html));
         }
         cmark_get_default_mem_allocator()->free(html);
     }
@@ -294,7 +382,7 @@ MarkdownRenderResult renderMarkdownDocumentWithStyle(quint64 requestId,
     MarkdownRenderResult result;
     result.requestId = requestId;
     result.filePath = filePath;
-    const QString body = markdownToHtmlBody(markdown, &result.sourceLines, cancellation);
+    const QString body = markdownToHtmlBody(markdown, cancellation);
     if (!cancellation || !cancellation->load(std::memory_order_relaxed))
     {
         result.htmlDocument = buildHtmlDocumentFromStyle(body, style);

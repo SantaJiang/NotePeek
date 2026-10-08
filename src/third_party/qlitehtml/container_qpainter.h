@@ -21,6 +21,15 @@
 class DocumentContainerPrivate;
 class DocumentContainerContextPrivate;
 
+// Laid-out document rectangle of an element that carries a cmark
+// data-sourcepos="startLine:startColumn-endLine:endColumn" attribute.
+struct QLITEHTML_EXPORT QLiteHtmlSourceBox
+{
+    int startLine = 0;
+    int endLine = 0;
+    QRect rect;
+};
+
 class QLITEHTML_EXPORT DocumentContainerContext
 {
 public:
@@ -55,6 +64,7 @@ public: // outside API
     int documentHeight() const;
     QVector<QRect> textRects();
     int anchorY(const QString &anchorName) const;
+    QVector<QLiteHtmlSourceBox> sourcePositionBoxes() const;
 
     enum class MediaType
     {

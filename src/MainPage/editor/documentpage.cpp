@@ -7,6 +7,7 @@
 
 #include <QAbstractScrollArea>
 #include <QApplication>
+#include <QHash>
 #include <QClipboard>
 #include <QEvent>
 #include <QGuiApplication>
@@ -24,9 +25,9 @@
 
 namespace {
 
-// Thin vertical accent bar drawn over the preview viewport to mark the block
-// matching the source cursor line.  It is a transparent, click-through child of
-// the viewport positioned manually as the cursor moves and the preview scrolls.
+// Vertical accent drawn over the preview viewport for the source range under
+// the cursor. It is a transparent, click-through child of the viewport and is
+// repositioned as the cursor moves and the preview scrolls.
 class PreviewLineMarker final : public QWidget
 {
 public:
@@ -447,8 +448,7 @@ void MarkdownDocumentPage::updatePreview()
     if (documentLength > PerformanceConstants::MarkdownLargePreviewLimit)
     {
         m_latestPreviewRequestId = 0;
-        m_previewSourceLines.clear();
-        m_previewLineMap.clear();
+        m_previewSourceBoxes.clear();
         m_previewer->updatePreview(m_preview,
                                    tr("Preview disabled for large Markdown files."),
                                    m_editor->filePath());
@@ -489,7 +489,6 @@ void MarkdownDocumentPage::onPreviewRendered(const MarkdownRenderResult &result)
 
     m_syncingScroll = true;
     m_previewer->applyRenderedPreview(m_preview, result);
-    m_previewSourceLines = result.sourceLines;
     rebuildPreviewScrollMap();
     m_editor->SendScintilla(QsciScintillaBase::SCI_SETFIRSTVISIBLELINE, firstVisibleLine);
     m_editor->SendScintilla(QsciScintillaBase::SCI_SETXOFFSET, xOffset);
@@ -617,26 +616,34 @@ void MarkdownDocumentPage::syncEditorScrollFromPreview()
 
 void MarkdownDocumentPage::rebuildPreviewScrollMap()
 {
-    m_previewLineMap.clear();
+    m_previewSourceBoxes.clear();
     if (!m_preview)
-    {
         return;
-    }
 
-    m_previewLineMap.reserve(m_previewSourceLines.size());
-    for (int line : std::as_const(m_previewSourceLines))
-    {
-        const int y = m_preview->anchorY(QStringLiteral("np-src-line-%1").arg(line));
-        if (y >= 0)
-        {
-            m_previewLineMap.append(qMakePair(line, y));
+    QHash<quint64, int> indexByRange;
+    const QVector<QLiteHtmlSourceBox> rawBoxes = m_preview->sourcePositionBoxes();
+    for (const QLiteHtmlSourceBox &rawBox : rawBoxes) {
+        if (rawBox.startLine <= 0 || rawBox.endLine < rawBox.startLine || rawBox.rect.height() <= 0)
+            continue;
+
+        const int top = rawBox.rect.top();
+        const int bottom = top + rawBox.rect.height();
+        const quint64 key = (quint64(rawBox.startLine) << 32) | quint64(rawBox.endLine);
+        const auto existing = indexByRange.constFind(key);
+        if (existing == indexByRange.cend()) {
+            PreviewSourceBox box;
+            box.startLine = rawBox.startLine;
+            box.endLine = rawBox.endLine;
+            box.top = top;
+            box.bottom = bottom;
+            indexByRange.insert(key, m_previewSourceBoxes.size());
+            m_previewSourceBoxes.append(box);
+        } else {
+            PreviewSourceBox &box = m_previewSourceBoxes[*existing];
+            box.top = qMin(box.top, top);
+            box.bottom = qMax(box.bottom, bottom);
         }
     }
-
-    std::sort(m_previewLineMap.begin(), m_previewLineMap.end(),
-              [](const QPair<int, int> &a, const QPair<int, int> &b) {
-                  return a.first < b.first;
-              });
 }
 
 void MarkdownDocumentPage::schedulePreviewScrollMapRebuild()
@@ -669,18 +676,16 @@ void MarkdownDocumentPage::updatePreviewLineMarker()
         return;
     }
 
-    const int contentY = previewYForSourceLine(m_currentSourceLine);
-    if (contentY < 0)
+    const PreviewSourceMarker marker = previewMarkerForLine(m_currentSourceLine);
+    if (!marker.valid())
     {
         m_previewLineMarker->hide();
         return;
     }
 
     QWidget *viewport = m_preview->viewport();
-    const int viewportY = contentY - m_preview->verticalScrollBar()->value();
-
-    // One preview text line is a good approximation of the marked block height.
-    const int markerHeight = qMax(18, m_preview->fontMetrics().height() + 6);
+    const int viewportY = marker.top - m_preview->verticalScrollBar()->value();
+    const int markerHeight = marker.height;
     const int markerWidth = 3;
     // Keep a small visual gap between the marker and the rendered Markdown.
     constexpr int markerContentGap = 5;
@@ -726,52 +731,179 @@ void MarkdownDocumentPage::scrollEditorToSourceLineCentered(int line)
     m_editor->setFirstVisibleLine(qMax(0, visibleLine - visibleLines / 2));
 }
 
-int MarkdownDocumentPage::previewYForSourceLine(int line) const
+MarkdownDocumentPage::PreviewSourceMarker MarkdownDocumentPage::previewMarkerForLine(int line) const
 {
-    if (m_previewLineMap.isEmpty())
-    {
-        return -1;
+    PreviewSourceMarker marker;
+    if (line < 1 || m_previewSourceBoxes.isEmpty())
+        return marker;
+
+    const PreviewSourceBox *best = nullptr;
+    for (const PreviewSourceBox &box : m_previewSourceBoxes) {
+        if (line < box.startLine || line > box.endLine || box.height() <= 0)
+            continue;
+        if (!best || box.lineSpan() < best->lineSpan()
+            || (box.lineSpan() == best->lineSpan() && box.height() < best->height())) {
+            best = &box;
+        }
     }
 
-    const auto nextIt = std::lower_bound(
-        m_previewLineMap.cbegin(), m_previewLineMap.cend(), line,
-        [](const QPair<int, int> &entry, int sourceLine) { return entry.first < sourceLine; });
-    if (nextIt == m_previewLineMap.cbegin())
-        return nextIt->second;
-    if (nextIt == m_previewLineMap.cend())
-        return m_previewLineMap.last().second;
+    const PreviewSourceBox *previous = nullptr;
+    const PreviewSourceBox *next = nullptr;
+    const auto considerNeighbor = [&](const PreviewSourceBox &box) {
+        if (best && (&box == best || box.startLine < best->startLine || box.endLine > best->endLine))
+            return;
+        if (box.endLine < line
+            && (!previous || box.endLine > previous->endLine
+                || (box.endLine == previous->endLine && box.bottom > previous->bottom))) {
+            previous = &box;
+        }
+        if (box.startLine > line
+            && (!next || box.startLine < next->startLine
+                || (box.startLine == next->startLine && box.top < next->top))) {
+            next = &box;
+        }
+    };
 
-    const auto previous = *(nextIt - 1);
-    const auto next = *nextIt;
-    const int lineSpan = next.first - previous.first;
-    if (lineSpan <= 0)
-        return previous.second;
-    const double t = double(line - previous.first) / double(lineSpan);
-    return previous.second + qRound(t * double(next.second - previous.second));
+    // A separator row or blank line sits inside a parent block (the table, a
+    // list item) but between the real children. Mark that gap instead of the
+    // whole parent. A paragraph has no children, so the whole paragraph stays
+    // the marker.
+    const bool parentSpansLines = best && best->lineSpan() > 0;
+    if (!best || parentSpansLines) {
+        for (const PreviewSourceBox &box : m_previewSourceBoxes)
+            considerNeighbor(box);
+    }
+
+    auto pinToEdge = [&](int edge) {
+        const int markerHeight = qMax(8, m_preview ? m_preview->fontMetrics().height() : 18);
+        marker.height = markerHeight;
+        marker.top = qMax(0, edge - markerHeight / 2);
+        marker.scrollY = edge;
+    };
+
+    if (previous && next) {
+        const int gapTop = previous->bottom;
+        const int gapBottom = qMax(gapTop, next->top);
+        const int markerHeight = qMax(8, m_preview ? m_preview->fontMetrics().height() : 18);
+        const int gapTravel = gapBottom - gapTop;
+        if (gapTravel >= markerHeight) {
+            const int firstGapLine = previous->endLine + 1;
+            const int lastGapLine = qMax(firstGapLine, next->startLine - 1);
+            const int gapLines = lastGapLine - firstGapLine;
+            const double t = gapLines <= 0
+                                 ? 0.5
+                                 : qBound(0.0, double(line - firstGapLine) / double(gapLines), 1.0);
+            marker.height = markerHeight;
+            marker.top = gapTop + qRound(t * double(gapTravel - markerHeight));
+            marker.scrollY = marker.top + markerHeight / 2;
+            return marker;
+        }
+        pinToEdge(next->top);
+        return marker;
+    }
+
+    if (!best) {
+        if (next)
+            pinToEdge(next->top);
+        else if (previous)
+            pinToEdge(previous->bottom);
+        return marker;
+    }
+
+    marker.top = best->top;
+    marker.height = best->height();
+    if (best->lineSpan() <= 0) {
+        marker.scrollY = best->top + marker.height / 2;
+        return marker;
+    }
+
+    const double t = qBound(0.0,
+                            double(line - best->startLine) / double(best->lineSpan()),
+                            1.0);
+    marker.scrollY = best->top + qRound(t * double(marker.height));
+    return marker;
+}
+
+int MarkdownDocumentPage::previewYForSourceLine(int line) const
+{
+    const PreviewSourceMarker marker = previewMarkerForLine(line);
+    return marker.valid() ? marker.scrollY : -1;
 }
 
 int MarkdownDocumentPage::sourceLineForPreviewY(int y) const
 {
-    if (m_previewLineMap.isEmpty())
-    {
+    if (m_previewSourceBoxes.isEmpty())
+        return -1;
+
+    const PreviewSourceBox *best = nullptr;
+    for (const PreviewSourceBox &box : m_previewSourceBoxes) {
+        if (y < box.top || y >= box.bottom || box.height() <= 0)
+            continue;
+        if (!best || box.height() < best->height()
+            || (box.height() == best->height() && box.lineSpan() < best->lineSpan())) {
+            best = &box;
+        }
+    }
+
+    if (!best) {
+        const PreviewSourceBox *previous = nullptr;
+        const PreviewSourceBox *next = nullptr;
+        for (const PreviewSourceBox &box : m_previewSourceBoxes) {
+            if (box.bottom <= y && (!previous || box.bottom > previous->bottom))
+                previous = &box;
+            if (box.top > y && (!next || box.top < next->top))
+                next = &box;
+        }
+        if (previous && next) {
+            const int boundary = previous->bottom + (next->top - previous->bottom) / 2;
+            return y < boundary ? previous->endLine : next->startLine;
+        }
+        if (previous)
+            return previous->endLine;
+        if (next)
+            return next->startLine;
         return -1;
     }
 
-    const auto nextIt = std::lower_bound(
-        m_previewLineMap.cbegin(), m_previewLineMap.cend(), y,
-        [](const QPair<int, int> &entry, int previewY) { return entry.second < previewY; });
-    if (nextIt == m_previewLineMap.cbegin())
-        return nextIt->first;
-    if (nextIt == m_previewLineMap.cend())
-        return m_previewLineMap.last().first;
+    const PreviewSourceBox *previous = nullptr;
+    const PreviewSourceBox *next = nullptr;
+    bool hasChild = false;
+    for (const PreviewSourceBox &box : m_previewSourceBoxes) {
+        if (&box == best || box.startLine < best->startLine || box.endLine > best->endLine)
+            continue;
+        if (box.lineSpan() >= best->lineSpan())
+            continue;
+        hasChild = true;
+        if (box.bottom <= y
+            && (!previous || box.endLine > previous->endLine
+                || (box.endLine == previous->endLine && box.bottom > previous->bottom))) {
+            previous = &box;
+        }
+        if (box.top > y
+            && (!next || box.startLine < next->startLine
+                || (box.startLine == next->startLine && box.top < next->top))) {
+            next = &box;
+        }
+    }
 
-    const auto previous = *(nextIt - 1);
-    const auto next = *nextIt;
-    const int ySpan = next.second - previous.second;
-    if (ySpan <= 0)
-        return previous.first;
-    const double t = double(y - previous.second) / double(ySpan);
-    return previous.first + qRound(t * double(next.first - previous.first));
+    if (hasChild && previous && next && next->startLine > previous->endLine + 1) {
+        const int firstGapLine = previous->endLine + 1;
+        const int lastGapLine = next->startLine - 1;
+        if (lastGapLine <= firstGapLine || next->top <= previous->bottom)
+            return firstGapLine;
+        const double t = qBound(0.0,
+                                double(y - previous->bottom) / double(next->top - previous->bottom),
+                                1.0);
+        return qBound(firstGapLine, firstGapLine + qRound(t * double(lastGapLine - firstGapLine)), lastGapLine);
+    }
+
+    if (best->lineSpan() <= 0)
+        return best->startLine;
+
+    const double t = qBound(0.0, double(y - best->top) / double(best->height()), 1.0);
+    return qBound(best->startLine,
+                  best->startLine + qRound(t * double(best->lineSpan())),
+                  best->endLine);
 }
 
 double MarkdownDocumentPage::editorScrollRatio() const

@@ -13,6 +13,7 @@
 #include "decorators/highlightedscrollbardecorator.h"
 #include "find/findreplacemanager.h"
 #include "tool/markdown/markdownpreviewer.h"
+#include <qlitehtmlwidget.h>
 #include "widgets/elidingcombobox.h"
 #include "widgets/qscieditorinfostatusbar.h"
 #include "apppreferences.h"
@@ -1337,6 +1338,78 @@ private slots:
         QTRY_VERIFY_WITH_TIMEOUT(!renderedHtml.isEmpty(), 3000);
         QVERIFY(!renderedHtml.contains(QStringLiteral("<script"), Qt::CaseInsensitive));
         QVERIFY(!renderedHtml.contains(QStringLiteral("javascript:"), Qt::CaseInsensitive));
+    }
+
+    void markdownPreviewMapsTableRowsAndFitsThePreviewWidth()
+    {
+        const QString paragraphUrl = QStringLiteral(
+            "https://example.com/paragraph-token-should-stay-whole");
+        const QString codeUrl = QStringLiteral(
+            "https://example.com/code-block-token-should-stay-whole");
+        const QString cellUrl = QStringLiteral(
+            "riverbankcomputing.com/software/qscintilla/extra-long-cell-token");
+        const QString markdown = paragraphUrl + QStringLiteral("\n\n```\n")
+                                 + codeUrl + QStringLiteral("\n```\n\n")
+                                 + QStringLiteral("| Name | Upstream |\n")
+                                 + QStringLiteral("| --- | --- |\n")
+                                 + QStringLiteral("| cmark | ") + cellUrl + QStringLiteral(" |\n")
+                                 + QStringLiteral("| qsci | https://riverbankcomputing.com/software/qscintilla |\n");
+
+        MarkdownPreviewer previewer;
+        QWidget host;
+        QLiteHtmlWidget *preview = previewer.createPreviewWidget(QString(),
+                                                                QStringLiteral("table.md"),
+                                                                &host);
+        preview->resize(420, 640);
+        previewer.updatePreview(preview, markdown, QStringLiteral("table.md"));
+
+        const QString html = preview->html();
+        QVERIFY(html.contains(QStringLiteral("width: 100%")));
+        QVERIFY(html.contains(paragraphUrl));
+        QVERIFY(html.contains(codeUrl));
+        QVERIFY(!html.contains(cellUrl));
+        QVERIFY(html.contains(QChar(0x200B)));
+
+        const QString tableOnly = QStringLiteral("| Name | Upstream |\n")
+                                  + QStringLiteral("| --- | --- |\n")
+                                  + QStringLiteral("| cmark | ") + cellUrl + QStringLiteral(" |\n")
+                                  + QStringLiteral("| qsci | riverbankcomputing.com/software/qscintilla |\n");
+        previewer.updatePreview(preview, tableOnly, QStringLiteral("table.md"));
+        QVERIFY2(preview->horizontalScrollBar()->maximum() <= 2,
+                 qPrintable(QStringLiteral("horizontal maximum %1 viewport %2")
+                                .arg(preview->horizontalScrollBar()->maximum())
+                                .arg(preview->viewport()->width())));
+
+        const QVector<QLiteHtmlSourceBox> boxes = preview->sourcePositionBoxes();
+        int firstRowTop = -1;
+        int secondRowTop = -1;
+        int firstRowBottom = -1;
+        int widest = 0;
+        for (const QLiteHtmlSourceBox &box : boxes) {
+            widest = qMax(widest, box.rect.width());
+            // tableOnly: header, separator, first body row, second body row.
+            if (box.startLine == box.endLine && box.startLine == 3) {
+                if (firstRowTop < 0 || box.rect.top() < firstRowTop) {
+                    firstRowTop = box.rect.top();
+                    firstRowBottom = box.rect.top() + box.rect.height();
+                }
+            }
+            if (box.startLine == box.endLine && box.startLine == 4)
+                secondRowTop = secondRowTop < 0 ? box.rect.top() : qMin(secondRowTop, box.rect.top());
+        }
+
+        QVERIFY2(firstRowTop >= 0 && secondRowTop > firstRowTop,
+                 qPrintable(QStringLiteral("row tops %1 %2, boxes %3")
+                                .arg(firstRowTop)
+                                .arg(secondRowTop)
+                                .arg(boxes.size())));
+        QVERIFY(secondRowTop + 1 >= firstRowBottom);
+        // The table stretches to the preview's content box. An unwrapped URL
+        // would be wider than the widget itself.
+        QVERIFY2(widest < preview->width() && widest > preview->width() / 2,
+                 qPrintable(QStringLiteral("widest %1 widget %2")
+                                .arg(widest)
+                                .arg(preview->width())));
     }
 
     void markdownPreviewToggleRestoresSplitAfterPreviewOnly()

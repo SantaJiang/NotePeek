@@ -23,6 +23,8 @@
 #include <QTextLayout>
 #include <QUrl>
 
+#include <litehtml/utf8_strings.h>
+
 #include <algorithm>
 
 const int kDragDistance = 5;
@@ -1015,6 +1017,124 @@ QVector<QRect> DocumentContainer::textRects()
     QVector<QRect> rects = d->m_textRects;
     d->m_textRects.clear();
     return rects;
+}
+
+namespace {
+
+bool parseSourcePosition(const char *text, int *startLine, int *endLine)
+{
+    if (!text || !startLine || !endLine)
+        return false;
+
+    auto readInt = [&text](int *value) {
+        if (*text < '0' || *text > '9')
+            return false;
+        int parsed = 0;
+        while (*text >= '0' && *text <= '9') {
+            parsed = parsed * 10 + (*text - '0');
+            ++text;
+        }
+        *value = parsed;
+        return true;
+    };
+
+    int start = 0;
+    int end = 0;
+    int ignored = 0;
+    if (!readInt(&start) || *text != ':')
+        return false;
+    ++text;
+    if (!readInt(&ignored) || *text != '-')
+        return false;
+    ++text;
+    if (!readInt(&end) || *text != ':')
+        return false;
+    if (start <= 0 || end < start)
+        return false;
+
+    *startLine = start;
+    *endLine = end;
+    return true;
+}
+
+void collectSourcePositionBoxes(const litehtml::element::ptr &element, QVector<QLiteHtmlSourceBox> &boxes)
+{
+    if (!element)
+        return;
+
+    if (const char *sourcepos = element->get_attr("data-sourcepos")) {
+        int startLine = 0;
+        int endLine = 0;
+        if (parseSourcePosition(sourcepos, &startLine, &endLine)) {
+            const litehtml::position place = element->get_placement();
+            // Table rows keep a zero box in litehtml; the cells carry the row
+            // rectangle. Skip anything that was not actually laid out.
+            if (place.width > 0 && place.height > 0) {
+                QLiteHtmlSourceBox box;
+                box.startLine = startLine;
+                box.endLine = endLine;
+                box.rect = QRect(place.x, place.y, place.width, place.height);
+                boxes.append(box);
+            }
+        }
+    }
+
+    for (const litehtml::element::ptr &child : element->children())
+        collectSourcePositionBoxes(child, boxes);
+}
+
+} // namespace
+
+QVector<QLiteHtmlSourceBox> DocumentContainer::sourcePositionBoxes() const
+{
+    QVector<QLiteHtmlSourceBox> boxes;
+    if (!d->m_document || !d->m_document->root())
+        return boxes;
+
+    collectSourcePositionBoxes(d->m_document->root(), boxes);
+    return boxes;
+}
+
+void DocumentContainerPrivate::split_text(const char *text,
+                                          const std::function<void(const char *)> &on_word,
+                                          const std::function<void(const char *)> &on_space)
+{
+    if (!text)
+        return;
+
+    const std::wstring str_in = static_cast<const wchar_t *>(litehtml::utf8_to_wchar(text));
+    std::wstring word;
+    auto flushWord = [&word, &on_word]() {
+        if (word.empty())
+            return;
+        on_word(litehtml::wchar_to_utf8(word));
+        word.clear();
+    };
+
+    for (wchar_t character : str_in) {
+        const litehtml::ucode_t c = static_cast<litehtml::ucode_t>(character);
+        if (c == 0x200B) {
+            flushWord();
+            continue;
+        }
+        if (c <= ' ' && (c == ' ' || c == '\t' || c == '\n' || c == '\r' || c == '\f')) {
+            flushWord();
+            word.push_back(character);
+            on_space(litehtml::wchar_to_utf8(word));
+            word.clear();
+            continue;
+        }
+        // CJK character range, matching litehtml's default splitter.
+        if (c >= 0x4E00 && c <= 0x9FCC) {
+            flushWord();
+            word.push_back(character);
+            on_word(litehtml::wchar_to_utf8(word));
+            word.clear();
+            continue;
+        }
+        word.push_back(character);
+    }
+    flushWord();
 }
 
 int DocumentContainer::anchorY(const QString &anchorName) const

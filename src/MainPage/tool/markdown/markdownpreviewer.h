@@ -7,7 +7,6 @@
 #include <QPointer>
 #include <QQueue>
 #include <QString>
-#include <QVector>
 
 #include <atomic>
 #include <memory>
@@ -24,7 +23,6 @@ struct MarkdownRenderResult
     quint64 requestId = 0;
     QString filePath;
     QString htmlDocument;
-    QVector<int> sourceLines;
 };
 
 Q_DECLARE_METATYPE(MarkdownRenderResult)

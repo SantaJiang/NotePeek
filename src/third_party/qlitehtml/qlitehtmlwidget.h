@@ -4,6 +4,7 @@
 #pragma once
 
 #include "qlitehtml_global.h"
+#include "container_qpainter.h"
 
 #include <QAbstractScrollArea>
 #include <QTextDocument>
@@ -42,6 +43,9 @@ public:
 
     void scrollToAnchor(const QString &name);
     int anchorY(const QString &name) const;
+    // Every rendered element that published a source position. Empty boxes and
+    // elements that did not receive a layout rectangle are omitted.
+    QVector<QLiteHtmlSourceBox> sourcePositionBoxes() const;
 
     using ResourceHandler = std::function<QByteArray(QUrl)>;
     void setResourceHandler(const ResourceHandler &handler);

@@ -2,7 +2,6 @@
 #define DOCUMENTPAGE_H
 
 #include <QWidget>
-#include <QPair>
 #include <QVector>
 
 #include "tool/markdown/markdownpreviewer.h"
@@ -113,6 +112,30 @@ private:
     void scrollEditorToSourceLineCentered(int line);
     int previewYForSourceLine(int line) const;
     int sourceLineForPreviewY(int y) const;
+
+    // One laid-out source range. Cells that share a range are merged, because
+    // litehtml gives <tr> an empty box and puts the row rectangle on the cells.
+    struct PreviewSourceBox
+    {
+        int startLine = 0;
+        int endLine = 0;
+        int top = 0;
+        int bottom = 0;
+
+        int lineSpan() const { return endLine - startLine; }
+        int height() const { return bottom - top; }
+    };
+
+    struct PreviewSourceMarker
+    {
+        int top = -1;
+        int height = 0;
+        int scrollY = -1;
+
+        bool valid() const { return top >= 0 && height > 0 && scrollY >= 0; }
+    };
+
+    PreviewSourceMarker previewMarkerForLine(int line) const;
     double editorScrollRatio() const;
     double previewScrollRatio() const;
     static void setScrollRatio(QWidget *widget, double ratio);
@@ -122,10 +145,9 @@ private:
     MarkdownPreviewer *m_previewer;
     QTimer *m_updateTimer;
     QTimer *m_scrollMapTimer;
-    QVector<QPair<int, int>> m_previewLineMap;
-    QVector<int> m_previewSourceLines;
-    // Thin accent bar painted over the preview viewport marking the block that
-    // corresponds to the source cursor line (VS Code-style).
+    QVector<PreviewSourceBox> m_previewSourceBoxes;
+    // Accent bar over the preview viewport. Its height is the laid-out block
+    // that owns the source cursor line, not a single preview text line.
     QWidget *m_previewLineMarker;
     int m_currentSourceLine;
     int m_pendingScrollMapSourceLine;

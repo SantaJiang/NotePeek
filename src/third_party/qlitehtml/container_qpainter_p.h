@@ -102,6 +102,12 @@ public: // document_container API
         const std::shared_ptr<litehtml::document> &doc) override;
     void get_media_features(litehtml::media_features &media) const override;
     void get_language(std::string &language, std::string &culture) const override;
+    // U+200B is a zero-width wrap opportunity inserted into Markdown table
+    // cells. litehtml otherwise treats a URL or path as one unbreakable word,
+    // which forces the table wider than the preview.
+    void split_text(const char *text,
+                    const std::function<void(const char *)> &on_word,
+                    const std::function<void(const char *)> &on_space) override;
 
     QPixmap getPixmap(const QString &imageUrl, const QString &baseUrl);
     QString serifFont() const;

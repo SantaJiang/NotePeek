@@ -590,6 +590,13 @@ int QLiteHtmlWidget::anchorY(const QString &name) const
     return d->documentContainer.anchorY(name);
 }
 
+QVector<QLiteHtmlSourceBox> QLiteHtmlWidget::sourcePositionBoxes() const
+{
+    if (!d->documentContainer.hasDocument())
+        return {};
+    return d->documentContainer.sourcePositionBoxes();
+}
+
 void QLiteHtmlWidget::setResourceHandler(const QLiteHtmlWidget::ResourceHandler &handler)
 {
     d->documentContainer.setDataCallback(handler);
