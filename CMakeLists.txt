@@ -9,7 +9,7 @@ if(CMAKE_HOST_SYSTEM_NAME STREQUAL "Darwin" AND NOT CMAKE_OSX_DEPLOYMENT_TARGET)
 endif()
 
 project(NotePeek
-    VERSION 1.8.5
+    VERSION 1.8.6
     DESCRIPTION "A modern code/text editor"
     HOMEPAGE_URL "https://github.com/SantaSpeeds/NotePeek"
     LANGUAGES C CXX
