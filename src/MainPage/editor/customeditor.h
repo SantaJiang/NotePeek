@@ -13,6 +13,10 @@ class CustomEditor : public NotePeek::Editor
 {
     Q_OBJECT
 public:
+    // Gap between the text and the editor edges. Soft wrap uses the same
+    // value on the right so wrapped lines do not sit against the frame.
+    static constexpr int ContentPadding = 6;
+
     explicit CustomEditor(QWidget *parent = nullptr);
 
     void setFilePath(const QString &path);

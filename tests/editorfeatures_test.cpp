@@ -437,7 +437,7 @@ private slots:
         const int horizontalPadding = static_cast<int>(editor.SendScintilla(
             QsciScintillaBase::SCI_GETMARGINLEFT));
 
-        QCOMPARE(horizontalPadding, 5);
+        QCOMPARE(horizontalPadding, 6);
         QCOMPARE(editor.configuredViewportMargins().top(), 0);
     }
 
@@ -903,6 +903,7 @@ private slots:
         QVERIFY(textEditor->filePath().isEmpty());
         QCOMPARE(textEditor->wrapMode(), CustomEditor::WrapWord);
         QCOMPARE(textEditor->marginWidth(0), 0);
+        QCOMPARE(textEditor->SendScintilla(QsciScintillaBase::SCI_GETMARGINRIGHT), 6L);
 
         // Code mode keeps line numbers and horizontal scrolling.
         prefs.setUntitledUsesCodeMode(true);
@@ -913,12 +914,14 @@ private slots:
         QVERIFY(codeEditor);
         QCOMPARE(codeEditor->wrapMode(), CustomEditor::WrapNone);
         QVERIFY(codeEditor->marginWidth(0) > 0);
+        QCOMPARE(codeEditor->SendScintilla(QsciScintillaBase::SCI_GETMARGINRIGHT), 0L);
 
         // Changing the preference re-applies to already open untitled documents.
         prefs.setUntitledUsesCodeMode(false);
         codeController.editorManager()->applyCodeFeaturePreferences();
         QCOMPARE(codeEditor->wrapMode(), CustomEditor::WrapWord);
         QCOMPARE(codeEditor->marginWidth(0), 0);
+        QCOMPARE(codeEditor->SendScintilla(QsciScintillaBase::SCI_GETMARGINRIGHT), 6L);
 
         prefs.setUntitledUsesCodeMode(originalMode);
     }

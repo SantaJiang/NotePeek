@@ -2,16 +2,12 @@
 #include <QFrame>
 #include <QMimeData>
 
-namespace {
-constexpr int EditorContentPadding = 5;
-}
-
 CustomEditor::CustomEditor(QWidget *parent)
     : NotePeek::Editor{parent}
 {
     setAcceptDrops(true);
     setFrameShape(QFrame::NoFrame);
-    SendScintilla(QsciScintillaBase::SCI_SETMARGINLEFT, 0UL, EditorContentPadding);
+    SendScintilla(QsciScintillaBase::SCI_SETMARGINLEFT, 0UL, ContentPadding);
 }
 
 void CustomEditor::setFilePath(const QString &path)

@@ -637,7 +637,8 @@ void EditorManager::applyDisplayPolicy(CustomEditor *editor, const QString &file
     {
         updateLineNumberMarginWidth(editor);
     }
-    editor->SendScintilla(QsciScintillaBase::SCI_SETMARGINRIGHT, 0UL, softWrap ? 5L : 0L);
+    editor->SendScintilla(QsciScintillaBase::SCI_SETMARGINRIGHT, 0UL,
+                          softWrap ? static_cast<long>(CustomEditor::ContentPadding) : 0L);
 }
 
 void EditorManager::applyCodeFeaturePreferences()
