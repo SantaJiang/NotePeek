@@ -137,15 +137,16 @@ void GitPresentationCoordinator::updatePresentation(const GitRepositorySnapshot 
 
     // Keep the established translation context after moving this behavior out
     // of MainWindow. The direct call also lets lupdate retain the translation.
-    const QString toolTip = QCoreApplication::translate(
+    // The status bar shows this text in a click popup, not a hover tooltip.
+    const QString details = QCoreApplication::translate(
                                 "MainWindow",
                                 "Repository: %1\nBranch: %2\nChanges: %3\n"
-                                "Ahead: %4, Behind: %5\nClick to refresh")
+                                "Ahead: %4, Behind: %5")
                                 .arg(snapshot.repositoryRoot, branch)
                                 .arg(snapshot.files.size())
                                 .arg(snapshot.ahead)
                                 .arg(snapshot.behind);
-    m_statusBar->setGitStatus(text, toolTip);
+    m_statusBar->setGitStatus(text, details);
 }
 
 void GitPresentationCoordinator::clearPresentation()

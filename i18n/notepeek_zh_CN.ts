@@ -843,17 +843,15 @@ Git 状态：%2</translation>
         <translation>致玥玥</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/versioncontrol/gitpresentationcoordinator.cpp" line="140"/>
+        <location filename="../src/MainPage/versioncontrol/gitpresentationcoordinator.cpp" line="141"/>
         <source>Repository: %1
 Branch: %2
 Changes: %3
-Ahead: %4, Behind: %5
-Click to refresh</source>
+Ahead: %4, Behind: %5</source>
         <translation>仓库：%1
 分支：%2
 变更：%3
-领先：%4，落后：%5
-点击刷新</translation>
+领先：%4，落后：%5</translation>
     </message>
 </context>
 <context>
@@ -1179,48 +1177,55 @@ Click to refresh</source>
 <context>
     <name>QsciEditorInfoStatusBar</name>
     <message>
-        <location filename="../src/MainPage/widgets/qscieditorinfostatusbar.cpp" line="237"/>
+        <location filename="../src/MainPage/widgets/qscieditorinfostatusbar.cpp" line="243"/>
+        <location filename="../src/MainPage/widgets/qscieditorinfostatusbar.cpp" line="263"/>
+        <location filename="../src/MainPage/widgets/qscieditorinfostatusbar.cpp" line="420"/>
+        <source>Refresh</source>
+        <translation>刷新</translation>
+    </message>
+    <message>
+        <location filename="../src/MainPage/widgets/qscieditorinfostatusbar.cpp" line="430"/>
         <source>Line %1, Column %2</source>
         <translation>行%1，列%2</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/widgets/qscieditorinfostatusbar.cpp" line="247"/>
+        <location filename="../src/MainPage/widgets/qscieditorinfostatusbar.cpp" line="440"/>
         <source>Line %1, Column %2 (Selected %3)</source>
         <translation>行%1，列%2(已选择%3)</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/widgets/qscieditorinfostatusbar.cpp" line="262"/>
+        <location filename="../src/MainPage/widgets/qscieditorinfostatusbar.cpp" line="455"/>
         <source>Plain Text</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="../src/MainPage/widgets/qscieditorinfostatusbar.cpp" line="271"/>
+        <location filename="../src/MainPage/widgets/qscieditorinfostatusbar.cpp" line="464"/>
         <source>Mixed line endings</source>
         <translation>混合换行符</translation>
     </message>
     <message>
-        <location filename="../src/MainPage/widgets/qscieditorinfostatusbar.cpp" line="278"/>
+        <location filename="../src/MainPage/widgets/qscieditorinfostatusbar.cpp" line="471"/>
         <source>Windows (CR LF)</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="../src/MainPage/widgets/qscieditorinfostatusbar.cpp" line="281"/>
+        <location filename="../src/MainPage/widgets/qscieditorinfostatusbar.cpp" line="474"/>
         <source>Unix (LF)</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="../src/MainPage/widgets/qscieditorinfostatusbar.cpp" line="284"/>
+        <location filename="../src/MainPage/widgets/qscieditorinfostatusbar.cpp" line="477"/>
         <source>Macintosh (CR)</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="../src/MainPage/widgets/qscieditorinfostatusbar.cpp" line="287"/>
-        <location filename="../src/MainPage/widgets/qscieditorinfostatusbar.cpp" line="301"/>
+        <location filename="../src/MainPage/widgets/qscieditorinfostatusbar.cpp" line="480"/>
+        <location filename="../src/MainPage/widgets/qscieditorinfostatusbar.cpp" line="494"/>
         <source>Unknown</source>
         <translation></translation>
     </message>
     <message>
-        <location filename="../src/MainPage/widgets/qscieditorinfostatusbar.cpp" line="301"/>
+        <location filename="../src/MainPage/widgets/qscieditorinfostatusbar.cpp" line="494"/>
         <source>UTF-8</source>
         <translation></translation>
     </message>

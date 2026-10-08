@@ -28,6 +28,7 @@
 
 
 class QsciScintilla;
+class GitStatusPopup;
 class ClickableLabel : public QLabel
 {
     Q_OBJECT
@@ -66,7 +67,7 @@ public:
     void refresh(QsciScintilla *editor);
     void connectToEditor(QsciScintilla *editor);
     void reapplyTheme();
-    void setGitStatus(const QString &text, const QString &toolTip = QString());
+    void setGitStatus(const QString &text, const QString &details = QString());
 
 signals:
     void customContextMenuRequestedForEOLLabel(const QPoint &pos);
@@ -74,6 +75,7 @@ signals:
 
 protected:
     void changeEvent(QEvent *event) override;
+    bool eventFilter(QObject *watched, QEvent *event) override;
 
 private slots:
     void editorCursorPositionChanged(int line, int index);
@@ -86,6 +88,9 @@ private:
     void updateEol(QsciScintilla *editor);
     void updateEncoding(QsciScintilla *editor);
     void applyChromeTheme();
+    void toggleGitDetailsPopup();
+    void hideGitDetailsPopup();
+    void positionGitDetailsPopup();
 
     QLabel *docType;
     QLabel *docPos;
@@ -94,6 +99,10 @@ private:
     QWidget *gitStatusContainer;
     StatusLabel *gitBranchIcon;
     StatusLabel *gitStatus;
+    GitStatusPopup *m_gitPopup = nullptr;
+    QString m_gitDetails;
+    bool m_hidingGitPopup = false;
+    bool m_suppressGitPopup = false;
 
     QPointer<QsciScintilla> currentEditor;
 };

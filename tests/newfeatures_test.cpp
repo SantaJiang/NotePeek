@@ -520,17 +520,40 @@ private slots:
         QSignalSpy refreshSpy(&statusBar,
                               &QsciEditorInfoStatusBar::gitRefreshRequested);
         statusBar.show();
-        statusBar.setGitStatus(QStringLiteral("main  •2"),
-                               QStringLiteral("Click to refresh"));
+        const QString details = QStringLiteral("Repository: demo\nBranch: main");
+        statusBar.setGitStatus(QStringLiteral("main  •2"), details);
         QVERIFY(!gitContainer->isHidden());
         QCOMPARE(gitLabel->text(), QStringLiteral("main  •2"));
+        QCOMPARE(gitIcon->toolTip(), QString());
+        QCOMPARE(gitLabel->toolTip(), QString());
+
         QTest::mouseClick(gitIcon, Qt::LeftButton);
+        auto *popup = statusBar.findChild<QWidget *>(QStringLiteral("statusGitPopup"));
+        auto *popupDetails = statusBar.findChild<QLabel *>(
+            QStringLiteral("statusGitPopupDetails"));
+        auto *refreshButton = statusBar.findChild<QPushButton *>(
+            QStringLiteral("statusGitPopupRefresh"));
+        QVERIFY(popup);
+        QVERIFY(popupDetails);
+        QVERIFY(refreshButton);
+        QVERIFY(popup->isVisible());
+        QCOMPARE(popupDetails->text(), details);
+        QTest::mouseClick(refreshButton, Qt::LeftButton);
         QCOMPARE(refreshSpy.count(), 1);
+
         QTest::mouseClick(gitLabel, Qt::LeftButton);
-        QCOMPARE(refreshSpy.count(), 2);
+        QVERIFY(!popup->isVisible());
+        QCOMPARE(refreshSpy.count(), 1);
+
+        QTest::mouseClick(gitLabel, Qt::LeftButton);
+        QVERIFY(popup->isVisible());
+        statusBar.setGitStatus(QStringLiteral("main  •3"),
+                               QStringLiteral("Repository: demo\nBranch: topic"));
+        QCOMPARE(popupDetails->text(), QStringLiteral("Repository: demo\nBranch: topic"));
 
         statusBar.setGitStatus(QString());
         QVERIFY(gitContainer->isHidden());
+        QVERIFY(!popup->isVisible());
     }
 
     void usesUntranslatedNameForUntitledDocuments()

@@ -21,9 +21,14 @@
 #include "editor/documentformat.h"
 #include "themecolors.h"
 #include "widgets/iconfont.h"
+#include <QCursor>
+#include <QGuiApplication>
 #include <QHBoxLayout>
 #include <QMainWindow>
+#include <QPushButton>
+#include <QScreen>
 #include <QTimer>
+#include <QVBoxLayout>
 #include <Qsci/qsciscintilla.h>
 #include <Qsci/qsciscintillabase.h>
 #include <Qsci/qscilexer.h>
@@ -32,8 +37,93 @@ namespace {
 
 constexpr int kItemSpacing = 15;
 constexpr int kGitIconSpacing = 5;
+constexpr int kGitPopupGap = 6;
 
 } // namespace
+
+class GitStatusPopup : public QFrame
+{
+public:
+    explicit GitStatusPopup(QWidget *parent = nullptr)
+        : QFrame(parent, Qt::Popup | Qt::FramelessWindowHint)
+    {
+        setObjectName(QStringLiteral("statusGitPopup"));
+        setAttribute(Qt::WA_StyledBackground, true);
+
+        auto *layout = new QVBoxLayout(this);
+        layout->setContentsMargins(12, 10, 12, 10);
+        layout->setSpacing(8);
+
+        m_details = new QLabel(this);
+        m_details->setObjectName(QStringLiteral("statusGitPopupDetails"));
+        m_details->setTextFormat(Qt::PlainText);
+        m_details->setWordWrap(true);
+        m_details->setMaximumWidth(420);
+        layout->addWidget(m_details);
+
+        m_refreshButton = new QPushButton(this);
+        m_refreshButton->setObjectName(QStringLiteral("statusGitPopupRefresh"));
+        m_refreshButton->setCursor(Qt::PointingHandCursor);
+        layout->addWidget(m_refreshButton, 0, Qt::AlignLeft);
+    }
+
+    void setDetails(const QString &text)
+    {
+        m_details->setText(text);
+    }
+
+    void setRefreshText(const QString &text)
+    {
+        m_refreshButton->setText(text);
+    }
+
+    QPushButton *refreshButton() const
+    {
+        return m_refreshButton;
+    }
+
+    void applyChromeTheme()
+    {
+        using namespace ThemeColors::EditorTopBar;
+
+        const QString foreground = text().name(QColor::HexRgb);
+        const QString styleSheet = QStringLiteral(
+            "QFrame#statusGitPopup {"
+            "  background-color: %1;"
+            "  color: %2;"
+            "  border: 1px solid %3;"
+            "  border-radius: 6px;"
+            "}"
+            "QLabel#statusGitPopupDetails {"
+            "  color: %4;"
+            "  background: transparent;"
+            "}"
+            "QPushButton#statusGitPopupRefresh {"
+            "  color: %5;"
+            "  background-color: %6;"
+            "  border: none;"
+            "  border-radius: 4px;"
+            "  padding: 4px 10px;"
+            "}"
+            "QPushButton#statusGitPopupRefresh:hover {"
+            "  background-color: %7;"
+            "}"
+        ).arg(popupBg().name(QColor::HexRgb),
+              foreground,
+              border().name(QColor::HexRgb),
+              foreground,
+              foreground,
+              hoverBg().name(QColor::HexRgb),
+              pressedBg().name(QColor::HexRgb));
+
+        if (this->styleSheet() != styleSheet)
+            setStyleSheet(styleSheet);
+    }
+
+private:
+    QLabel *m_details = nullptr;
+    QPushButton *m_refreshButton = nullptr;
+};
 
 QsciEditorInfoStatusBar::QsciEditorInfoStatusBar(QMainWindow *window)
     : QStatusBar(window), currentEditor(nullptr)
@@ -73,9 +163,9 @@ QsciEditorInfoStatusBar::QsciEditorInfoStatusBar(QMainWindow *window)
     gitStatusContainer->hide();
     addWidget(gitStatusContainer, 0);
     connect(gitBranchIcon, &StatusLabel::clicked,
-            this, &QsciEditorInfoStatusBar::gitRefreshRequested);
+            this, &QsciEditorInfoStatusBar::toggleGitDetailsPopup);
     connect(gitStatus, &StatusLabel::clicked,
-            this, &QsciEditorInfoStatusBar::gitRefreshRequested);
+            this, &QsciEditorInfoStatusBar::toggleGitDetailsPopup);
 
     docPos = new StatusLabel(this);
     docPos->setObjectName(QStringLiteral("statusDocumentPosition"));
@@ -117,12 +207,109 @@ QsciEditorInfoStatusBar::QsciEditorInfoStatusBar(QMainWindow *window)
     applyChromeTheme();
 }
 
-void QsciEditorInfoStatusBar::setGitStatus(const QString &text, const QString &toolTip)
+void QsciEditorInfoStatusBar::setGitStatus(const QString &text, const QString &details)
 {
+    m_gitDetails = details;
     gitStatus->setText(text);
-    gitStatus->setToolTip(toolTip);
-    gitBranchIcon->setToolTip(toolTip);
+    gitStatus->setToolTip(QString());
+    gitBranchIcon->setToolTip(QString());
     gitStatusContainer->setVisible(!text.isEmpty());
+
+    if (!m_gitPopup)
+        return;
+
+    if (text.isEmpty() || details.isEmpty())
+    {
+        hideGitDetailsPopup();
+        return;
+    }
+
+    if (m_gitPopup->isVisible())
+    {
+        m_gitPopup->setDetails(details);
+        positionGitDetailsPopup();
+    }
+}
+
+void QsciEditorInfoStatusBar::toggleGitDetailsPopup()
+{
+    if (m_gitDetails.isEmpty())
+        return;
+
+    if (!m_gitPopup)
+    {
+        m_gitPopup = new GitStatusPopup(this);
+        m_gitPopup->installEventFilter(this);
+        m_gitPopup->setRefreshText(tr("Refresh"));
+        connect(m_gitPopup->refreshButton(), &QPushButton::clicked,
+                this, &QsciEditorInfoStatusBar::gitRefreshRequested);
+    }
+
+    if (m_gitPopup->isVisible())
+    {
+        hideGitDetailsPopup();
+        return;
+    }
+
+    // Qt::Popup closes on the mouse press that lands back on this control.
+    // The matching release would otherwise open the bubble again immediately.
+    if (m_suppressGitPopup)
+    {
+        m_suppressGitPopup = false;
+        return;
+    }
+
+    m_gitPopup->setDetails(m_gitDetails);
+    m_gitPopup->setRefreshText(tr("Refresh"));
+    m_gitPopup->applyChromeTheme();
+    positionGitDetailsPopup();
+    m_gitPopup->show();
+}
+
+void QsciEditorInfoStatusBar::hideGitDetailsPopup()
+{
+    if (!m_gitPopup || !m_gitPopup->isVisible())
+        return;
+
+    m_hidingGitPopup = true;
+    m_gitPopup->hide();
+    m_hidingGitPopup = false;
+}
+
+void QsciEditorInfoStatusBar::positionGitDetailsPopup()
+{
+    if (!m_gitPopup)
+        return;
+
+    m_gitPopup->adjustSize();
+    const QPoint anchor = gitStatusContainer->mapToGlobal(QPoint(0, 0));
+    QPoint pos(anchor.x(), anchor.y() - m_gitPopup->height() - kGitPopupGap);
+    if (QScreen *screen = gitStatusContainer->screen())
+    {
+        const QRect available = screen->availableGeometry();
+        if (pos.x() + m_gitPopup->width() > available.right() - kGitPopupGap)
+        {
+            pos.setX(qMax(available.left() + kGitPopupGap,
+                          available.right() - m_gitPopup->width() - kGitPopupGap));
+        }
+        if (pos.x() < available.left() + kGitPopupGap)
+            pos.setX(available.left() + kGitPopupGap);
+        if (pos.y() < available.top() + kGitPopupGap)
+            pos.setY(anchor.y() + gitStatusContainer->height() + kGitPopupGap);
+    }
+    m_gitPopup->move(pos);
+}
+
+bool QsciEditorInfoStatusBar::eventFilter(QObject *watched, QEvent *event)
+{
+    if (watched == m_gitPopup && event->type() == QEvent::Hide && !m_hidingGitPopup)
+    {
+        const QRect control(gitStatusContainer->mapToGlobal(QPoint(0, 0)),
+                            gitStatusContainer->size());
+        m_suppressGitPopup = QGuiApplication::mouseButtons() != Qt::NoButton
+                             && control.contains(QCursor::pos());
+    }
+    return QStatusBar::eventFilter(watched, event);
 }
 
 void QsciEditorInfoStatusBar::refresh(QsciScintilla *editor)
@@ -209,6 +396,8 @@ void QsciEditorInfoStatusBar::applyChromeTheme()
     {
         setStyleSheet(styleSheet);
     }
+    if (m_gitPopup)
+        m_gitPopup->applyChromeTheme();
 }
 
 void QsciEditorInfoStatusBar::reapplyTheme()
@@ -225,6 +414,10 @@ void QsciEditorInfoStatusBar::changeEvent(QEvent *event)
         // Let QApplication finish installing the platform palette before QSS
         // repolishes this widget and its children.
         QTimer::singleShot(0, this, &QsciEditorInfoStatusBar::applyChromeTheme);
+    }
+    else if (event->type() == QEvent::LanguageChange && m_gitPopup)
+    {
+        m_gitPopup->setRefreshText(tr("Refresh"));
     }
 }
 
