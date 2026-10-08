@@ -375,6 +375,7 @@ PreferencesDialog::PreferencesDialog(QWidget *parent)
     , m_documentCompletion(new QCheckBox(tr("Suggest words from the current document"), this))
     , m_semanticHighlighting(new QCheckBox(tr("Add function, type, member and variable colors"), this))
     , m_languageCombo(new QComboBox(this))
+    , m_colorThemeCombo(new QComboBox(this))
     , m_searchEdit(new QLineEdit(this))
     , m_sectionList(new QListWidget(this))
     , m_sectionStack(new QStackedWidget(this))
@@ -472,8 +473,15 @@ PreferencesDialog::PreferencesDialog(QWidget *parent)
     m_overtypeMode->addItem(tr("Overwrite (OVR)"), true);
     m_overtypeMode->setToolTip(tr("Controls whether typing inserts or replaces the character ahead of the caret."));
 
+    m_colorThemeCombo->setObjectName(QStringLiteral("colorThemeCombo"));
+    m_colorThemeCombo->addItem(tr("Light"), int(AppPreferences::ColorTheme::Light));
+    m_colorThemeCombo->addItem(tr("Dark"), int(AppPreferences::ColorTheme::Dark));
+    m_colorThemeCombo->addItem(tr("Follow system"), int(AppPreferences::ColorTheme::System));
+    m_colorThemeCombo->setToolTip(tr("Applies immediately to the whole application."));
+
     auto *generalSection = makeSection(tr("General"), this);
     auto *generalLayout = qobject_cast<QVBoxLayout *>(generalSection->layout());
+    generalLayout->addLayout(makeSettingsRow(tr("Theme color"), m_colorThemeCombo, generalSection));
     generalLayout->addLayout(makeSettingsRow(tr("Language"), m_languageCombo, generalSection));
     generalLayout->addLayout(makeSettingsRow(tr("Interface"), m_showStatusBar, generalSection));
     generalLayout->addLayout(makeSettingsRow(tr("Startup"), m_showFileTree, generalSection));
@@ -504,19 +512,19 @@ PreferencesDialog::PreferencesDialog(QWidget *parent)
     // matching sidebar entry.  The page index returned by addWidget is stored
     // on the list item (Qt::UserRole) so each entry stays bound to its page
     // regardless of the order in which pages and entries are added.
-    const int editorIndex = m_sectionStack->addWidget(
-        makeScrollablePage(editorSection, m_sectionStack));
     const int generalIndex = m_sectionStack->addWidget(
         makeScrollablePage(generalSection, m_sectionStack));
+    const int editorIndex = m_sectionStack->addWidget(
+        makeScrollablePage(editorSection, m_sectionStack));
     const int codeIndex = m_sectionStack->addWidget(
         makeScrollablePage(codeSection, m_sectionStack));
     const int versionControlIndex = m_sectionStack->addWidget(
         makeScrollablePage(versionControlSection, m_sectionStack));
 
-    auto *editorItem = new QListWidgetItem(tr("Editor"), m_sectionList);
-    editorItem->setData(Qt::UserRole, editorIndex);
     auto *generalItem = new QListWidgetItem(tr("General"), m_sectionList);
     generalItem->setData(Qt::UserRole, generalIndex);
+    auto *editorItem = new QListWidgetItem(tr("Editor"), m_sectionList);
+    editorItem->setData(Qt::UserRole, editorIndex);
     auto *codeItem = new QListWidgetItem(tr("Code Editing"), m_sectionList);
     codeItem->setData(Qt::UserRole, codeIndex);
     auto *versionControlItem = new QListWidgetItem(tr("Version Control"), m_sectionList);
@@ -727,6 +735,7 @@ void PreferencesDialog::connectLiveUpdates()
         m_overtypeMode,
         m_markdownPreviewOpenMode,
         m_languageCombo,
+        m_colorThemeCombo,
     };
     for (QComboBox *combo : combos)
     {
@@ -837,6 +846,8 @@ void PreferencesDialog::loadFromPreferences()
 
     const int languageIndex = m_languageCombo->findData(prefs.language());
     m_languageCombo->setCurrentIndex(languageIndex >= 0 ? languageIndex : 0);
+    const int colorThemeIndex = m_colorThemeCombo->findData(int(prefs.colorTheme()));
+    m_colorThemeCombo->setCurrentIndex(colorThemeIndex >= 0 ? colorThemeIndex : 0);
 }
 
 void PreferencesDialog::commit()
@@ -862,8 +873,17 @@ void PreferencesDialog::commit()
     prefs.setDocumentCompletionEnabled(m_documentCompletion->isChecked());
     prefs.setSemanticHighlightingEnabled(m_semanticHighlighting->isChecked());
     prefs.setLanguage(m_languageCombo->currentData().toString());
+    const AppPreferences::ColorTheme previousColorTheme = prefs.colorTheme();
+    const AppPreferences::ColorTheme selectedColorTheme =
+        static_cast<AppPreferences::ColorTheme>(m_colorThemeCombo->currentData().toInt());
+    prefs.setColorTheme(selectedColorTheme);
 
     prefs.save();
+    if (previousColorTheme != selectedColorTheme)
+    {
+        prefs.applyColorTheme();
+        scheduleThemeRefresh();
+    }
 
     emit applied();
 }

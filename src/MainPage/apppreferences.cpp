@@ -1,5 +1,6 @@
 #include "apppreferences.h"
 #include "features/settings/settingsrepository.h"
+#include "themecolors.h"
 
 #include <QFontDatabase>
 #include <QFontMetrics>
@@ -79,6 +80,7 @@ AppPreferences::AppPreferences(std::unique_ptr<SettingsRepository> repository)
     , m_codeFontSize(defaultFontSize())
     , m_darkSyntaxThemeId(QStringLiteral("upstream-vscode-dark-2026"))
     , m_lightSyntaxThemeId(QStringLiteral("upstream-vscode-light-2026"))
+    , m_colorTheme(ColorTheme::System)
     , m_showFileTreeOnStartup(false)
     , m_showStatusBar(true)
     , m_revealCurrentFileInTree(false)
@@ -245,6 +247,15 @@ void AppPreferences::load()
     if (settings.contains(QStringLiteral("syntaxThemeFollowsSystem")))
         m_repository->remove({QStringLiteral("syntaxThemeFollowsSystem")});
 
+    const QString colorTheme =
+        settings.value(QStringLiteral("colorTheme"), QStringLiteral("system")).toString();
+    if (colorTheme == QLatin1String("light"))
+        m_colorTheme = ColorTheme::Light;
+    else if (colorTheme == QLatin1String("dark"))
+        m_colorTheme = ColorTheme::Dark;
+    else
+        m_colorTheme = ColorTheme::System;
+
     m_showFileTreeOnStartup =
         settings.value(QStringLiteral("showFileTreeOnStartup"), false).toBool();
     m_showStatusBar =
@@ -310,6 +321,12 @@ void AppPreferences::save() const
     settings.insert(QStringLiteral("codeFontSize"), m_codeFontSize);
     settings.insert(QStringLiteral("darkSyntaxTheme"), m_darkSyntaxThemeId);
     settings.insert(QStringLiteral("lightSyntaxTheme"), m_lightSyntaxThemeId);
+    QString colorTheme = QStringLiteral("system");
+    if (m_colorTheme == ColorTheme::Light)
+        colorTheme = QStringLiteral("light");
+    else if (m_colorTheme == ColorTheme::Dark)
+        colorTheme = QStringLiteral("dark");
+    settings.insert(QStringLiteral("colorTheme"), colorTheme);
     settings.insert(QStringLiteral("showFileTreeOnStartup"), m_showFileTreeOnStartup);
     settings.insert(QStringLiteral("showStatusBar"), m_showStatusBar);
     settings.insert(QStringLiteral("revealCurrentFileInTree"), m_revealCurrentFileInTree);
@@ -402,4 +419,15 @@ void AppPreferences::setLightSyntaxThemeId(const QString &themeId)
 QString AppPreferences::currentSyntaxThemeId(bool systemDark) const
 {
     return systemDark ? m_darkSyntaxThemeId : m_lightSyntaxThemeId;
+}
+
+void AppPreferences::applyColorTheme() const
+{
+    ThemeColors::ColorSchemePreference preference =
+        ThemeColors::ColorSchemePreference::FollowSystem;
+    if (m_colorTheme == ColorTheme::Light)
+        preference = ThemeColors::ColorSchemePreference::Light;
+    else if (m_colorTheme == ColorTheme::Dark)
+        preference = ThemeColors::ColorSchemePreference::Dark;
+    ThemeColors::setColorSchemePreference(preference);
 }

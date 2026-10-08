@@ -39,13 +39,28 @@ public:
 
     // Syntax colour themes exported by NotePeekScintilla. Dark and light
     // choices are stored independently and the active one is always selected
-    // by the current system appearance, so syntax highlighting tracks the
-    // light/dark theme automatically.
+    // by the effective appearance (the color theme, or the system appearance
+    // when that theme follows the system).
     QString darkSyntaxThemeId() const { return m_darkSyntaxThemeId; }
     QString lightSyntaxThemeId() const { return m_lightSyntaxThemeId; }
     void setDarkSyntaxThemeId(const QString &themeId);
     void setLightSyntaxThemeId(const QString &themeId);
     QString currentSyntaxThemeId(bool systemDark) const;
+
+    // Application appearance. System follows the platform; Light and Dark
+    // pin the whole UI, including which syntax theme is active.
+    enum class ColorTheme
+    {
+        System,
+        Light,
+        Dark
+    };
+
+    ColorTheme colorTheme() const { return m_colorTheme; }
+    void setColorTheme(ColorTheme theme) { m_colorTheme = theme; }
+    // Push the stored choice into ThemeColors and, on Qt 6.5+, the style.
+    // Call after load() and after the user changes the setting.
+    void applyColorTheme() const;
 
     // Show the left file-tree dock when the application starts.  This only
     // seeds the initial state; the user's manual toggles during a session are
@@ -145,6 +160,7 @@ private:
     int m_codeFontSize;
     QString m_darkSyntaxThemeId;
     QString m_lightSyntaxThemeId;
+    ColorTheme m_colorTheme;
     bool m_showFileTreeOnStartup;
     bool m_showStatusBar;
     bool m_revealCurrentFileInTree;

@@ -68,6 +68,7 @@ private:
     QCheckBox *m_documentCompletion;
     QCheckBox *m_semanticHighlighting;
     QComboBox *m_languageCombo;
+    QComboBox *m_colorThemeCombo;
     QLineEdit *m_searchEdit;
     QListWidget *m_sectionList;
     QStackedWidget *m_sectionStack;

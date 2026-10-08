@@ -95,6 +95,7 @@ int main(int argc, char *argv[])
     // validation sees the bundled families, and before the translator so the
     // language preference can override the system locale.
     AppPreferences::instance().load();
+    AppPreferences::instance().applyColorTheme();
 
     //translate — an explicit language preference wins over the system locale
     QTranslator translator;

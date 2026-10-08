@@ -14,10 +14,9 @@
 #include <QToolButton>
 #include <QSignalSpy>
 #include <QScrollBar>
-#if QT_VERSION >= QT_VERSION_CHECK(6, 8, 0)
+#include <QGuiApplication>
 #include <QScopeGuard>
 #include <QStyleHints>
-#endif
 #include <QStackedWidget>
 #include <QStringList>
 #include <QTimer>
@@ -1343,9 +1342,17 @@ private slots:
         QVERIFY(search);
         QVERIFY(sections);
         QCOMPARE(sections->count(), 4);
+        QCOMPARE(sections->item(0)->text(), QStringLiteral("General"));
+        QCOMPARE(sections->item(1)->text(), QStringLiteral("Editor"));
+        QCOMPARE(sections->currentRow(), 0);
         QVERIFY(dialog.width() <= 700);
         QVERIFY(dialog.height() <= 320);
         QCOMPARE(search->width(), sections->viewport()->width());
+
+        // Editor is no longer the first page. Show it before measuring its
+        // title against the font rows, which only have a layout once visible.
+        sections->setCurrentRow(1);
+        QCoreApplication::processEvents();
 
         QLabel *sectionTitle = nullptr;
         QLabel *textFontLabel = nullptr;
@@ -1370,8 +1377,11 @@ private slots:
         // than merely its widget geometry, aligns with the regular labels.
         QCOMPARE(sectionTitle->mapTo(&dialog, QPoint()).x() + 4,
                  textFontLabel->mapTo(&dialog, QPoint()).x());
-        QVERIFY(codeFontLabel->mapTo(&dialog, QPoint()).y()
-                - textFontLabel->mapTo(&dialog, QPoint()).y() <= 36);
+        // Adjacent form rows. 40 px is one control plus the section spacing;
+        // an extra row between them would be roughly twice that.
+        const int fontRowGap = codeFontLabel->mapTo(&dialog, QPoint()).y()
+            - textFontLabel->mapTo(&dialog, QPoint()).y();
+        QVERIFY(fontRowGap <= 44);
 
         auto *darkCombo = dialog.findChild<QComboBox *>(
             QStringLiteral("darkSyntaxThemeCombo"));
@@ -1430,15 +1440,15 @@ private slots:
         QCOMPARE(appliedSpy.count(), 8);
 
         search->setText(QStringLiteral("Markdown"));
-        QVERIFY(sections->item(0)->isHidden());
-        QVERIFY(!sections->item(1)->isHidden());
+        QVERIFY(!sections->item(0)->isHidden());
+        QVERIFY(sections->item(1)->isHidden());
         QVERIFY(sections->item(2)->isHidden());
         QVERIFY(sections->item(3)->isHidden());
-        QCOMPARE(sections->currentItem(), sections->item(1));
+        QCOMPARE(sections->currentItem(), sections->item(0));
 
         search->setText(QStringLiteral("Remember last"));
-        QVERIFY(sections->item(0)->isHidden());
-        QVERIFY(!sections->item(1)->isHidden());
+        QVERIFY(!sections->item(0)->isHidden());
+        QVERIFY(sections->item(1)->isHidden());
         QVERIFY(sections->item(2)->isHidden());
         QVERIFY(sections->item(3)->isHidden());
 
@@ -1494,6 +1504,68 @@ private slots:
         styleHints->setColorScheme(originalScheme);
         QCoreApplication::processEvents();
 #endif
+    }
+
+    void colorThemeSettingOffersLightDarkAndSystem()
+    {
+        AppPreferences &preferences = AppPreferences::instance();
+        const AppPreferences::ColorTheme previousTheme = preferences.colorTheme();
+#if QT_VERSION >= QT_VERSION_CHECK(6, 5, 0)
+        QStyleHints *styleHints = QGuiApplication::styleHints();
+        const Qt::ColorScheme originalScheme = styleHints->colorScheme();
+#endif
+        const auto restore = qScopeGuard([previousTheme
+#if QT_VERSION >= QT_VERSION_CHECK(6, 5, 0)
+                                           , styleHints, originalScheme
+#endif
+        ]() {
+            AppPreferences &prefs = AppPreferences::instance();
+            prefs.setColorTheme(previousTheme);
+            prefs.applyColorTheme();
+#if QT_VERSION >= QT_VERSION_CHECK(6, 5, 0)
+            if (previousTheme == AppPreferences::ColorTheme::System)
+                styleHints->setColorScheme(originalScheme);
+#endif
+            prefs.save();
+        });
+
+        PreferencesDialog dialog;
+        auto *combo = dialog.findChild<QComboBox *>(QStringLiteral("colorThemeCombo"));
+        QVERIFY(combo);
+        QCOMPARE(combo->count(), 3);
+        QCOMPARE(combo->itemText(0), QStringLiteral("Light"));
+        QCOMPARE(combo->itemData(0).toInt(), int(AppPreferences::ColorTheme::Light));
+        QCOMPARE(combo->itemText(1), QStringLiteral("Dark"));
+        QCOMPARE(combo->itemData(1).toInt(), int(AppPreferences::ColorTheme::Dark));
+        QCOMPARE(combo->itemText(2), QStringLiteral("Follow system"));
+        QCOMPARE(combo->itemData(2).toInt(), int(AppPreferences::ColorTheme::System));
+        QCOMPARE(combo->currentData().toInt(), int(previousTheme));
+
+        QLabel *themeLabel = nullptr;
+        const QList<QLabel *> labels = dialog.findChildren<QLabel *>();
+        for (QLabel *label : labels)
+        {
+            if (label->text() == QLatin1String("Theme color"))
+                themeLabel = label;
+        }
+        QVERIFY(themeLabel);
+
+        combo->setCurrentIndex(0);
+        QCOMPARE(preferences.colorTheme(), AppPreferences::ColorTheme::Light);
+        QVERIFY(!ThemeColors::isDarkMode());
+        QCOMPARE(ThemeColors::colorSchemePreference(),
+                 ThemeColors::ColorSchemePreference::Light);
+
+        combo->setCurrentIndex(1);
+        QCOMPARE(preferences.colorTheme(), AppPreferences::ColorTheme::Dark);
+        QVERIFY(ThemeColors::isDarkMode());
+        QCOMPARE(ThemeColors::colorSchemePreference(),
+                 ThemeColors::ColorSchemePreference::Dark);
+
+        combo->setCurrentIndex(2);
+        QCOMPARE(preferences.colorTheme(), AppPreferences::ColorTheme::System);
+        QCOMPARE(ThemeColors::colorSchemePreference(),
+                 ThemeColors::ColorSchemePreference::FollowSystem);
     }
 
     void statusBarVisibilityFollowsPreferences()

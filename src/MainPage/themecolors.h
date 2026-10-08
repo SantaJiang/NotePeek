@@ -25,8 +25,48 @@ namespace ThemeColors {
 
 // ---------- detection ----------
 
+// The user's appearance choice. FollowSystem reads the platform scheme;
+// Light and Dark pin the application until the choice changes.
+enum class ColorSchemePreference
+{
+    FollowSystem,
+    Light,
+    Dark
+};
+
+inline ColorSchemePreference &colorSchemePreferenceStorage()
+{
+    static ColorSchemePreference preference = ColorSchemePreference::FollowSystem;
+    return preference;
+}
+
+inline ColorSchemePreference colorSchemePreference()
+{
+    return colorSchemePreferenceStorage();
+}
+
+// Records the preference and, on Qt 6.5+, asks the style to follow it.
+// Unknown means "match the system" for QStyleHints::setColorScheme.
+inline void setColorSchemePreference(ColorSchemePreference preference)
+{
+    colorSchemePreferenceStorage() = preference;
+#if QT_VERSION >= QT_VERSION_CHECK(6, 5, 0)
+    Qt::ColorScheme scheme = Qt::ColorScheme::Unknown;
+    if (preference == ColorSchemePreference::Light)
+        scheme = Qt::ColorScheme::Light;
+    else if (preference == ColorSchemePreference::Dark)
+        scheme = Qt::ColorScheme::Dark;
+    QGuiApplication::styleHints()->setColorScheme(scheme);
+#endif
+}
+
 inline bool isDarkMode()
 {
+    const ColorSchemePreference preference = colorSchemePreference();
+    if (preference == ColorSchemePreference::Dark)
+        return true;
+    if (preference == ColorSchemePreference::Light)
+        return false;
 #if QT_VERSION >= QT_VERSION_CHECK(6, 5, 0)
     return QGuiApplication::styleHints()->colorScheme() == Qt::ColorScheme::Dark;
 #else

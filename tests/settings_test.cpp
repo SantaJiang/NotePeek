@@ -151,6 +151,46 @@ private slots:
         QVERIFY(recording->removedOnLoad.contains(QStringLiteral("fixedSyntaxTheme")));
         QVERIFY(recording->removedOnLoad.contains(QStringLiteral("syntaxThemeFollowsSystem")));
     }
+
+    void colorThemeDefaultsToSystemAndPersistsExplicitChoices()
+    {
+        auto repository = std::make_unique<RecordingSettingsRepository>();
+        AppPreferences preferences(std::move(repository));
+        preferences.load();
+        QCOMPARE(preferences.colorTheme(), AppPreferences::ColorTheme::System);
+
+        auto savedRepository = std::make_unique<RecordingSettingsRepository>();
+        RecordingSettingsRepository *recording = savedRepository.get();
+        AppPreferences saving(std::move(savedRepository));
+        saving.setColorTheme(AppPreferences::ColorTheme::Dark);
+        saving.save();
+        QCOMPARE(recording->savedValues.value(QStringLiteral("colorTheme")).toString(),
+                 QStringLiteral("dark"));
+
+        saving.setColorTheme(AppPreferences::ColorTheme::Light);
+        saving.save();
+        QCOMPARE(recording->savedValues.value(QStringLiteral("colorTheme")).toString(),
+                 QStringLiteral("light"));
+
+        saving.setColorTheme(AppPreferences::ColorTheme::System);
+        saving.save();
+        QCOMPARE(recording->savedValues.value(QStringLiteral("colorTheme")).toString(),
+                 QStringLiteral("system"));
+
+        auto loadedRepository = std::make_unique<RecordingSettingsRepository>();
+        loadedRepository->loadedValues.insert(QStringLiteral("colorTheme"),
+                                              QStringLiteral("light"));
+        AppPreferences loaded(std::move(loadedRepository));
+        loaded.load();
+        QCOMPARE(loaded.colorTheme(), AppPreferences::ColorTheme::Light);
+
+        auto invalidRepository = std::make_unique<RecordingSettingsRepository>();
+        invalidRepository->loadedValues.insert(QStringLiteral("colorTheme"),
+                                               QStringLiteral("neon"));
+        AppPreferences invalid(std::move(invalidRepository));
+        invalid.load();
+        QCOMPARE(invalid.colorTheme(), AppPreferences::ColorTheme::System);
+    }
 };
 
 QTEST_MAIN(SettingsTest)
