@@ -236,7 +236,7 @@ QString preferencesStyleSheet()
 {
     using namespace ThemeColors::Preferences;
 
-    return QStringLiteral(
+    QString styleSheet = QStringLiteral(
         "QDialog {"
         "  background-color: %1;"
         "  color: %5;"
@@ -347,6 +347,15 @@ QString preferencesStyleSheet()
              accent().name(QColor::HexRgb),
              accentText().name(QColor::HexRgb),
              accentPressed().name(QColor::HexRgb));
+#ifdef Q_OS_WIN
+    styleSheet += QStringLiteral(
+        "QLineEdit#settingsSearch, QPushButton, QListWidget#sectionList::item { border-radius:0; }"
+        "QListWidget#sectionList::item:selected { background-color:%1; color:%2; }"
+        "QAbstractItemView { selection-background-color:%1; selection-color:%2; }"
+        "QAbstractItemView::item:selected { background-color:%1; color:%2; }")
+        .arg(pressedBg().name(QColor::HexRgb), text().name(QColor::HexRgb));
+#endif
+    return styleSheet;
 }
 
 } // namespace
@@ -666,7 +675,13 @@ void PreferencesDialog::scheduleThemeRefresh()
 void PreferencesDialog::reapplyTheme()
 {
     polishDialogPalette(this);
+#ifdef Q_OS_WIN
+    const QString styleSheet = preferencesStyleSheet();
+    if (this->styleSheet() != styleSheet)
+        setStyleSheet(styleSheet);
+#else
     setStyleSheet(preferencesStyleSheet());
+#endif
 }
 
 void PreferencesDialog::populateSyntaxThemeCombos()

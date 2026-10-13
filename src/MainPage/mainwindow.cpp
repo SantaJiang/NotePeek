@@ -20,6 +20,9 @@
 #include <QTimer>
 #include <QDockWidget>
 #include <QMenu>
+#ifdef Q_OS_WIN
+#include <QMenuBar>
+#endif
 #include <QSplitter>
 
 #include <utility>
@@ -41,7 +44,49 @@
 #include "widgets/fileexplorerdock.h"
 #include "widgets/searchresultsdock.h"
 
+#ifdef Q_OS_WIN
+// Include native headers after project headers: Windows defines PASCAL,
+// which is also a language name in LexerFactory.
+#include <qt_windows.h>
+#endif
+
 namespace {
+
+#ifdef Q_OS_WIN
+void applyWindowsMenuColors(QMainWindow *window)
+{
+    // Colour-only styling: preserve Fusion's sizing, fonts and menu geometry.
+    HIGHCONTRASTW contrast{};
+    contrast.cbSize = sizeof(contrast);
+    const bool highContrast = SystemParametersInfoW(
+        SPI_GETHIGHCONTRAST, sizeof(contrast), &contrast, 0)
+        && (contrast.dwFlags & HCF_HIGHCONTRASTON);
+    QString styleSheet;
+    if (!highContrast)
+    {
+        const bool dark = ThemeColors::isDarkMode();
+        styleSheet = QStringLiteral(
+            "QMenuBar { background-color:%1; color:%2; }"
+            "QMenuBar::item { background-color:transparent; }"
+            "QMenuBar::item:selected, QMenuBar::item:pressed { background-color:%3; color:%2; }"
+            "QMenu { background-color:%4; color:%2; }"
+            "QMenu::item:selected { background-color:%3; color:%2; }"
+            "QMenu::item:disabled { color:%5; }")
+            .arg(ThemeColors::EditorTopBar::background().name(),
+                 ThemeColors::FileTree::text().name(),
+                 dark ? QStringLiteral("#3B4758") : QStringLiteral("#E8EFFA"),
+                 ThemeColors::EditorTopBar::popupBg().name(),
+                 ThemeColors::EditorTopBar::mutedText().name());
+    }
+    if (window->menuBar()->styleSheet() != styleSheet)
+        window->menuBar()->setStyleSheet(styleSheet);
+    for (QMenu *menu : window->findChildren<QMenu *>())
+    {
+        if (menu->styleSheet() != styleSheet)
+            menu->setStyleSheet(styleSheet);
+    }
+}
+#endif
 
 QString normalizedAbsolutePath(const QString &path)
 {
@@ -267,6 +312,9 @@ MainWindow::MainWindow(QWidget *parent,
     ui->editorSplitter->setStretchFactor(1, 1);
     applyEditorSplitterStyle(ui->editorSplitter);
     applyMainWindowSeparatorStyle(this);
+#ifdef Q_OS_WIN
+    applyWindowsMenuColors(this);
+#endif
     m_editorCoordinator = new SplitEditorCoordinator(m_documentControllers,
                                                      ui->editorSplitter,
                                                      m_singleFileWindow,
@@ -515,6 +563,9 @@ void MainWindow::reapplyChromeTheme()
     }
 
     const QScopedValueRollback<bool> guard(m_reapplyingChromeTheme, true);
+#ifdef Q_OS_WIN
+    applyWindowsMenuColors(this);
+#endif
     applyEditorSplitterStyle(ui->editorSplitter);
     applyMainWindowSeparatorStyle(this);
     ui->statusbar->reapplyTheme();

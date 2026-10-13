@@ -183,6 +183,23 @@ struct RoleColors
 // of an index-ordered array) lets the compiler flag missing roles.
 inline RoleColors roleColors(ColorRole role)
 {
+#ifdef Q_OS_WIN
+    // Settings use the existing menu/editor chrome on Windows. Other platforms
+    // retain their original preferences palette below.
+    switch (role)
+    {
+    case ColorRole::PrefWindowBg: case ColorRole::PrefInputBg:
+        role = ColorRole::TopBarPopupBg; break;
+    case ColorRole::PrefPanelBg: role = ColorRole::ChromeBackground; break;
+    case ColorRole::PrefBorder: role = ColorRole::TopBarBorder; break;
+    case ColorRole::PrefText: role = ColorRole::FileTreeText; break;
+    case ColorRole::PrefMutedText: role = ColorRole::TopBarText; break;
+    case ColorRole::PrefHoverBg: role = ColorRole::TopBarHoverBg; break;
+    case ColorRole::PrefPressedBg:
+        return {qRgb(0xe8,0xef,0xfa), qRgb(0x3b,0x47,0x58)};
+    default: break;
+    }
+#endif
     switch (role)
     {
     case ColorRole::EditorMarginFg:          return {qRgb(0x66,0x66,0x66), qRgb(0x85,0x85,0x85)};

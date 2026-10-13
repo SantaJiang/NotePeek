@@ -216,7 +216,7 @@ void FileExplorerDock::reapplyTheme()
     // Keep the view's semantic palette roles owned by one styling mechanism.
     // Combining setPalette() with setStyleSheet() lets a repolish restore the
     // previous scheme's explicitly resolved text roles on some platforms.
-    const QString styleSheet = QStringLiteral(
+    QString styleSheet = QStringLiteral(
                                   "QTreeView {"
                                   "  background-color: %1;"
                                   "  color: %2;"
@@ -244,6 +244,10 @@ void FileExplorerDock::reapplyTheme()
                                        hoverBg().name(QColor::HexRgb),
                                        selectionBg().name(QColor::HexRgb),
                                        selectionText().name(QColor::HexRgb));
+#ifdef Q_OS_WIN
+    styleSheet += QStringLiteral("QTreeView { border-top: 1px solid %1; }")
+                      .arg(ThemeColors::EditorTopBar::border().name(QColor::HexRgb));
+#endif
     if (m_treeView->styleSheet() != styleSheet)
     {
         m_treeView->setStyleSheet(styleSheet);
