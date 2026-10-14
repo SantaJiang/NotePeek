@@ -6,6 +6,7 @@
 #include <QGuiApplication>
 #include <QtGlobal>
 #include <NotePeek/syntaxstyler.h>
+#include "platform/platformstyle.h"
 
 #if QT_VERSION >= QT_VERSION_CHECK(6, 5, 0)
 #include <QStyleHints>
@@ -181,25 +182,8 @@ struct RoleColors
 
 // The single source of truth for every themable colour. The switch (instead
 // of an index-ordered array) lets the compiler flag missing roles.
-inline RoleColors roleColors(ColorRole role)
+inline RoleColors defaultRoleColors(ColorRole role)
 {
-#ifdef Q_OS_WIN
-    // Settings use the existing menu/editor chrome on Windows. Other platforms
-    // retain their original preferences palette below.
-    switch (role)
-    {
-    case ColorRole::PrefWindowBg: case ColorRole::PrefInputBg:
-        role = ColorRole::TopBarPopupBg; break;
-    case ColorRole::PrefPanelBg: role = ColorRole::ChromeBackground; break;
-    case ColorRole::PrefBorder: role = ColorRole::TopBarBorder; break;
-    case ColorRole::PrefText: role = ColorRole::FileTreeText; break;
-    case ColorRole::PrefMutedText: role = ColorRole::TopBarText; break;
-    case ColorRole::PrefHoverBg: role = ColorRole::TopBarHoverBg; break;
-    case ColorRole::PrefPressedBg:
-        return {qRgb(0xe8,0xef,0xfa), qRgb(0x3b,0x47,0x58)};
-    default: break;
-    }
-#endif
     switch (role)
     {
     case ColorRole::EditorMarginFg:          return {qRgb(0x66,0x66,0x66), qRgb(0x85,0x85,0x85)};
@@ -295,6 +279,11 @@ inline RoleColors roleColors(ColorRole role)
     case ColorRole::MarkdownLinkFg:          return {qRgb(0x09,0x69,0xda), qRgb(0x58,0xa6,0xff)};
     }
     return {qRgb(0x00,0x00,0x00), qRgb(0xff,0xff,0xff)};
+}
+
+inline RoleColors roleColors(ColorRole role)
+{
+    return PlatformStyle::current().roleColors(role);
 }
 
 inline QColor color(ColorRole role)

@@ -2,6 +2,7 @@
 
 #include "foundation/documentpath.h"
 #include "themecolors.h"
+#include "platform/platformstyle.h"
 #include "widgets/filetreeview.h"
 #include "widgets/filetypefilterproxymodel.h"
 
@@ -244,10 +245,7 @@ void FileExplorerDock::reapplyTheme()
                                        hoverBg().name(QColor::HexRgb),
                                        selectionBg().name(QColor::HexRgb),
                                        selectionText().name(QColor::HexRgb));
-#ifdef Q_OS_WIN
-    styleSheet += QStringLiteral("QTreeView { border-top: 1px solid %1; }")
-                      .arg(ThemeColors::EditorTopBar::border().name(QColor::HexRgb));
-#endif
+    styleSheet += PlatformStyle::current().fileTreeOverrides();
     if (m_treeView->styleSheet() != styleSheet)
     {
         m_treeView->setStyleSheet(styleSheet);

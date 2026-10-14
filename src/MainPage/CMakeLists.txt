@@ -43,6 +43,8 @@ add_library(notepeek_core STATIC
     tool/markdown/markdownpreviewer.cpp
     tool/markdown/markdownpreviewer.h
     themecolors.h
+    platform/platformstyle.h
+    platform/platformstyle.cpp
     versioncontrol/gitcommandrunner.cpp
     versioncontrol/gitcommandrunner.h
     versioncontrol/gitexecutable.cpp
@@ -53,6 +55,18 @@ add_library(notepeek_core STATIC
     versioncontrol/gitstatusparser.h
     versioncontrol/gittypes.h
 )
+
+# Keep native headers and system APIs out of every other platform's build.
+if(WIN32)
+    target_sources(notepeek_core PRIVATE platform/windowsplatformstyle.cpp)
+    target_link_libraries(notepeek_core PRIVATE user32)
+elseif(APPLE)
+    target_sources(notepeek_core PRIVATE platform/macosplatformstyle.cpp)
+elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    target_sources(notepeek_core PRIVATE platform/linuxplatformstyle.cpp)
+else()
+    target_sources(notepeek_core PRIVATE platform/genericplatformstyle.cpp)
+endif()
 
 target_link_libraries(notepeek_core PUBLIC
     notepeek_foundation

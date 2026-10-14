@@ -4,7 +4,7 @@
 #include <QApplication>
 #include <QTranslator>
 #include <QDebug>
-#include <QStyleFactory>
+#include "platform/platformstyle.h"
 #include <QFontDatabase>
 #include <QEvent>
 #include <QFileOpenEvent>
@@ -62,19 +62,7 @@ int main(int argc, char *argv[])
                                       QStringLiteral("[files...]"));
     commandLine.process(a);
 
-    //style
-#ifdef Q_OS_WIN
-    if (QStyle *style = QStyleFactory::create("Fusion"))
-        a.setStyle(style);
-#elif defined(Q_OS_MAC)
-    if (QStyle *style = QStyleFactory::create("Fusion"))
-        a.setStyle(style);
-#elif defined(Q_OS_LINUX)
-    if (QStyle *style = QStyleFactory::create("Fusion"))
-        a.setStyle(style);
-#else
-    qDebug() << "Running on unknown platform";
-#endif
+    PlatformStyle::current().initializeApplication(a);
 
     //font — install the bundled families so they are available as editor fonts
     //regardless of what the host system ships.

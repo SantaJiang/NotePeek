@@ -189,3 +189,16 @@ if(Python3_Interpreter_FOUND)
                 --root ${CMAKE_SOURCE_DIR}
     )
 endif()
+
+add_executable(notepeek_platformstyle_test
+    platformstyle_test.cpp
+)
+target_link_libraries(notepeek_platformstyle_test PRIVATE
+    notepeek_core
+    Qt6::Test
+)
+notepeek_configure_project_target(notepeek_platformstyle_test)
+add_test(NAME notepeek_platformstyle_test COMMAND notepeek_platformstyle_test)
+set_tests_properties(notepeek_platformstyle_test PROPERTIES
+    ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
+)

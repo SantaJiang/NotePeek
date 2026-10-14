@@ -2,6 +2,7 @@
 
 #include "apppreferences.h"
 #include "themecolors.h"
+#include "platform/platformstyle.h"
 #include <NotePeek/syntaxtheme.h>
 
 #include <QAbstractItemView>
@@ -347,14 +348,7 @@ QString preferencesStyleSheet()
              accent().name(QColor::HexRgb),
              accentText().name(QColor::HexRgb),
              accentPressed().name(QColor::HexRgb));
-#ifdef Q_OS_WIN
-    styleSheet += QStringLiteral(
-        "QLineEdit#settingsSearch, QPushButton, QListWidget#sectionList::item { border-radius:0; }"
-        "QListWidget#sectionList::item:selected { background-color:%1; color:%2; }"
-        "QAbstractItemView { selection-background-color:%1; selection-color:%2; }"
-        "QAbstractItemView::item:selected { background-color:%1; color:%2; }")
-        .arg(pressedBg().name(QColor::HexRgb), text().name(QColor::HexRgb));
-#endif
+    styleSheet += PlatformStyle::current().preferencesOverrides();
     return styleSheet;
 }
 
@@ -675,13 +669,9 @@ void PreferencesDialog::scheduleThemeRefresh()
 void PreferencesDialog::reapplyTheme()
 {
     polishDialogPalette(this);
-#ifdef Q_OS_WIN
     const QString styleSheet = preferencesStyleSheet();
     if (this->styleSheet() != styleSheet)
         setStyleSheet(styleSheet);
-#else
-    setStyleSheet(preferencesStyleSheet());
-#endif
 }
 
 void PreferencesDialog::populateSyntaxThemeCombos()
