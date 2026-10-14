@@ -1349,6 +1349,21 @@ private slots:
         QVERIFY(dialog.height() <= 320);
         QCOMPARE(search->width(), sections->viewport()->width());
 
+#ifdef Q_OS_LINUX
+        // Check real row geometry: a stylesheet string can be present while
+        // the native delegate still produces cramped rows.
+        for (int row = 0; row < sections->count(); ++row)
+        {
+            const QRect itemRect = sections->visualItemRect(sections->item(row));
+            QVERIFY(itemRect.height() >= 36);
+            if (row > 0)
+            {
+                const QRect previousRect = sections->visualItemRect(sections->item(row - 1));
+                QVERIFY(itemRect.top() - previousRect.bottom() - 1 >= 8);
+            }
+        }
+#endif
+
         // Editor is no longer the first page. Show it before measuring its
         // title against the font rows, which only have a layout once visible.
         sections->setCurrentRow(1);

@@ -411,6 +411,7 @@ PreferencesDialog::PreferencesDialog(QWidget *parent)
     m_sectionList->setUniformItemSizes(true);
     m_sectionList->setFocusPolicy(Qt::StrongFocus);
     m_sectionList->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    PlatformStyle::current().configurePreferencesSidebar(m_sectionList);
 
     auto *editorSection = makeSection(tr("Editor"), this);
     auto *editorLayout = qobject_cast<QVBoxLayout *>(editorSection->layout());

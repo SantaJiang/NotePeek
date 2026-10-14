@@ -58,6 +58,9 @@ private slots:
             expected = i == 7
                 ? ThemeColors::RoleColors{qRgb(0xe8, 0xef, 0xfa), qRgb(0x3b, 0x47, 0x58)}
                 : ThemeColors::defaultRoleColors(chrome[i]);
+#elif defined(Q_OS_LINUX)
+            if (preferences[i] == ColorRole::PrefWindowBg)
+                expected = {qRgb(0xff, 0xff, 0xff), qRgb(0x26, 0x26, 0x26)};
 #endif
             const auto actual = style.roleColors(preferences[i]);
             QCOMPARE(actual.light, expected.light);

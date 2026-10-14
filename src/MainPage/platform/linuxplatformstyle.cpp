@@ -4,8 +4,25 @@
 
 #include <QMainWindow>
 #include <QMenuBar>
+#include <QListWidget>
+#include <QStyledItemDelegate>
 
 namespace {
+
+class PreferencesSidebarDelegate final : public QStyledItemDelegate
+{
+public:
+    using QStyledItemDelegate::QStyledItemDelegate;
+
+    QSize sizeHint(const QStyleOptionViewItem &option, const QModelIndex &index) const override
+    {
+        QSize size = QStyledItemDelegate::sizeHint(option, index);
+        // List rows need an explicit height; stylesheet padding alone does
+        // not reliably expand QListWidget's item geometry on Linux.
+        size.setHeight(qMax(size.height(), qMax(36, option.fontMetrics.height() + 16)));
+        return size;
+    }
+};
 
 class LinuxPlatformStyle final : public PlatformStyle
 {
@@ -30,6 +47,21 @@ public:
         QMenuBar *menuBar = window->menuBar();
         if (menuBar->styleSheet() != styleSheet)
             menuBar->setStyleSheet(styleSheet);
+    }
+
+    ThemeColors::RoleColors roleColors(ThemeColors::ColorRole role) const override
+    {
+        if (role == ThemeColors::ColorRole::PrefWindowBg)
+            return {qRgb(0xff, 0xff, 0xff), qRgb(0x26, 0x26, 0x26)};
+        return PlatformStyle::roleColors(role);
+    }
+
+    void configurePreferencesSidebar(QListWidget *sidebar) const override
+    {
+        if (!sidebar)
+            return;
+        sidebar->setSpacing(4);
+        sidebar->setItemDelegate(new PreferencesSidebarDelegate(sidebar));
     }
 };
 

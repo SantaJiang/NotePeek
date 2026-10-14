@@ -77,6 +77,10 @@ ThemeColors::RoleColors PlatformStyle::roleColors(ThemeColors::ColorRole role) c
     return ThemeColors::defaultRoleColors(role);
 }
 
+void PlatformStyle::configurePreferencesSidebar(QListWidget *) const
+{
+}
+
 QString PlatformStyle::preferencesOverrides() const
 {
     return {};

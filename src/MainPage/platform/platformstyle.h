@@ -4,6 +4,7 @@
 #include <QString>
 
 class QApplication;
+class QListWidget;
 class QMainWindow;
 class QSplitter;
 
@@ -22,6 +23,7 @@ public:
 
     virtual void initializeApplication(QApplication &application) const;
     virtual void applyMainWindow(QMainWindow *window, QSplitter *splitter) const;
+    virtual void configurePreferencesSidebar(QListWidget *sidebar) const;
     virtual ThemeColors::RoleColors roleColors(ThemeColors::ColorRole role) const;
     virtual QString preferencesOverrides() const;
     virtual QString fileTreeOverrides() const;
