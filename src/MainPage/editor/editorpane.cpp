@@ -144,7 +144,7 @@ EditorPane::EditorPane(QWidget *parent)
     tabShortcut->setContext(Qt::WidgetWithChildrenShortcut);
     connect(tabShortcut, &QShortcut::activated, this, &EditorPane::showEditorSwitchPopup);
 
-#ifdef Q_OS_MAC
+#ifdef Q_OS_MACOS
     // Cmd+Tab is taken by the system on macOS; offer Option+Tab as well.
     auto *tabShortcutMac = new QShortcut(QKeySequence(Qt::ALT | Qt::Key_Tab), this);
     tabShortcutMac->setContext(Qt::WidgetWithChildrenShortcut);

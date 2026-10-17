@@ -107,7 +107,7 @@ QString AppPreferences::defaultCodeFontFamily()
 {
 #if defined(Q_OS_WIN)
     const QString platformFallback = QStringLiteral("Consolas");
-#elif defined(Q_OS_MAC)
+#elif defined(Q_OS_MACOS)
     const QString platformFallback = QStringLiteral("Menlo");
 #else
     const QString platformFallback = QStringLiteral("Noto Sans Mono");
@@ -126,7 +126,7 @@ QString AppPreferences::defaultTextFontFamily()
 
 int AppPreferences::defaultFontSize()
 {
-#if defined(Q_OS_MAC)
+#if defined(Q_OS_MACOS)
     return 12;
 #else
     return 10;
