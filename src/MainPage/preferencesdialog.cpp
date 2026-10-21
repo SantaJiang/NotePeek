@@ -577,10 +577,7 @@ PreferencesDialog::PreferencesDialog(QWidget *parent)
     layout->setSpacing(0);
     layout->addLayout(bodyLayout);
 
-    // Keep the compact default while allowing larger fonts and translations
-    // to request more space.
-    setMinimumWidth(kDialogWidth);
-    resize(kDialogWidth, kDialogHeight);
+    setFixedSize(kDialogWidth, kDialogHeight);
 
     loadFromPreferences();
     connectLiveUpdates();
