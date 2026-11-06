@@ -606,7 +606,7 @@ void MainWindow::on_action_about_triggered()
                              .arg(QApplication::applicationDisplayName(),
                                   QApplication::applicationVersion(),
                                   "Copyright © 2026 Santa.",
-                                  tr("For Yueyue")),
+                                  QStringLiteral("Made for 玥玥宝宝")),
                          QMessageBox::Ok,
                          this);
     const QIcon appIcon(QStringLiteral(":/resource/notepeek.svg"));
