@@ -255,6 +255,28 @@ elseif(APPLE)
         ${CMAKE_SOURCE_DIR}/THIRD_PARTY_NOTICES.md
         ${CMAKE_SOURCE_DIR}/docs/dependency-policy.md
     )
+    execute_process(
+      COMMAND xcrun --sdk macosx --show-sdk-version
+      OUTPUT_VARIABLE macos_sdk_version
+      OUTPUT_STRIP_TRAILING_WHITESPACE
+    )
+    if(macos_sdk_version VERSION_GREATER_EQUAL "26.0")
+      set(app_icon_source "${CMAKE_CURRENT_SOURCE_DIR}/resource/AppIcon.icon")
+      set(app_icon_output "${CMAKE_CURRENT_BINARY_DIR}/macos-icon")
+      set(app_icon_catalog "${app_icon_output}/Assets.car")
+      add_custom_command(
+        OUTPUT "${app_icon_catalog}"
+        COMMAND "${CMAKE_COMMAND}" -E make_directory "${app_icon_output}"
+        COMMAND xcrun actool --compile "${app_icon_output}" --platform macosx
+                --minimum-deployment-target 13.0 --app-icon AppIcon
+                --output-partial-info-plist "${app_icon_output}/Info.plist"
+                "${app_icon_source}"
+        DEPENDS "${app_icon_source}/icon.json" "${app_icon_source}/Assets/Mark.svg"
+        VERBATIM
+      )
+      set_source_files_properties("${app_icon_catalog}" PROPERTIES MACOSX_PACKAGE_LOCATION Resources)
+      target_sources(notepeek PRIVATE "${app_icon_catalog}")
+    endif()
 elseif(UNIX)
     set_target_properties(notepeek PROPERTIES
         BUILD_RPATH "${CMAKE_BINARY_DIR}/src/QScintilla"

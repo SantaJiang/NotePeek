@@ -8,6 +8,8 @@
     <string>en</string>
     <key>CFBundleExecutable</key>
     <string>NotePeek</string>
+    <key>CFBundleIconName</key>
+    <string>AppIcon</string>
     <key>CFBundleIconFile</key>
     <string>notepeek.icns</string>
     <key>CFBundleIdentifier</key>
