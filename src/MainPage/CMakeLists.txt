@@ -273,6 +273,7 @@ elseif(APPLE)
                 "${app_icon_source}"
         DEPENDS "${app_icon_source}/icon.json" "${app_icon_source}/Assets/Mark.svg"
                 "${app_icon_source}/Assets/Default.png"
+                "${app_icon_source}/Assets/Dark.png"
         VERBATIM
       )
       set_source_files_properties("${app_icon_catalog}" PROPERTIES MACOSX_PACKAGE_LOCATION Resources)
