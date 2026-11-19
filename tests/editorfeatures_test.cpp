@@ -927,6 +927,101 @@ private slots:
         prefs.setUntitledUsesCodeMode(originalMode);
     }
 
+    void wrapsCjkTextInsideUnspacedRuns()
+    {
+        // Word wrap only breaks at spaces, so one run of Chinese text used to move
+        // to the next line whole and leave the rest of the line empty no matter how
+        // wide the window was. CJK character boundaries must be wrap opportunities.
+        CustomEditor editor;
+        editor.setWrapMode(CustomEditor::WrapWord);
+        // Every editor NotePeek opens is UTF-8; the wrap rule is scoped to it.
+        editor.setUtf8(true);
+
+        const QString prefix = QStringLiteral("x ");
+        const QString cjkRun = QString(80, QChar(0x4E2D));
+        editor.setText(prefix + cjkRun);
+        editor.resize(300, 200);
+        editor.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&editor));
+        QCoreApplication::processEvents();
+
+        const long lineHeight = editor.SendScintilla(QsciScintillaBase::SCI_TEXTHEIGHT, 0L);
+        QVERIFY(lineHeight > 0);
+        const long cjkRunLines = editor.SendScintilla(QsciScintillaBase::SCI_VISIBLEFROMDOCLINE, 1L)
+                               - editor.SendScintilla(QsciScintillaBase::SCI_VISIBLEFROMDOCLINE, 0L);
+        QVERIFY2(cjkRunLines > 1, "the long CJK run has to wrap at this width");
+
+        const long breakByte = editor.SendScintilla(QsciScintillaBase::SCI_POSITIONFROMPOINT,
+                                                    0UL, lineHeight + lineHeight / 2);
+        // The prefix takes two bytes: breaking there leaves the first line empty.
+        // At least five CJK characters (three bytes each) have to fit on it instead.
+        QVERIFY2(breakByte > prefix.toUtf8().size() + 5 * 3,
+                 qPrintable(QStringLiteral("wrapped after byte %1").arg(breakByte)));
+
+        // The break may not split a character: decoding the first line must be lossless.
+        const QByteArray bytes = (prefix + cjkRun).toUtf8();
+        QCOMPARE(QString::fromUtf8(bytes.left(static_cast<int>(breakByte))).toUtf8().size(),
+                 static_cast<int>(breakByte));
+
+        // A wrapped line may not start with closing punctuation or with a mark that
+        // attaches to the character before it.
+        const auto verifyLineStarts = [&](const QString &text, const QString &forbidden,
+                                          const QString &label, int width) {
+            editor.resize(width, 200);
+            editor.setText(text);
+            QCoreApplication::processEvents();
+            const QByteArray sampleBytes = text.toUtf8();
+            const long lines =
+                editor.SendScintilla(QsciScintillaBase::SCI_VISIBLEFROMDOCLINE, 1L)
+                - editor.SendScintilla(QsciScintillaBase::SCI_VISIBLEFROMDOCLINE, 0L);
+            QVERIFY2(lines > 1, qPrintable(label + QStringLiteral(" has to wrap at this width")));
+            for (long line = 1; line < lines; ++line) {
+                const long start = editor.SendScintilla(QsciScintillaBase::SCI_POSITIONFROMPOINT,
+                                                        0UL, lineHeight * line + lineHeight / 2);
+                const QString rest = QString::fromUtf8(sampleBytes.mid(static_cast<int>(start)));
+                QVERIFY2(!rest.isEmpty(),
+                         qPrintable(label + QStringLiteral(" line %1 starts past the end of the text")
+                                               .arg(line)));
+                QVERIFY2(!forbidden.contains(rest.at(0)),
+                         qPrintable(label + QStringLiteral(" line %1 starts with '%2'")
+                                               .arg(line).arg(rest.at(0))));
+            }
+        };
+
+        verifyLineStarts(QStringLiteral("中文，").repeated(40), QStringLiteral("，"),
+                         QStringLiteral("CJK prose"), 300);
+        // Mixed Latin and CJK text also wraps beside ASCII punctuation: the closing
+        // half of a pair may not start a line at any width.
+        const QString mixedText = QStringLiteral("中文“引号”NotePeek(测试)，").repeated(12);
+        for (int width = 300; width <= 420; width += 14) {
+            verifyLineStarts(mixedText, QStringLiteral(")，”"),
+                             QStringLiteral("mixed text at %1 px").arg(width), width);
+        }
+        // A variation selector belongs to the character it follows; the second one
+        // is outside the BMP, which exercises the four-byte UTF-8 path.
+        verifyLineStarts(QStringLiteral("中文\uFE0F文\U000E0100文").repeated(12),
+                         QStringLiteral("\uFE0F\U000E0100"),
+                         QStringLiteral("text with variation selectors"), 300);
+
+        // ASCII text keeps breaking at spaces: the CJK rule must not touch it.
+        editor.resize(300, 200);
+        const QString asciiText = QStringLiteral("alpha bravo charlie delta echo foxtrot golf ")
+                                      .repeated(6);
+        editor.setText(asciiText);
+        QCoreApplication::processEvents();
+        const QByteArray asciiBytes = asciiText.toUtf8();
+        const long asciiLines =
+            editor.SendScintilla(QsciScintillaBase::SCI_VISIBLEFROMDOCLINE, 1L)
+            - editor.SendScintilla(QsciScintillaBase::SCI_VISIBLEFROMDOCLINE, 0L);
+        QVERIFY2(asciiLines > 1, "the ASCII sample has to wrap at this width");
+        for (long line = 1; line < asciiLines; ++line) {
+            const long start = editor.SendScintilla(QsciScintillaBase::SCI_POSITIONFROMPOINT,
+                                                    0UL, lineHeight * line + lineHeight / 2);
+            QVERIFY2(start > 0 && asciiBytes.at(static_cast<int>(start) - 1) == ' ',
+                     qPrintable(QStringLiteral("line %1 breaks inside a word").arg(line)));
+        }
+    }
+
     void togglesCurrentCodeFold()
     {
         EditorManager manager;

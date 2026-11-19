@@ -64,6 +64,186 @@ static inline bool IsControlCharacter(int ch) {
 	return ch >= 0 && ch < ' ';
 }
 
+// NotePeek: word wrap for scripts that do not separate words with spaces.
+// Word wrap only breaks at whitespace and style changes, so a run of Chinese,
+// Japanese or Korean text counts as one unbreakable word: when it does not fit
+// in the space left on the current line it moves to the next line whole leaving
+// a large ragged gap, and widening the window only helps once the whole run fits
+// after the previous break. These helpers allow a break between neighbouring
+// characters when either side is CJK, following the common subset of the Unicode
+// line breaking rules: never break before closing punctuation or before a mark
+// that attaches to the preceding character, and never break after opening
+// punctuation or after a no-break space.
+
+namespace {
+
+constexpr bool InRange(int value, int first, int last) noexcept {
+	return (value >= first) && (value <= last);
+}
+
+bool IsCjkCharacter(int codePoint) noexcept {
+	return InRange(codePoint, 0x1100, 0x11FF)	// Hangul Jamo
+		|| InRange(codePoint, 0x2E80, 0x303F)	// CJK radicals, symbols and punctuation
+		|| InRange(codePoint, 0x3040, 0x30FF)	// Hiragana and Katakana
+		|| InRange(codePoint, 0x3130, 0x318F)	// Hangul compatibility Jamo
+		|| InRange(codePoint, 0x31F0, 0x31FF)	// Katakana phonetic extensions
+		|| InRange(codePoint, 0x3400, 0x4DBF)	// CJK unified ideographs extension A
+		|| InRange(codePoint, 0x4E00, 0x9FFF)	// CJK unified ideographs
+		|| InRange(codePoint, 0xA960, 0xA97F)	// Hangul Jamo extended A
+		|| InRange(codePoint, 0xAC00, 0xD7FF)	// Hangul syllables
+		|| InRange(codePoint, 0xF900, 0xFAFF)	// CJK compatibility ideographs
+		|| InRange(codePoint, 0xFE30, 0xFE4F)	// CJK compatibility forms
+		|| InRange(codePoint, 0xFF00, 0xFFEF)	// Halfwidth and fullwidth forms
+		|| InRange(codePoint, 0x20000, 0x3FFFF);	// Ideographs beyond the BMP
+}
+
+// Marks that modify the character before them instead of standing on their own.
+// A line may not start with one: it would be drawn on a character that is not
+// there, which is invisible for a variation selector and a stray accent for a
+// combining mark.
+bool IsAttachedMark(int codePoint) noexcept {
+	return InRange(codePoint, 0x0300, 0x036F)	// Combining diacritical marks
+		|| InRange(codePoint, 0x0483, 0x0489)	// Cyrillic combining marks
+		|| InRange(codePoint, 0x1AB0, 0x1AFF)	// Combining diacritical marks extended
+		|| InRange(codePoint, 0x1DC0, 0x1DFF)	// Combining diacritical marks supplement
+		|| InRange(codePoint, 0x20D0, 0x20F0)	// Combining marks for symbols
+		|| InRange(codePoint, 0xFE00, 0xFE0F)	// Variation selectors
+		|| InRange(codePoint, 0xFE20, 0xFE2F)	// Combining half marks
+		|| InRange(codePoint, 0x1F3FB, 0x1F3FF)	// Emoji skin tone modifiers
+		|| InRange(codePoint, 0xE0100, 0xE01EF)	// Variation selectors supplement
+		|| codePoint == 0x200D;	// Zero width joiner
+}
+
+// Characters that may not begin a line: closing punctuation, small kana and
+// attached marks. Full-width forms carry most CJK punctuation, but text that
+// mixes Latin and CJK also wraps next to ASCII punctuation, where a line should
+// not start with the closing half of a pair, a full stop or an apostrophe.
+bool MayNotStartLine(int codePoint) noexcept {
+	switch (codePoint) {
+	case 0x00A0: case 0x3000: case 0x3001: case 0x3002: case 0x3005: case 0x3009:
+	case 0x300B: case 0x300D: case 0x300F: case 0x3011: case 0x3015: case 0x3017:
+	case 0x3019: case 0x301B: case 0x301E: case 0x301F: case 0x303B:
+	case 0x3041: case 0x3043: case 0x3045: case 0x3047: case 0x3049:
+	case 0x3063: case 0x3083: case 0x3085: case 0x3087: case 0x308E:
+	case 0x3095: case 0x3096: case 0x309B: case 0x309C: case 0x30A1:
+	case 0x30A3: case 0x30A5: case 0x30A7: case 0x30A9: case 0x30C3:
+	case 0x30E3: case 0x30E5: case 0x30E7: case 0x30EE: case 0x30F5:
+	case 0x30F6: case 0x30FB: case 0x30FC: case 0x30FD: case 0x30FE:
+	case 0xFF01: case 0xFF09: case 0xFF0C: case 0xFF0E: case 0xFF1A:
+	case 0xFF1B: case 0xFF1F: case 0xFF3D: case 0xFF5D: case 0xFF60:
+	case 0xFF61: case 0xFF63: case 0xFF64: case 0xFF65: case 0xFF67:
+	case 0xFF68: case 0xFF69: case 0xFF6A: case 0xFF6B: case 0xFF6C:
+	case 0xFF6D: case 0xFF6E: case 0xFF6F: case 0xFF70: case 0xFF9E:
+	case 0xFF9F: case 0xFFE0:
+	case 0x2013: case 0x2014: case 0x2019: case 0x201D: case 0x2026:	// Dashes, closing quotes, ellipsis
+	case ')': case ']': case '}': case ',': case '.': case ':': case ';':
+	case '!': case '?': case '%': case '\'': case '"':
+		return true;
+	default:
+		return IsAttachedMark(codePoint);
+	}
+}
+
+// Characters that may not end a line: opening punctuation, and the no-break
+// space, which holds the text on both of its sides together.
+bool MayNotEndLine(int codePoint) noexcept {
+	switch (codePoint) {
+	case 0x00A0: case 0x3008: case 0x300A: case 0x300C: case 0x300E: case 0x3010:
+	case 0x3014: case 0x3016: case 0x3018: case 0x301A: case 0x301D:
+	case 0xFF08: case 0xFF3B: case 0xFF5B: case 0xFF5F: case 0xFF62:
+	case 0x2018: case 0x201C:	// Opening quotes
+	case '(': case '[': case '{':
+		return true;
+	default:
+		return false;
+	}
+}
+
+bool IsHangulJamo(int codePoint) noexcept {
+	return InRange(codePoint, 0x1100, 0x11FF)	// Hangul Jamo
+		|| InRange(codePoint, 0xA960, 0xA97F)	// Hangul Jamo extended A
+		|| InRange(codePoint, 0xD7B0, 0xD7FF);	// Hangul Jamo extended B
+}
+
+// Offset of the character preceding p, which must be a character boundary.
+Sci::Position CharacterStartBefore(const char *chars, Sci::Position p) noexcept {
+	Sci::Position start = p - 1;
+	// A UTF-8 character is at most four bytes, so this stops at its lead byte.
+	while ((start > 0) && UTF8IsTrailByte(static_cast<unsigned char>(chars[start]))) {
+		start--;
+	}
+	return start;
+}
+
+// Decodes the UTF-8 character at start and reports where the next one begins.
+int CodePointAt(const char *chars, Sci::Position start, Sci::Position end, Sci::Position &next) noexcept {
+	const unsigned char lead = static_cast<unsigned char>(chars[start]);
+	int codePoint = lead;
+	int continuation = 0;
+	if (lead >= 0xF0) {
+		codePoint = lead & 0x07;
+		continuation = 3;
+	} else if (lead >= 0xE0) {
+		codePoint = lead & 0x0F;
+		continuation = 2;
+	} else if (lead >= 0xC0) {
+		codePoint = lead & 0x1F;
+		continuation = 1;
+	}
+	if (start + continuation >= end) {
+		next = start + 1;
+		return lead;
+	}
+	for (int i = 1; i <= continuation; i++) {
+		const unsigned char trail = static_cast<unsigned char>(chars[start + i]);
+		if (!UTF8IsTrailByte(trail)) {
+			next = start + 1;
+			return lead;
+		}
+		codePoint = (codePoint << 6) | (trail & 0x3F);
+	}
+	next = start + 1 + continuation;
+	return codePoint;
+}
+
+// True when a line break is allowed between the character before p and the one at p.
+bool IsCjkWrapOpportunity(const LineLayout *ll, Sci::Position p) noexcept {
+	if (!ll || p <= 0 || p >= ll->numCharsInLine) {
+		return false;
+	}
+	const char *chars = ll->chars.get();
+	if (IsASCII(chars[p]) && IsASCII(chars[p - 1])) {
+		// Two single-byte characters: no CJK involved, and the whitespace and
+		// style-change rules were tested by the caller already.
+		return false;
+	}
+	// Only character boundaries are legal wrap points: splitting a UTF-8
+	// continuation byte would cut a character in half.
+	if (UTF8IsTrailByte(static_cast<unsigned char>(chars[p]))) {
+		return false;
+	}
+	Sci::Position ignored = 0;
+	const int following = CodePointAt(chars, p, ll->numCharsInLine, ignored);
+	if (IsSpaceOrTab(following)) {
+		return false;
+	}
+	const int preceding = CodePointAt(chars, CharacterStartBefore(chars, p), p, ignored);
+	if (IsSpaceOrTab(preceding)) {
+		return false;
+	}
+	if (!IsCjkCharacter(following) && !IsCjkCharacter(preceding)) {
+		return false;
+	}
+	if (IsHangulJamo(preceding) && IsHangulJamo(following)) {
+		// A decomposed Hangul syllable spans several jamo, which have to stay
+		// together to form one character.
+		return false;
+	}
+	return !MayNotStartLine(following) && !MayNotEndLine(preceding);
+}
+
+}	// namespace
+
 static bool IsMarkdownListMarkerPrefixBreak(const LineLayout *ll, Sci::Position p) {
 	if (!ll || p <= 0 || p >= ll->numCharsInLine) {
 		return false;
@@ -594,6 +774,9 @@ void EditView::LayoutLine(const EditModel &model, Sci::Line line, Surface *surfa
 			if ((vstyle.wrapVisualFlags & SC_WRAPVISUALFLAG_START) && (ll->wrapIndent < vstyle.aveCharWidth))
 				ll->wrapIndent = vstyle.aveCharWidth; // Indent to show start visual
 			ll->lines = 0;
+			// CJK prose has no spaces, so the character boundaries inside a CJK
+			// run are the only wrap opportunities such a line offers.
+			const bool utf8Document = model.pdoc->CodePage() == SC_CP_UTF8;
 			// Calculate line start positions based upon width.
 			Sci::Position lastGoodBreak = 0;
 			Sci::Position lastLineStart = 0;
@@ -633,6 +816,9 @@ void EditView::LayoutLine(const EditModel &model, Sci::Line line, Surface *surfa
 						lastGoodBreak = p;
 					} else if (IsSpaceOrTab(ll->chars[p - 1]) && !IsSpaceOrTab(ll->chars[p])
 						&& !IsMarkdownListMarkerPrefixBreak(ll, p)) {
+						lastGoodBreak = p;
+					} else if ((vstyle.wrapState == eWrapWord) && utf8Document
+						&& IsCjkWrapOpportunity(ll, p)) {
 						lastGoodBreak = p;
 					}
 				}

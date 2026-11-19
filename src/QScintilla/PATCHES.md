@@ -44,6 +44,20 @@ distributed under GNU GPL version 3.0 when they form part of QScintilla.
 
 - Centred line numbers in number margins used by NotePeek.
 - Prevented word wrapping from splitting Markdown list-marker prefixes.
+- Made CJK character boundaries wrap opportunities in `EditView::LayoutLine`.
+  Word wrap only breaks at whitespace and style changes, so a run of Chinese,
+  Japanese or Korean prose counted as one unbreakable word: when it did not fit
+  in the space left on the line it moved to the next line whole, leaving most of
+  that line empty, and widening the window did not help until the whole run fit
+  after the previous break. Breaks are now allowed between neighbouring
+  characters when either side is CJK, following the common subset of the Unicode
+  line breaking rules: never before closing punctuation (full-width or ASCII, so
+  mixed Latin/CJK text does not start a line with `)` or `.`), never before a
+  combining mark or variation selector that belongs to the character before it,
+  never between the jamo of a decomposed Hangul syllable, and never after
+  opening punctuation or a no-break space. The rule is only applied to UTF-8
+  documents, where the byte offsets used by the layout are character boundaries.
+  Pure-ASCII text and `SC_WRAP_WHITESPACE` or `SC_WRAP_CHAR` modes are unaffected.
 - Kept left and right text padding while extending caret-line backgrounds
   through that padding, including translucent highlights, so the highlight
   reaches both edges of the text area. Range invalidation includes the left
